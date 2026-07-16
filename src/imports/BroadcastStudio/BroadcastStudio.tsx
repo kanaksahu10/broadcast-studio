@@ -13,6 +13,7 @@ import TopbarSearch from '../TopbarSearch/TopbarSearch';
 import NotificationPanel from '../NotificationPanel-1/NotificationPanel-29-20200';
 import { useState, useRef, useEffect } from 'react';
 import kebabSvgPaths from '../Menus/svg-duzgfqtilr';
+import BroadcastStudioDashboard from './BroadcastStudioDashboard';
 
 interface GoalTemplate {
   id: string;
@@ -1380,7 +1381,7 @@ function Container({ goalTemplates }: { goalTemplates: GoalTemplate[] }) {
   };
 
   return (
-    <div className="absolute content-stretch flex flex-col gap-[12px] items-start left-[345px] right-[76px] top-[115px]" data-name="Container">
+    <div className="relative content-stretch flex flex-col gap-[12px] items-start w-full" data-name="Container">
       <Container1 selectedCount={selectedIds.size} onReassign={handleReassign} />
       <GoalTemplateTable
         goalTemplates={goalTemplates}
@@ -1810,35 +1811,23 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
         </div>
         <div aria-hidden="true" className="absolute border-[#e5e5e5] border-r border-solid inset-0 pointer-events-none" />
       </div>
-      {/* Breadcrumb toolbar — always visible in main content area */}
+      {/* Main content area: fixed breadcrumb toolbar + its own independent scroll region,
+          so content taller than the viewport scrolls instead of being clipped. */}
       <div className="absolute bg-[#f8f8f8] flex gap-[14px] h-[48px] items-center left-[329px] right-[60px] p-[16px] top-[59px] z-10" data-name="Toolbar">
         <MdArrowBack size={21} color="#27496D" />
-        <span className="font-['Montserrat',sans-serif] font-medium text-[15px] text-black leading-[15px]">Broadcast Studio</span>
+        <span className="font-['Montserrat',sans-serif] font-medium text-[15px] text-black leading-[15px]">
+          {expandedSection === 'agency' ? 'View Goals' : 'Broadcast Studio'}
+        </span>
       </div>
-      {expandedSection === 'agency' && (
-        <div
-          className="transition-opacity duration-200 ease-in-out"
-          style={{ opacity: 1 }}
-        >
-          <div className="absolute content-stretch flex gap-[14px] h-[48px] items-center left-[329px] right-[60px] p-[16px] top-[59px]" data-name="Toolbar">
-            <div className="relative shrink-0 size-[21px]" data-name="react-icons/md/MdArrowBack">
-              <svg className="absolute block inset-0 size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 32 32">
-                <g id="Vector" />
-              </svg>
-              <div className="absolute inset-[16.67%]" data-name="Vector">
-                <svg className="absolute block inset-0 size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 14 14">
-                  <path d={svgPaths.p11d8a500} fill="var(--fill-0, #27496D)" id="Vector" />
-                </svg>
-              </div>
-            </div>
-            <div className="flex flex-col font-['Montserrat',sans-serif] font-medium justify-center leading-[0] not-italic relative shrink-0 text-[15px] text-black whitespace-nowrap">
-              <p className="leading-[15px]">{`View Goals `}</p>
-            </div>
-          </div>
-          <Container goalTemplates={goalTemplates} />
+      <div className="absolute left-[329px] right-[60px] top-[107px] bottom-0 overflow-y-auto">
+        <div className="p-[16px]">
+          {expandedSection === 'agency' ? (
+            <Container goalTemplates={goalTemplates} />
+          ) : (
+            <BroadcastStudioDashboard />
+          )}
         </div>
-      )}
-
+      </div>
     </div>
   );
 }
