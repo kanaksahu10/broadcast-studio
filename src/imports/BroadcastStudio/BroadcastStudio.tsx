@@ -1468,7 +1468,7 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
                     <div className="bg-[#a3a3a3] h-[45px] relative shrink-0 w-[4px]" />
                     <div className="content-stretch flex gap-[9px] items-center relative shrink-0">
                       <RiTeamLine className="shrink-0 text-[#27496d]" size={23} />
-                      <p className="font-['Montserrat',sans-serif] font-bold leading-[20px] not-italic relative shrink-0 text-[#27496d] text-[14px] whitespace-nowrap">Agency Employees</p>
+                      <p className="font-['Montserrat',sans-serif] font-normal leading-[20px] not-italic relative shrink-0 text-[#27496d] text-[14px] whitespace-nowrap">Agency Employees</p>
                     </div>
                   </div>
                 </div>
