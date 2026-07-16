@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Broadcast Studio</title>
+
+<!-- Montserrat from Google Fonts (matches the Figma design intent) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" />
+
+<!-- Tailwind v4 browser CDN — scans DOM at runtime and emits utilities -->
+<script src="https://unpkg.com/@tailwindcss/browser@4.1.12"></script>
+
+<!-- Theme variables + base layer (lifted from src/styles/theme.css) -->
+<style type="text/tailwindcss">
+@import 'tailwindcss';
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground; }
+  html { font-size: var(--font-size); }
+  h1 { font-size: var(--text-2xl); font-weight: var(--font-weight-medium); line-height: 1.5; }
+  h2 { font-size: var(--text-xl); font-weight: var(--font-weight-medium); line-height: 1.5; }
+  h3 { font-size: var(--text-lg); font-weight: var(--font-weight-medium); line-height: 1.5; }
+  h4 { font-size: var(--text-base); font-weight: var(--font-weight-medium); line-height: 1.5; }
+  label, button { font-size: var(--text-base); font-weight: var(--font-weight-medium); line-height: 1.5; }
+  input { font-size: var(--text-base); font-weight: var(--font-weight-normal); line-height: 1.5; }
+}
+</style>
+
+<style>
+:root {
+  --font-size: 16px;
+  --background: #ffffff;
+  --foreground: oklch(0.145 0 0);
+  --card: #ffffff;
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #030213;
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0.0058 264.53);
+  --secondary-foreground: #030213;
+  --muted: #ececf0;
+  --muted-foreground: #717182;
+  --accent: #e9ebef;
+  --accent-foreground: #030213;
+  --destructive: #d4183d;
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.1);
+  --input: transparent;
+  --input-background: #f3f3f5;
+  --switch-background: #cbced4;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: #030213;
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+html, body { height: 100%; margin: 0; background: #ffffff; }
+#root { height: 100%; background: #ffffff; }
+
+/* Boot splash */
+#boot {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px; font-family: ui-sans-serif, system-ui, sans-serif;
+  color: #717182; background: #fff; z-index: 9999; transition: opacity .25s;
+}
+#boot.hide { opacity: 0; pointer-events: none; }
+.boot-spin {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid #ececf0; border-top-color: #030213;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.boot-status { font-size: 13px; }
+.boot-error {
+  max-width: 640px; margin-top: 8px; padding: 12px 16px;
+  background: #fef2f4; color: #b3133a; border: 1px solid #f5c4d0;
+  border-radius: 8px; font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+  white-space: pre-wrap; word-break: break-word;
+}
+</style>
+
+<!-- Import map for bare npm specifiers (consumed by blob: modules) -->
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1?dev=false",
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime?dev=false",
+    "react-dom": "https://esm.sh/react-dom@18.3.1?external=react&dev=false",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?external=react&dev=false",
+    "react-icons/fi": "https://esm.sh/react-icons@5.6.0/fi?external=react&dev=false",
+    "react-icons/bs": "https://esm.sh/react-icons@5.6.0/bs?external=react&dev=false",
+    "react-icons/ri": "https://esm.sh/react-icons@5.6.0/ri?external=react&dev=false",
+    "react-icons/bi": "https://esm.sh/react-icons@5.6.0/bi?external=react&dev=false",
+    "react-icons/gr": "https://esm.sh/react-icons@5.6.0/gr?external=react&dev=false",
+    "react-icons/md": "https://esm.sh/react-icons@5.6.0/md?external=react&dev=false",
+    "react-icons/tb": "https://esm.sh/react-icons@5.6.0/tb?external=react&dev=false",
+    "react-icons/ai": "https://esm.sh/react-icons@5.6.0/ai?external=react&dev=false",
+    "react-icons/pi": "https://esm.sh/react-icons@5.6.0/pi?external=react&dev=false"
+  }
+}
+</script>
+
+<!-- Babel standalone (compiles .ts / .tsx in-browser) -->
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+        integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+        crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<div id="boot">
+  <div class="boot-spin"></div>
+  <div class="boot-status" id="boot-status">Booting…</div>
+  <div class="boot-error" id="boot-error" style="display:none"></div>
+</div>
+
+<script>
+(async () => {
+  const statusEl = document.getElementById('boot-status');
+  const errorEl  = document.getElementById('boot-error');
+  const bootEl   = document.getElementById('boot');
+  const setStatus = (s) => { statusEl.textContent = s; };
+  const fail = (e) => {
+    console.error(e);
+    statusEl.textContent = 'Failed to boot';
+    errorEl.style.display = 'block';
+    errorEl.textContent = (e && e.stack) ? e.stack : String(e);
+  };
+
+  try {
+    setStatus('Loading source modules…');
+
+    // ── Module loader ─────────────────────────────────────────────────────
+    const cache = new Map();             // absolute path -> blob URL
+    const inflight = new Map();          // absolute path -> promise
+    const IMG_RE = /\.(png|jpe?g|gif|webp|svg|ico)$/i;
+    const CSS_RE = /\.css$/i;
+    const HAS_EXT_RE = /\.[a-z0-9]+$/i;
+
+    function joinPath(base, rel) {
+      // Resolve `rel` against `base` (both absolute-ish paths).
+      // Use URL with a fake origin so we keep just the pathname.
+      const u = new URL(rel, 'http://x' + base);
+      return u.pathname;
+    }
+
+    async function probe(path) {
+      // Returns the first existing variant of `path` (trying extensions if missing).
+      if (HAS_EXT_RE.test(path)) {
+        return path;
+      }
+      for (const ext of ['.tsx', '.ts', '.js', '/index.tsx', '/index.ts', '/index.js']) {
+        const r = await fetch(path + ext, { method: 'HEAD' });
+        if (r.ok) return path + ext;
+      }
+      throw new Error('Cannot resolve module: ' + path);
+    }
+
+    async function loadModule(rawPath) {
+      // Normalise: drop query/hash, leading "./"
+      let path = rawPath.split('?')[0].split('#')[0];
+      if (cache.has(path)) return cache.get(path);
+      if (inflight.has(path)) return inflight.get(path);
+
+      const p = (async () => {
+        const realPath = await probe(path);
+        if (cache.has(realPath)) {
+          cache.set(path, cache.get(realPath));
+          return cache.get(realPath);
+        }
+
+        // Image: export the absolute URL as default.
+        if (IMG_RE.test(realPath)) {
+          const url = new URL(realPath, location.href).href;
+          const code = 'export default ' + JSON.stringify(url) + ';';
+          const blobUrl = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
+          cache.set(path, blobUrl);
+          cache.set(realPath, blobUrl);
+          return blobUrl;
+        }
+
+        // CSS: inject <link>, return empty module.
+        if (CSS_RE.test(realPath)) {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = realPath;
+          document.head.appendChild(link);
+          const code = 'export default {};';
+          const blobUrl = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
+          cache.set(path, blobUrl);
+          cache.set(realPath, blobUrl);
+          return blobUrl;
+        }
+
+        // TS / TSX / JS: fetch source, recursively resolve imports, rewrite, compile.
+        const res = await fetch(realPath, { cache: 'no-store' });
+        if (!res.ok) throw new Error('Failed to fetch ' + realPath + ' (' + res.status + ')');
+        let src = await res.text();
+
+        // Strip 'use client' directives — irrelevant outside Next.
+        src = src.replace(/^\s*["']use client["'];?\s*\n?/m, '');
+
+        // Collect import specifiers.
+        const specs = new Set();
+        const collectRe = /(?:^|[\s;])(?:import\s+(?:[^'"`]+?\s+from\s+)?|export\s+(?:\*|\{[^}]*\})\s+from\s+)(['"])([^'"]+)\1/g;
+        let m;
+        while ((m = collectRe.exec(src))) specs.add(m[2]);
+
+        // Resolve relative specs in parallel.
+        const dir = realPath.replace(/[^/]*$/, '');
+        const resolved = new Map();
+        await Promise.all([...specs].map(async (spec) => {
+          if (spec.startsWith('.') || spec.startsWith('/')) {
+            const abs = spec.startsWith('/') ? spec : joinPath(dir, spec);
+            const blobUrl = await loadModule(abs);
+            resolved.set(spec, blobUrl);
+          }
+          // bare specs stay as-is → resolved by import map
+        }));
+
+        // Rewrite relative specs to blob URLs.
+        src = src.replace(
+          /((?:import\s+(?:[^'"`]+?\s+from\s+)?|export\s+(?:\*|\{[^}]*\})\s+from\s+))(['"])([^'"]+)(\2)/g,
+          (full, prefix, q1, spec, q2) => {
+            if (resolved.has(spec)) {
+              return prefix + q1 + resolved.get(spec) + q2;
+            }
+            return full;
+          }
+        );
+
+        // Compile TS → JS (and JSX → React.createElement via automatic runtime).
+        const isTSX = /\.tsx$/i.test(realPath);
+        let compiled;
+        try {
+          compiled = Babel.transform(src, {
+            filename: realPath,
+            presets: [
+              ['typescript', { isTSX, allExtensions: true, allowDeclareFields: true, onlyRemoveTypeImports: true }],
+              ['react', { runtime: 'automatic', development: false }]
+            ],
+            sourceMaps: 'inline',
+          }).code;
+        } catch (err) {
+          throw new Error('Babel failed on ' + realPath + ': ' + err.message);
+        }
+
+        const blobUrl = URL.createObjectURL(new Blob([compiled], { type: 'application/javascript' }));
+        cache.set(path, blobUrl);
+        cache.set(realPath, blobUrl);
+        return blobUrl;
+      })();
+
+      inflight.set(path, p);
+      return p;
+    }
+
+    // ── Boot ──────────────────────────────────────────────────────────────
+    setStatus('Compiling TypeScript…');
+    // Resolve the entry relative to this HTML's URL so it works no matter where it's served from.
+    const entryAbs = new URL('./src/main.tsx', location.href).pathname;
+    const entryBlob = await loadModule(entryAbs);
+
+    setStatus('Starting app…');
+    await import(entryBlob);
+
+    // Hide splash once React paints something.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        bootEl.classList.add('hide');
+        setTimeout(() => bootEl.remove(), 300);
+      });
+    });
+  } catch (e) {
+    fail(e);
+  }
+})();
+</script>
+</body>
+</html>
+
+<style id="__om-edit-overrides">
+#root >.relative { color: rgb(0, 0, 0) !important }
+#root >.relative { color: rgb(255, 255, 255) !important }
+#root >.relative { opacity: 0 !important }
+#root >.relative { opacity: 1 !important }
+[data-name="Goals"] >div:nth-child(4) .px-\[8px\] { height: 6px !important }
+[data-name="Goals"] >div:nth-child(4) .px-\[8px\] { height: 66px !important }
+[data-name="Goals"] >div:nth-child(4) .px-\[8px\] { height: 6px !important }
+[data-name="Goals"] >div:nth-child(4) .px-\[8px\] { height: 116px !important }
+</style>
