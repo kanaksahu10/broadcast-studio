@@ -36,6 +36,7 @@ const STATES = Array.from(new Set(AGENCIES.map((a) => a.state)));
 const PACKAGES = Array.from(new Set(AGENCIES.map((a) => a.package)));
 const ROLES = Array.from(new Set(AGENCIES.map((a) => a.role)));
 const FEATURE_PATHS = ['Dashboard', 'Scheduling', 'Billing', 'Clients', 'Employees', 'Broadcast Studio'];
+const FREQUENCY_OPTIONS = ['Once', 'Every Login', 'Daily', 'Weekly'];
 
 /* -- Design tokens copied from the GEOH "Overlay - New Message" Figma frame -- */
 const BORDER = '#cfcfcf';
@@ -325,11 +326,18 @@ export default function ComposeMessageOverlay({ onClose }: { onClose: () => void
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [frequency, setFrequency] = useState('');
   const [dismissible, setDismissible] = useState<Dismissible>('Dismissible');
   const [pushNotification, setPushNotification] = useState(false);
 
+  const [audienceSearch, setAudienceSearch] = useState('');
+
   const isAnnouncement = messageType === 'Announcement';
   const isEmergency = messageType === 'Emergency';
+
+  const audienceOptions = (searchMode === 'Agency' ? AGENCIES.map((a) => a.name) : STATES).filter((opt) =>
+    opt.toLowerCase().includes(audienceSearch.trim().toLowerCase())
+  );
 
   let matching = searchMode === 'State'
     ? (statesOrAgencies.length > 0 ? AGENCIES.filter((a) => statesOrAgencies.includes(a.state)) : [])
@@ -341,13 +349,14 @@ export default function ComposeMessageOverlay({ onClose }: { onClose: () => void
   const handleSearchModeChange = (v: string) => {
     setSearchMode(v as SearchMode);
     setStatesOrAgencies([]);
+    setAudienceSearch('');
   };
 
   const handleSubmit = () => {
     console.log('Create Message', {
       title, body, reason, messageType, displayFormat, placement, featurePath,
-      hasCta, ctaLabel, ctaDestination, searchMode, statesOrAgencies, packages, roles,
-      startDate, endDate, dismissible, pushNotification,
+      hasCta, ctaLabel, ctaDestination, searchMode, audienceSearch, statesOrAgencies, packages, roles,
+      startDate, endDate, frequency, dismissible, pushNotification,
     });
     onClose();
   };
@@ -392,6 +401,7 @@ export default function ComposeMessageOverlay({ onClose }: { onClose: () => void
               <SectionHeader>Date &amp; Time</SectionHeader>
               <DateField label="Start Date *" value={startDate} onChange={setStartDate} />
               <DateField label="End Date" value={endDate} onChange={setEndDate} />
+              <SelectField label="Frequency *" value={frequency} onChange={setFrequency} placeholder="Select frequency..." options={FREQUENCY_OPTIONS} />
             </div>
           </div>
 
@@ -399,12 +409,18 @@ export default function ComposeMessageOverlay({ onClose }: { onClose: () => void
             <div className="flex flex-col gap-[16px] w-full">
               <SectionHeader>Search Mode</SectionHeader>
               <RadioField label="Search By *" value={searchMode} onChange={handleSearchModeChange} options={['Agency', 'State']} />
+              <TextField
+                label="Search By"
+                value={audienceSearch}
+                onChange={setAudienceSearch}
+                placeholder={searchMode === 'Agency' ? 'Search agencies by name...' : 'Search states by name...'}
+              />
               <MultiSelectField
                 label="States / Agency *"
                 values={statesOrAgencies}
                 onChange={setStatesOrAgencies}
                 placeholder={searchMode === 'State' ? 'Select states...' : 'Select agencies...'}
-                options={searchMode === 'Agency' ? AGENCIES.map((a) => a.name) : STATES}
+                options={audienceOptions}
                 caption={`${audienceCount} ${audienceCount === 1 ? 'agency' : 'agencies'} will see this message`}
               />
               <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} />
