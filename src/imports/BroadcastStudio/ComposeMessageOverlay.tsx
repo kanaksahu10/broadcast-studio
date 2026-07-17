@@ -298,7 +298,7 @@ function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestin
         <ToggleSwitch checked={checked} onChange={onChange} />
       </div>
       {checked && (
-        <div className="grid grid-cols-2 gap-[12px] w-full">
+        <div className="flex flex-col gap-[16px] w-full">
           <TextField label="Label" value={label} onChange={onLabelChange} placeholder="e.g. Learn More" />
           <TextField label="Destination URL" value={destination} onChange={onDestinationChange} placeholder="https://..." />
         </div>
