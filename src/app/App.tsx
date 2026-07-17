@@ -1,4 +1,5 @@
-import BroadcastStudioWrapper from './components/BroadcastStudioWrapper';
+import React from "react";
+import BroadcastStudioWrapper from "./components/BroadcastStudioWrapper";
 
 export default function App() {
   return (
