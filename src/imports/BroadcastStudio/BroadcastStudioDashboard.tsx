@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { BsSearch } from 'react-icons/bs';
 import { MdAdd, MdTableRows, MdViewKanban } from 'react-icons/md';
+import ComposeMessageOverlay from './ComposeMessageOverlay';
 
 type ViewMode = 'datagrid' | 'kanban';
 
@@ -75,10 +76,11 @@ function StatusCard({ label, count, color, bg, hoverBorder, hoverShadow, active,
   );
 }
 
-function NewMessageButton() {
+function NewMessageButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className="bg-[#2699fb] content-stretch flex gap-[6px] h-[32px] items-center px-[14px] rounded-[8px] shrink-0 cursor-pointer"
       data-name="New Message Button"
     >
@@ -333,6 +335,7 @@ export default function BroadcastStudioDashboard() {
   const [selectedStatus, setSelectedStatus] = useState<MessageStatus>('Live');
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('datagrid');
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
 
   const liveCount = MESSAGES.filter((m) => m.status === 'Live').length;
   const pendingCount = MESSAGES.filter((m) => m.status === 'Pending').length;
@@ -360,7 +363,7 @@ export default function BroadcastStudioDashboard() {
 
       <div className="flex items-center gap-[12px] w-full">
         <SearchInput value={search} onChange={setSearch} />
-        <NewMessageButton />
+        <NewMessageButton onClick={() => setIsComposeOpen(true)} />
         <div className="flex-1" />
         <ViewToggle view={viewMode} onChange={setViewMode} />
       </div>
@@ -372,6 +375,8 @@ export default function BroadcastStudioDashboard() {
       )}
 
       <AudienceMetrics rows={MESSAGES} />
+
+      {isComposeOpen && <ComposeMessageOverlay onClose={() => setIsComposeOpen(false)} />}
     </div>
   );
 }
