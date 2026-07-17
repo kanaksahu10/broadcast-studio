@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { IoIosClose } from 'react-icons/io';
-import { RiArrowDropDownFill } from 'react-icons/ri';
+import { IoMdArrowDropdown } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck } from 'react-icons/md';
-import { HiSpeakerphone } from 'react-icons/hi';
+import { MdCheck, MdPreview, MdSend } from 'react-icons/md';
+import { GrAnnounce } from 'react-icons/gr';
 
 type MessageType = '' | 'Announcement' | 'Emergency';
 type DisplayFormat = '' | 'Overlay' | 'Banner';
@@ -39,7 +39,7 @@ const FEATURE_PATHS = ['Dashboard', 'Scheduling', 'Billing', 'Clients', 'Employe
 const FREQUENCY_OPTIONS = ['Once', 'Every Login', 'Daily', 'Weekly'];
 
 /* -- Design tokens copied from the GEOH "Overlay - New Message" Figma frame -- */
-const BORDER = '#cfcfcf';
+const BORDER = '#e5e5e5';
 const LABEL_GREY = '#646464';
 const NAVY = '#334c6d';
 const PRIMARY = '#2699fb';
@@ -53,7 +53,7 @@ function FieldShell({ label, height, children }: { label: string; height?: numbe
   return (
     <div
       className="bg-white border rounded-[4px] px-[12px] py-[8px] flex flex-col gap-[8px] justify-center w-full"
-      style={{ borderColor: BORDER, height: height ?? 70 }}
+      style={{ borderColor: BORDER, borderWidth: '1px', height: height ?? 70 }}
     >
       <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: LABEL_GREY }}>
         {label}
@@ -103,41 +103,96 @@ function SelectField({
   placeholder: string;
   options: string[];
 }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (opt: string) => {
+    onChange(opt);
+    setOpen(false);
+  };
+
   return (
-    <FieldShell label={label}>
-      <div className="flex items-center justify-between w-full relative">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="appearance-none bg-transparent outline-none font-['Montserrat',sans-serif] font-normal text-[13px] w-full pr-[24px] cursor-pointer"
-          style={{ color: value ? '#000000' : PLACEHOLDER }}
-        >
-          <option value="" disabled hidden>
-            {placeholder}
-          </option>
-          {options.map((opt) => (
-            <option key={opt} value={opt} style={{ color: '#000000' }}>
-              {opt}
-            </option>
-          ))}
-        </select>
-        <RiArrowDropDownFill className="absolute right-0 pointer-events-none" size={20} color={LABEL_GREY} />
-      </div>
-    </FieldShell>
+    <div className="relative w-full" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`bg-white w-full flex flex-col gap-[8px] justify-center px-[8px] py-[12px] text-left cursor-pointer border border-[#e5e5e5] ${
+          open ? 'rounded-tl-[4px] rounded-tr-[4px]' : 'rounded-[4px]'
+        }`}
+      >
+        <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: LABEL_GREY }}>
+          {label}
+        </p>
+        <div className="flex items-center justify-between w-full">
+          <span
+            className="font-['Montserrat',sans-serif] font-normal text-[13px]"
+            style={{ color: value ? '#000000' : PLACEHOLDER }}
+          >
+            {value || placeholder}
+          </span>
+          <IoMdArrowDropdown
+            size={20}
+            color="#27496D"
+            style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 150ms' }}
+          />
+        </div>
+      </button>
+      {open && (
+        <div className="absolute z-10 top-full left-0 w-full">
+          {options.map((opt, idx) => {
+            const isLast = idx === options.length - 1;
+            return (
+              <button
+                type="button"
+                key={opt}
+                onClick={() => handleSelect(opt)}
+                className={`w-full flex items-center h-[40px] px-[8px] py-[4px] text-left hover:bg-[#efefef] cursor-pointer bg-white border-l border-r border-[#e5e5e5] ${
+                  isLast ? 'border-b rounded-bl-[4px] rounded-br-[4px]' : ''
+                }`}
+              >
+                <span className="font-['Montserrat',sans-serif] font-medium text-[12px] text-black">{opt}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
 function DateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [focused, setFocused] = useState(false);
   return (
     <FieldShell label={label}>
       <div className="flex items-center justify-between w-full relative">
-        <input
-          type="date"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="date-input-no-native-icon font-['Montserrat',sans-serif] font-normal text-[13px] text-black outline-none bg-transparent w-full pr-[24px]"
-        />
-        <BiCalendarEvent className="absolute right-0 pointer-events-none" size={18} color={LABEL_GREY} />
+        <div className="relative flex-1 pr-[24px]">
+          <input
+            type="date"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            className="date-input-no-native-icon font-['Montserrat',sans-serif] font-normal text-[13px] outline-none bg-transparent w-full"
+            style={{ color: value ? '#000000' : focused ? '#B8B8B8' : 'transparent' }}
+          />
+          {!value && !focused && (
+            <span
+              className="absolute inset-0 font-['Montserrat',sans-serif] font-normal text-[13px] pointer-events-none flex items-center"
+              style={{ color: '#B8B8B8' }}
+            >
+              00 / 00 / 0000
+            </span>
+          )}
+        </div>
+        <BiCalendarEvent className="absolute right-0 pointer-events-none" size={18} color="#27496D" />
       </div>
     </FieldShell>
   );
@@ -195,7 +250,7 @@ function MultiSelectField({
                 ))
               )}
             </div>
-            <RiArrowDropDownFill className="shrink-0" size={20} color={LABEL_GREY} />
+            <IoMdArrowDropdown className="shrink-0" size={20} color="#27496D" />
           </div>
         </FieldShell>
       </button>
@@ -307,11 +362,16 @@ function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestin
   );
 }
 
-export default function ComposeMessageOverlay({ onClose }: { onClose: () => void }) {
-  const [title, setTitle] = useState('');
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData }: {
+  onClose: () => void;
+  onMessageCreated?: (data: { title: string; messageType: string; statesOrAgencies: string[]; searchMode: string; startDate: string; endDate: string; }) => void;
+  onSaveAsDraft?: (data: { title: string; messageType: string; statesOrAgencies: string[]; searchMode: string; startDate: string; endDate: string; }) => void;
+  initialData?: { title?: string; messageType?: string; startDate?: string; endDate?: string; };
+}) {
+  const [title, setTitle] = useState(initialData?.title ?? '');
   const [body, setBody] = useState('');
   const [reason, setReason] = useState('');
-  const [messageType, setMessageType] = useState<MessageType>('');
+  const [messageType, setMessageType] = useState<MessageType>((initialData?.messageType as MessageType) ?? '');
   const [displayFormat, setDisplayFormat] = useState<DisplayFormat>('');
   const [placement, setPlacement] = useState<Placement>('');
   const [featurePath, setFeaturePath] = useState('');
@@ -324,8 +384,8 @@ export default function ComposeMessageOverlay({ onClose }: { onClose: () => void
   const [packages, setPackages] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
 
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(initialData?.startDate ?? '');
+  const [endDate, setEndDate] = useState(initialData?.endDate ?? '');
   const [frequency, setFrequency] = useState('');
   const [dismissible, setDismissible] = useState<Dismissible>('Dismissible');
   const [pushNotification, setPushNotification] = useState(false);
@@ -340,114 +400,222 @@ export default function ComposeMessageOverlay({ onClose }: { onClose: () => void
   if (roles.length > 0) matching = matching.filter((a) => roles.includes(a.role));
   const audienceCount = matching.length;
 
+  const isFormValid =
+    title.trim() !== '' &&
+    body.trim() !== '' &&
+    reason.trim() !== '' &&
+    messageType !== '' &&
+    startDate !== '' &&
+    frequency !== '' &&
+    statesOrAgencies.length > 0 &&
+    (messageType !== 'Announcement' || (
+      displayFormat !== '' &&
+      placement !== '' &&
+      (placement !== 'Feature Specific' || featurePath !== '')
+    ));
+
   const handleSearchModeChange = (v: string) => {
     setSearchMode(v as SearchMode);
     setStatesOrAgencies([]);
   };
 
   const handleSubmit = () => {
-    console.log('Create Message', {
-      title, body, reason, messageType, displayFormat, placement, featurePath,
-      hasCta, ctaLabel, ctaDestination, searchMode, statesOrAgencies, packages, roles,
-      startDate, endDate, frequency, dismissible, pushNotification,
-    });
+    onMessageCreated?.({ title, messageType, statesOrAgencies, searchMode, startDate, endDate });
     onClose();
   };
 
+  const handleSaveAsDraft = () => {
+    onSaveAsDraft?.({ title, messageType, statesOrAgencies, searchMode, startDate, endDate });
+    onClose();
+  };
+
+  const hasPreview = isFormValid;
+
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-50 bg-white flex flex-col">
       <style>{`.date-input-no-native-icon::-webkit-calendar-picker-indicator { opacity: 0; position: absolute; right: 0; width: 24px; height: 100%; cursor: pointer; }`}</style>
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-[820px] max-w-full h-full bg-white shadow-2xl flex flex-col">
-        <div className="flex items-center justify-between h-[56px] px-[16px] border-b shrink-0" style={{ borderColor: BORDER }}>
-          <h2 className="font-['Montserrat',sans-serif] font-medium text-[16px] text-black">New Message</h2>
-          <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
-            <IoIosClose size={26} color="#000000" />
-          </button>
+
+      {/* Top header bar */}
+      <div className="flex items-center justify-between h-[56px] px-[24px] border-b shrink-0" style={{ borderColor: BORDER }}>
+        <h2 className="font-['Montserrat',sans-serif] font-semibold text-[16px] text-black">New Message</h2>
+        <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
+          <IoIosClose size={26} color="#000000" />
+        </button>
+      </div>
+
+      {/* Body: left form + right preview */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+
+        {/* LEFT — scrollable form, fixed 399px */}
+        <div style={{ width: '399px', minWidth: '399px', maxWidth: '399px', overflowY: 'auto', borderRight: `1px solid ${BORDER}` }} className="p-[24px] flex flex-col gap-[16px]">
+
+          {/* Message Basics card */}
+          <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Message Basics</p>
+            <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Type message title" />
+            <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Type the message body" />
+            <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Why is this message being sent?" />
+            <SelectField label="Message Type *" value={messageType} onChange={(v) => setMessageType(v as MessageType)} placeholder="Select message type..." options={['Announcement', 'Emergency']} />
+            {isEmergency && (
+              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#717182]">
+                Emergency messages are always sent as a non-dismissible, app-wide banner.
+              </p>
+            )}
+            {isAnnouncement && (
+              <>
+                <SelectField label="Display Format *" value={displayFormat} onChange={(v) => setDisplayFormat(v as DisplayFormat)} placeholder="Select display format..." options={['Overlay', 'Banner']} />
+                <SelectField label="Placement *" value={placement} onChange={(v) => setPlacement(v as Placement)} placeholder="Select placement..." options={['App-wide', 'Feature Specific']} />
+                {placement === 'Feature Specific' && (
+                  <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} />
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Date & Time card */}
+          <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Date &amp; Time</p>
+            <DateField label="Start Date *" value={startDate} onChange={setStartDate} />
+            <DateField label="End Date" value={endDate} onChange={setEndDate} />
+            <SelectField label="Frequency *" value={frequency} onChange={setFrequency} placeholder="Select frequency..." options={FREQUENCY_OPTIONS} />
+          </div>
+
+          {/* Audience card */}
+          <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+            <div className="flex flex-wrap items-center justify-between gap-x-[8px] gap-y-[2px]">
+              <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Audience</p>
+              <span className="font-['Montserrat',sans-serif] font-medium text-[12px] shrink-0" style={{ color: NAVY }}>
+                {audienceCount} {audienceCount === 1 ? 'agency' : 'agencies'} will see this message
+              </span>
+            </div>
+            <RadioField label="Search By *" value={searchMode} onChange={handleSearchModeChange} options={['Agency', 'State']} />
+            <MultiSelectField
+              label={searchMode === 'Agency' ? 'Agency *' : 'State *'}
+              values={statesOrAgencies}
+              onChange={setStatesOrAgencies}
+              placeholder={searchMode === 'State' ? 'Select states...' : 'Select agencies...'}
+              options={searchMode === 'Agency' ? AGENCIES.map((a) => a.name) : STATES}
+            />
+            <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} />
+            <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} />
+          </div>
+
+          {/* Display Settings card */}
+          <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Display Settings</p>
+            <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} />
+            <CtaBox
+              checked={hasCta}
+              onChange={setHasCta}
+              label={ctaLabel}
+              destination={ctaDestination}
+              onLabelChange={setCtaLabel}
+              onDestinationChange={setCtaDestination}
+            />
+            {isEmergency && <ToggleRow label="Also send as push notification" checked={pushNotification} onChange={setPushNotification} />}
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto flex gap-[32px] items-start p-[16px]">
-          <div className="flex-1 min-w-0 flex flex-col gap-[24px] pl-[16px]">
-            <div className="flex flex-col gap-[16px] w-full">
-              <SectionHeader>Message Basics</SectionHeader>
-              <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Type message title" />
-              <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Type the message body" />
-              <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Why is this message being sent?" />
-              <SelectField label="Message Type *" value={messageType} onChange={(v) => setMessageType(v as MessageType)} placeholder="Select message type..." options={['Announcement', 'Emergency']} />
-              {isEmergency && (
-                <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#717182]">
-                  Emergency messages are always sent as a non-dismissible, app-wide banner.
-                </p>
-              )}
-              {isAnnouncement && (
-                <>
-                  <SelectField label="Display Format *" value={displayFormat} onChange={(v) => setDisplayFormat(v as DisplayFormat)} placeholder="Select display format..." options={['Overlay', 'Banner']} />
-                  <SelectField label="Placement *" value={placement} onChange={(v) => setPlacement(v as Placement)} placeholder="Select placement..." options={['App-wide', 'Feature Specific']} />
-                  {placement === 'Feature Specific' && (
-                    <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} />
+        {/* RIGHT — preview + actions */}
+        <div style={{ flex: 1, minWidth: 0, backgroundColor: '#f8f8f8' }} className="flex flex-col p-[24px] gap-[16px]">
+          {/* Preview card */}
+          <div className="bg-white rounded-[8px] border flex flex-col flex-1 overflow-hidden" style={{ borderColor: BORDER }}>
+            <div className="px-[16px] py-[12px] border-b" style={{ borderColor: BORDER }}>
+              <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] text-black">Message Preview</p>
+            </div>
+            <div className="flex-1 flex flex-col p-[16px]">
+              {hasPreview ? (
+                <div className="flex flex-col gap-[12px]">
+                  {/* Emergency banner style */}
+                  {isEmergency && (
+                    <div className="rounded-[8px] border-l-[4px] p-[14px] flex flex-col gap-[6px]" style={{ borderLeftColor: '#DA4040', backgroundColor: '#fff5f5' }}>
+                      <p className="font-['Montserrat',sans-serif] font-semibold text-[13px]" style={{ color: '#DA4040' }}>⚠ Emergency</p>
+                      <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">{title}</p>
+                      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-[#383838]">{body}</p>
+                      {hasCta && ctaLabel && (
+                        <button className="self-start mt-[4px] rounded-[6px] px-[12px] py-[6px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: '#DA4040' }}>{ctaLabel}</button>
+                      )}
+                    </div>
                   )}
-                </>
+                  {/* Announcement banner style */}
+                  {isAnnouncement && displayFormat === 'Banner' && (
+                    <div className="rounded-[8px] border-l-[4px] p-[14px] flex flex-col gap-[6px]" style={{ borderLeftColor: PRIMARY, backgroundColor: '#e8f4ff' }}>
+                      <p className="font-['Montserrat',sans-serif] font-semibold text-[13px]" style={{ color: PRIMARY }}>Announcement</p>
+                      <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">{title}</p>
+                      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-[#383838]">{body}</p>
+                      {hasCta && ctaLabel && (
+                        <button className="self-start mt-[4px] rounded-[6px] px-[12px] py-[6px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: PRIMARY }}>{ctaLabel}</button>
+                      )}
+                    </div>
+                  )}
+                  {/* Announcement overlay style */}
+                  {isAnnouncement && displayFormat === 'Overlay' && (
+                    <div className="rounded-[8px] border p-[16px] flex flex-col gap-[8px] shadow-md" style={{ borderColor: BORDER }}>
+                      <p className="font-['Montserrat',sans-serif] font-semibold text-[15px] text-black">{title}</p>
+                      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-[#383838]">{body}</p>
+                      {hasCta && ctaLabel && (
+                        <button className="self-start mt-[4px] rounded-[6px] px-[12px] py-[6px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: PRIMARY }}>{ctaLabel}</button>
+                      )}
+                    </div>
+                  )}
+                  {/* Meta */}
+                  <div className="flex flex-wrap gap-[8px] mt-[4px]">
+                    {startDate && <span className="text-[11px] font-['Montserrat',sans-serif] text-[#8b8b8b]">Starts {startDate}</span>}
+                    {audienceCount > 0 && <span className="text-[11px] font-['Montserrat',sans-serif] text-[#8b8b8b]">• {audienceCount} {audienceCount === 1 ? 'agency' : 'agencies'}</span>}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center gap-[10px] py-[40px]">
+                  <MdPreview size={40} color="#d1d3d4" />
+                  <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8] text-center max-w-[220px]">
+                    Preview will appear here once all required fields are completed.
+                  </p>
+                </div>
               )}
             </div>
-
-            <div className="flex flex-col gap-[16px] w-full">
-              <SectionHeader>Date &amp; Time</SectionHeader>
-              <DateField label="Start Date *" value={startDate} onChange={setStartDate} />
-              <DateField label="End Date" value={endDate} onChange={setEndDate} />
-              <SelectField label="Frequency *" value={frequency} onChange={setFrequency} placeholder="Select frequency..." options={FREQUENCY_OPTIONS} />
-            </div>
           </div>
 
-          <div className="flex-1 min-w-0 flex flex-col gap-[24px] pr-[16px]">
-            <div className="flex flex-col gap-[16px] w-full">
-              <SectionHeader>Search Mode</SectionHeader>
-              <RadioField label="Search By *" value={searchMode} onChange={handleSearchModeChange} options={['Agency', 'State']} />
-              <MultiSelectField
-                label="States / Agency *"
-                values={statesOrAgencies}
-                onChange={setStatesOrAgencies}
-                placeholder={searchMode === 'State' ? 'Select states...' : 'Select agencies...'}
-                options={searchMode === 'Agency' ? AGENCIES.map((a) => a.name) : STATES}
-                caption={`${audienceCount} ${audienceCount === 1 ? 'agency' : 'agencies'} will see this message`}
-              />
-              <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} />
-              <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} />
-            </div>
-
-            <div className="flex flex-col gap-[16px] w-full">
-              <SectionHeader>Display Settings</SectionHeader>
-              <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} />
-              <CtaBox
-                checked={hasCta}
-                onChange={setHasCta}
-                label={ctaLabel}
-                destination={ctaDestination}
-                onLabelChange={setCtaLabel}
-                onDestinationChange={setCtaDestination}
-              />
-              {isEmergency && <ToggleRow label="Also send as push notification" checked={pushNotification} onChange={setPushNotification} />}
+          {/* Action buttons below preview */}
+          <div className="flex items-center justify-between shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="font-['Montserrat',sans-serif] font-medium text-[13px] capitalize cursor-pointer"
+              style={{ color: NAVY }}
+            >
+              Cancel
+            </button>
+            <div className="flex items-center gap-[8px]">
+              <button
+                type="button"
+                onClick={handleSaveAsDraft}
+                className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[4px] border cursor-pointer"
+                style={{ backgroundColor: '#e8f4ff', borderColor: PRIMARY, borderWidth: '1px' }}
+              >
+                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: PRIMARY }}>
+                  Save as Draft
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={isFormValid ? handleSubmit : undefined}
+                disabled={!isFormValid}
+                className="rounded-[8px] px-[16px] h-[32px] flex items-center gap-[8px]"
+                style={{
+                  backgroundColor: isFormValid ? PRIMARY : '#e1e3e4',
+                  cursor: isFormValid ? 'pointer' : 'not-allowed',
+                }}
+              >
+                <MdSend size={17} color={isFormValid ? 'white' : '#a1a3a4'} />
+                <span
+                  className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase"
+                  style={{ color: isFormValid ? 'white' : '#a1a3a4' }}
+                >
+                  Send for Approval
+                </span>
+              </button>
             </div>
           </div>
-        </div>
-
-        <div className="bg-[#f8f8f8] border-t h-[60px] px-[16px] py-[13px] flex items-center justify-between shrink-0" style={{ borderColor: BORDER }}>
-          <button
-            type="button"
-            onClick={onClose}
-            className="font-['Montserrat',sans-serif] font-medium text-[14px] capitalize cursor-pointer"
-            style={{ color: NAVY }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            className="rounded-[8px] px-[16px] py-[8px] flex items-center gap-[8px] cursor-pointer"
-            style={{ backgroundColor: PRIMARY }}
-          >
-            <HiSpeakerphone size={17} color="white" />
-            <span className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-white uppercase">Create Message</span>
-          </button>
         </div>
       </div>
     </div>

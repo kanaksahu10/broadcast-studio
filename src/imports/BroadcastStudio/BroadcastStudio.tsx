@@ -134,15 +134,17 @@ function KebabMenu({
   );
 }
 
-function TopBar() {
+function TopBar({ onHamburgerClick, sidebarCollapsed }: { onHamburgerClick: () => void; sidebarCollapsed: boolean }) {
   return (
     <div className="absolute inset-x-0 top-0 h-[59px] bg-white border-b border-[#dfdfdf] z-10 flex items-center" data-name="Top Bar">
       {/* Logo + Hamburger — same width as sidebar */}
-      <div className="flex items-center justify-between px-[16px] w-[329px] shrink-0">
-        <Logo />
-        <svg fill="none" viewBox="0 0 14.2642 10.5" className="w-[14px] h-[11px] cursor-pointer">
-          <path d={svgPaths.p15f65700} fill="#334D6E" />
-        </svg>
+      <div className={`flex items-center px-[16px] shrink-0 transition-[width] duration-200 ${sidebarCollapsed ? 'w-[72px] justify-center' : 'w-[329px] justify-between'}`}>
+        {!sidebarCollapsed && <Logo />}
+        <button onClick={onHamburgerClick} className="p-0 bg-transparent border-0 cursor-pointer flex items-center justify-center">
+          <svg fill="none" viewBox="0 0 14.2642 10.5" className="w-[14px] h-[11px]">
+            <path d={svgPaths.p15f65700} fill="#334D6E" />
+          </svg>
+        </button>
       </div>
       {/* Search */}
       <div className="flex-1 flex items-center px-[16px]">
@@ -1395,6 +1397,7 @@ function Container({ goalTemplates }: { goalTemplates: GoalTemplate[] }) {
 
 export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioProps) {
   const [expandedSection, setExpandedSection] = useState<'clients' | 'agency' | 'superAdmin' | null>('superAdmin');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleClientsClick = () => {
     setExpandedSection('clients');
@@ -1414,28 +1417,32 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
 
   return (
     <div className="bg-[#f8f8f8] relative size-full" data-name="Agency Management - Goal Templates">
-      <TopBar />
+      <TopBar onHamburgerClick={() => setSidebarCollapsed(s => !s)} sidebarCollapsed={sidebarCollapsed} />
       <div className="absolute right-0 top-[59px] bottom-0 w-[60px] border-l border-[#e5e5e5] z-50">
         <NotificationPanel />
       </div>
-      <div className="absolute bg-[#eaeaea] bottom-0 left-0 top-[59px] w-[329px]" data-name="Sidebar Menu">
+      <div className={`absolute bg-[#eaeaea] bottom-0 left-0 top-[59px] overflow-hidden transition-[width] duration-200 ${sidebarCollapsed ? 'w-[72px] [&_p]:hidden' : 'w-[329px]'}`} data-name="Sidebar Menu">
         <div className="content-stretch flex flex-col items-start overflow-y-auto relative rounded-[inherit] size-full">
-          <div className="bg-[#eaeaea] relative shrink-0 w-full" data-name="Organization Switcher">
-            <div aria-hidden="true" className="absolute border border-[#e5e5e5] border-solid inset-0 pointer-events-none" />
-            <div className="content-stretch flex flex-col gap-[10px] items-start p-[16px] relative size-full">
-              <div className="absolute bg-[#efefef] inset-0" data-name="Background">
-                <div aria-hidden="true" className="absolute border-[#dfdfdf] border-b border-solid inset-0 pointer-events-none" />
+          {!sidebarCollapsed && (
+            <>
+              <div className="bg-[#eaeaea] relative shrink-0 w-full" data-name="Organization Switcher">
+                <div aria-hidden="true" className="absolute border border-[#e5e5e5] border-solid inset-0 pointer-events-none" />
+                <div className="content-stretch flex flex-col gap-[10px] items-start p-[16px] relative size-full">
+                  <div className="absolute bg-[#efefef] inset-0" data-name="Background">
+                    <div aria-hidden="true" className="absolute border-[#dfdfdf] border-b border-solid inset-0 pointer-events-none" />
+                  </div>
+                  <Frame3 />
+                </div>
               </div>
-              <Frame3 />
-            </div>
-          </div>
-          <div className="bg-[#eaeaea] content-stretch flex flex-col gap-[10px] h-[45px] items-start justify-center p-[16px] relative shrink-0 w-full" data-name="Organization Switcher">
-            <div aria-hidden="true" className="absolute border border-[#e5e5e5] border-solid inset-0 pointer-events-none" />
-            <div className="absolute bg-[#efefef] inset-0" data-name="Background">
-              <div aria-hidden="true" className="absolute border-[#dfdfdf] border-b border-solid inset-0 pointer-events-none" />
-            </div>
-            <Frame4 />
-          </div>
+              <div className="bg-[#eaeaea] content-stretch flex flex-col gap-[10px] h-[45px] items-start justify-center p-[16px] relative shrink-0 w-full" data-name="Organization Switcher">
+                <div aria-hidden="true" className="absolute border border-[#e5e5e5] border-solid inset-0 pointer-events-none" />
+                <div className="absolute bg-[#efefef] inset-0" data-name="Background">
+                  <div aria-hidden="true" className="absolute border-[#dfdfdf] border-b border-solid inset-0 pointer-events-none" />
+                </div>
+                <Frame4 />
+              </div>
+            </>
+          )}
           <div className="content-stretch flex flex-col items-start relative shrink-0 w-full" data-name="Super Administrator">
             <button
               onClick={handleSuperAdminClick}
@@ -1813,13 +1820,13 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
       </div>
       {/* Main content area: fixed breadcrumb toolbar + its own independent scroll region,
           so content taller than the viewport scrolls instead of being clipped. */}
-      <div className="absolute bg-[#f8f8f8] flex gap-[14px] h-[48px] items-center left-[329px] right-[60px] p-[16px] top-[59px] z-10" data-name="Toolbar">
+      <div className={`absolute bg-[#f8f8f8] flex gap-[14px] h-[48px] items-center right-[60px] p-[16px] top-[59px] z-10 transition-[left] duration-200 ${sidebarCollapsed ? 'left-[72px]' : 'left-[329px]'}`} data-name="Toolbar">
         <MdArrowBack size={21} color="#27496D" />
         <span className="font-['Montserrat',sans-serif] font-medium text-[15px] text-black leading-[15px]">
           {expandedSection === 'agency' ? 'View Goals' : 'Broadcast Studio'}
         </span>
       </div>
-      <div className="absolute left-[329px] right-[60px] top-[107px] bottom-0 overflow-y-auto">
+      <div className={`absolute right-[60px] top-[107px] bottom-0 overflow-y-auto transition-[left] duration-200 ${sidebarCollapsed ? 'left-[72px]' : 'left-[329px]'}`}>
         <div className="p-[16px]">
           {expandedSection === 'agency' ? (
             <Container goalTemplates={goalTemplates} />
