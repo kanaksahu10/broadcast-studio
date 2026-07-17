@@ -6,7 +6,7 @@ import ComposeMessageOverlay from './ComposeMessageOverlay';
 type ViewMode = 'datagrid' | 'kanban';
 
 type MessageStatus = 'Live' | 'Pending' | 'Draft';
-type MessageType = 'Announcement' | 'Emergency';
+type MessageType = '' | 'Announcement' | 'Emergency';
 
 interface BroadcastMessageRow {
   id: string;
@@ -44,7 +44,21 @@ const STATUS_HOVER_SHADOW: Record<MessageStatus, string> = {
   Draft: '0px 0px 8px #c8c8c8',
 };
 
-const MESSAGES: BroadcastMessageRow[] = [
+function formatDisplayDate(dateStr: string): string {
+  if (!dateStr) return '—';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function parseDisplayDate(str: string): string {
+  if (!str || str === '—') return '';
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const INITIAL_MESSAGES: BroadcastMessageRow[] = [
   { id: '1', subject: 'Summer Schedule Update', type: 'Announcement', audience: 'All Field Staff', channel: 'Email', status: 'Live', startDate: 'Jul 10, 2026', endDate: 'Jul 17, 2026', recipients: 1204 },
   { id: '2', subject: 'New Overtime Policy', type: 'Emergency', audience: 'Payroll Admins', channel: 'Email', status: 'Live', startDate: 'Jul 8, 2026', endDate: 'Jul 15, 2026', recipients: 42 },
   { id: '3', subject: 'Holiday Closure Notice', type: 'Announcement', audience: 'All Employees', channel: 'SMS', status: 'Pending', startDate: 'Jul 20, 2026', endDate: 'Jul 27, 2026', recipients: 3150 },
@@ -131,11 +145,10 @@ function StatusBadge({ status }: { status: MessageStatus }) {
 const COLUMNS: Array<{ key: keyof BroadcastMessageRow | 'recipients'; label: string; width: number }> = [
   { key: 'subject', label: 'Message Title', width: 240 },
   { key: 'type', label: 'Type', width: 130 },
-  { key: 'audience', label: 'Audience', width: 200 },
+  { key: 'audience', label: 'Audience', width: 120 },
   { key: 'status', label: 'Status', width: 110 },
   { key: 'startDate', label: 'Start Date', width: 130 },
   { key: 'endDate', label: 'End Date', width: 130 },
-  { key: 'recipients', label: 'Recipients', width: 120 },
 ];
 
 function MessageTable({ rows }: { rows: BroadcastMessageRow[] }) {
@@ -172,8 +185,10 @@ function MessageTable({ rows }: { rows: BroadcastMessageRow[] }) {
               <div className="h-full flex items-center px-[12px] py-[10px] shrink-0" style={{ width: 130 }}>
                 <p className="font-['Montserrat',sans-serif] font-normal leading-[17px] text-[#000000] text-[12px] whitespace-nowrap">{row.type}</p>
               </div>
-              <div className="h-full flex items-center px-[12px] py-[10px] shrink-0" style={{ width: 200 }}>
-                <p className="font-['Montserrat',sans-serif] font-normal leading-[17px] text-[#000000] text-[12px] whitespace-nowrap">{row.audience}</p>
+              <div className="h-full flex items-center px-[12px] py-[10px] shrink-0" style={{ width: 120 }}>
+                <p className="font-['Montserrat',sans-serif] font-normal leading-[17px] text-[#000000] text-[12px] whitespace-nowrap">
+                  {row.recipients === null ? '—' : row.recipients.toLocaleString()}
+                </p>
               </div>
               <div className="h-full flex items-center px-[12px] py-[10px] shrink-0" style={{ width: 110 }}>
                 <StatusBadge status={row.status} />
@@ -183,11 +198,6 @@ function MessageTable({ rows }: { rows: BroadcastMessageRow[] }) {
               </div>
               <div className="h-full flex items-center px-[12px] py-[10px] shrink-0" style={{ width: 130 }}>
                 <p className="font-['Montserrat',sans-serif] font-normal leading-[17px] text-[#000000] text-[12px] whitespace-nowrap">{row.endDate}</p>
-              </div>
-              <div className="h-full flex items-center px-[12px] py-[10px] shrink-0" style={{ width: 120 }}>
-                <p className="font-['Montserrat',sans-serif] font-normal leading-[17px] text-[#000000] text-[12px] whitespace-nowrap">
-                  {row.recipients === null ? '—' : row.recipients.toLocaleString()}
-                </p>
               </div>
             </div>
           ))
@@ -255,36 +265,30 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
   Draft: 'Edit',
 };
 
-function KanbanCard({ row }: { row: BroadcastMessageRow }) {
+function KanbanCard({ row, onAction }: { row: BroadcastMessageRow; onAction?: () => void }) {
   const color = STATUS_COLOR[row.status];
-  const dateRange = row.startDate === '—' ? '—' : `${row.startDate.replace(', 2026', '')} – ${row.endDate.replace(', 2026', '')}`;
+  const dateRange = row.startDate === '—' ? '—' : `${row.startDate} – ${row.endDate}`;
   return (
     <div className="bg-white rounded-[8px] border border-[#e5e5e5] overflow-hidden flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div className="w-[4px] shrink-0" style={{ backgroundColor: color }} />
       <div className="flex flex-col gap-[10px] p-[14px] flex-1 min-w-0">
         <div>
           <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px] text-[#000000]">{row.subject}</p>
-          <p className="font-['Montserrat',sans-serif] font-normal text-[11px] leading-[16px] text-[#9a9a9a] mt-[2px]">{row.type}</p>
+          {(row.type || dateRange !== '—') && (
+            <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
+              {row.type}{row.type && dateRange !== '—' && <span> • </span>}{dateRange !== '—' && dateRange}
+            </p>
+          )}
         </div>
-        <div className="flex items-center justify-between gap-[8px]">
-          <span className="font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px] bg-[#e8f3ff] text-[#2699fb] whitespace-nowrap">{row.audience}</span>
-          <span className="font-['Montserrat',sans-serif] font-normal text-[11px] text-[#b8b8b8] whitespace-nowrap shrink-0">{dateRange}</span>
-        </div>
-        <div className="flex items-center justify-between gap-[8px]">
-          <div className="flex items-center gap-[5px]">
-            {row.recipients !== null ? (
-              <>
-                <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><path d="M9.5 5.5C10.33 5.5 11 4.83 11 4C11 3.17 10.33 2.5 9.5 2.5C8.67 2.5 8 3.17 8 4C8 4.83 8.67 5.5 9.5 5.5ZM4.5 5.5C5.33 5.5 6 4.83 6 4C6 3.17 5.33 2.5 4.5 2.5C3.67 2.5 3 3.17 3 4C3 4.83 3.67 5.5 4.5 5.5ZM4.5 6.5C3.17 6.5 0.5 7.17 0.5 8.5V9.5H8.5V8.5C8.5 7.17 5.83 6.5 4.5 6.5ZM9.5 6.5C9.33 6.5 9.13 6.51 8.92 6.53C9.6 7.02 10 7.7 10 8.5V9.5H13.5V8.5C13.5 7.17 10.83 6.5 9.5 6.5Z" fill="#b8b8b8"/></svg>
-                <span className="font-['Montserrat',sans-serif] font-normal text-[11px] text-[#717182]">{row.recipients.toLocaleString()}</span>
-              </>
-            ) : (
-              <span className="font-['Montserrat',sans-serif] font-normal text-[11px] text-[#b8b8b8]">Not submitted</span>
-            )}
-          </div>
+        {row.recipients !== null && (
+          <span className="font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px] bg-[#e8f3ff] text-[#2699fb] whitespace-nowrap self-start">{row.recipients.toLocaleString()} Agencies</span>
+        )}
+        <div className="flex items-center justify-end">
           <button
             type="button"
-            className="font-['Montserrat',sans-serif] font-medium text-[11px] px-[12px] py-[4px] rounded-[6px] border transition-colors duration-100"
+            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] h-[32px] rounded-[6px] border transition-colors duration-100"
             style={{ color, borderColor: color, backgroundColor: 'white' }}
+            onClick={onAction}
           >
             {ACTION_LABEL[row.status]}
           </button>
@@ -295,12 +299,15 @@ function KanbanCard({ row }: { row: BroadcastMessageRow }) {
 }
 
 const KANBAN_COLUMNS: Array<{ status: MessageStatus; label: string }> = [
-  { status: 'Live', label: 'Live' },
-  { status: 'Pending', label: 'Pending Approval' },
   { status: 'Draft', label: 'Drafts' },
+  { status: 'Pending', label: 'Pending Approval' },
+  { status: 'Live', label: 'Live' },
 ];
 
-function KanbanBoard({ rows }: { rows: BroadcastMessageRow[] }) {
+function KanbanBoard({ rows, onEdit }: {
+  rows: BroadcastMessageRow[];
+  onEdit: (row: BroadcastMessageRow) => void;
+}) {
   return (
     <div className="flex gap-[16px] w-full items-start">
       {KANBAN_COLUMNS.map(({ status, label }) => {
@@ -321,7 +328,13 @@ function KanbanBoard({ rows }: { rows: BroadcastMessageRow[] }) {
                   <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8]">No messages</p>
                 </div>
               ) : (
-                colRows.map((row) => <KanbanCard key={row.id} row={row} />)
+                colRows.map((row) => (
+                  <KanbanCard
+                    key={row.id}
+                    row={row}
+                    onAction={row.status === 'Draft' ? () => onEdit(row) : undefined}
+                  />
+                ))
               )}
             </div>
           </div>
@@ -332,17 +345,49 @@ function KanbanBoard({ rows }: { rows: BroadcastMessageRow[] }) {
 }
 
 export default function BroadcastStudioDashboard() {
+  const [messages, setMessages] = useState<BroadcastMessageRow[]>(INITIAL_MESSAGES);
   const [selectedStatus, setSelectedStatus] = useState<MessageStatus>('Live');
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('datagrid');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<BroadcastMessageRow | null>(null);
 
-  const liveCount = MESSAGES.filter((m) => m.status === 'Live').length;
-  const pendingCount = MESSAGES.filter((m) => m.status === 'Pending').length;
-  const draftCount = MESSAGES.filter((m) => m.status === 'Draft').length;
+  const handleMessageCreated = (data: {
+    title: string;
+    messageType: string;
+    statesOrAgencies: string[];
+    searchMode: string;
+    startDate: string;
+    endDate: string;
+  }) => {
+    const audience =
+      data.statesOrAgencies.length === 0
+        ? 'All'
+        : data.statesOrAgencies.length <= 2
+        ? data.statesOrAgencies.join(', ')
+        : `${data.statesOrAgencies.slice(0, 2).join(', ')} +${data.statesOrAgencies.length - 2}`;
+
+    const newMessage: BroadcastMessageRow = {
+      id: Date.now().toString(),
+      subject: data.title,
+      type: data.messageType as MessageType,
+      audience,
+      channel: 'Email',
+      status: 'Pending',
+      startDate: formatDisplayDate(data.startDate),
+      endDate: data.endDate ? formatDisplayDate(data.endDate) : '—',
+      recipients: null,
+    };
+    setMessages((prev) => [newMessage, ...prev]);
+    setSelectedStatus('Pending');
+  };
+
+  const liveCount = messages.filter((m) => m.status === 'Live').length;
+  const pendingCount = messages.filter((m) => m.status === 'Pending').length;
+  const draftCount = messages.filter((m) => m.status === 'Draft').length;
 
   const query = search.trim().toLowerCase();
-  const searchFiltered = MESSAGES.filter(
+  const searchFiltered = messages.filter(
     (row) =>
       query.length === 0 ||
       row.subject.toLowerCase().includes(query) ||
@@ -361,6 +406,8 @@ export default function BroadcastStudioDashboard() {
         </div>
       )}
 
+      {viewMode === 'kanban' && <AudienceMetrics rows={messages} />}
+
       <div className="flex items-center gap-[12px] w-full">
         <SearchInput value={search} onChange={setSearch} />
         <NewMessageButton onClick={() => setIsComposeOpen(true)} />
@@ -371,12 +418,76 @@ export default function BroadcastStudioDashboard() {
       {viewMode === 'datagrid' ? (
         <MessageTable rows={filteredRows} />
       ) : (
-        <KanbanBoard rows={searchFiltered} />
+        <KanbanBoard
+          rows={searchFiltered}
+          onEdit={(row) => {
+            setMessages((prev) => prev.filter((m) => m.id !== row.id));
+            setEditingRow(row);
+          }}
+        />
       )}
 
-      <AudienceMetrics rows={MESSAGES} />
+      {editingRow && (
+        <ComposeMessageOverlay
+          onClose={() => setEditingRow(null)}
+          initialData={{
+            title: editingRow.subject,
+            messageType: editingRow.type,
+            startDate: parseDisplayDate(editingRow.startDate),
+            endDate: parseDisplayDate(editingRow.endDate),
+          }}
+          onMessageCreated={(data) => { handleMessageCreated(data); setEditingRow(null); }}
+          onSaveAsDraft={(data) => {
+            const audience =
+              data.statesOrAgencies.length === 0 ? 'All'
+              : data.statesOrAgencies.length <= 2 ? data.statesOrAgencies.join(', ')
+              : `${data.statesOrAgencies.slice(0, 2).join(', ')} +${data.statesOrAgencies.length - 2}`;
+            setMessages((prev) => [{
+              id: Date.now().toString(),
+              subject: data.title || 'Untitled Draft',
+              type: (data.messageType as MessageType) || '',
+              audience,
+              channel: 'Email',
+              status: 'Draft',
+              startDate: data.startDate ? formatDisplayDate(data.startDate) : '—',
+              endDate: data.endDate ? formatDisplayDate(data.endDate) : '—',
+              recipients: null,
+            }, ...prev]);
+            setSelectedStatus('Draft');
+            setEditingRow(null);
+          }}
+        />
+      )}
 
-      {isComposeOpen && <ComposeMessageOverlay onClose={() => setIsComposeOpen(false)} />}
+      {isComposeOpen && (
+        <ComposeMessageOverlay
+          onClose={() => setIsComposeOpen(false)}
+          onMessageCreated={handleMessageCreated}
+          onSaveAsDraft={(data) => {
+            const audience =
+              data.statesOrAgencies.length === 0
+                ? 'All'
+                : data.statesOrAgencies.length <= 2
+                ? data.statesOrAgencies.join(', ')
+                : `${data.statesOrAgencies.slice(0, 2).join(', ')} +${data.statesOrAgencies.length - 2}`;
+            setMessages((prev) => [
+              {
+                id: Date.now().toString(),
+                subject: data.title || 'Untitled Draft',
+                type: (data.messageType as MessageType) || '',
+                audience,
+                channel: 'Email',
+                status: 'Draft',
+                startDate: data.startDate ? formatDisplayDate(data.startDate) : '—',
+                endDate: data.endDate ? formatDisplayDate(data.endDate) : '—',
+                recipients: null,
+              },
+              ...prev,
+            ]);
+            setSelectedStatus('Draft');
+          }}
+        />
+      )}
     </div>
   );
 }
