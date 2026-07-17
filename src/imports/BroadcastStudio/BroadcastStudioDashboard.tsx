@@ -206,21 +206,10 @@ export default function BroadcastStudioDashboard() {
 
   return (
     <div className="flex flex-col gap-[20px] items-start w-full pb-[8px]" data-name="Broadcast Studio Dashboard">
-      <div className="flex items-center gap-[16px] w-full">
-        <StatusCard label="Live" count={liveCount} color={STATUS_COLOR.Live} />
-        <StatusCard label="Pending" count={pendingCount} color={STATUS_COLOR.Pending} />
-        <StatusCard label="Drafts" count={draftCount} color={STATUS_COLOR.Draft} />
+      <div className="flex items-center gap-[12px] w-full">
+        <SearchInput value={search} onChange={setSearch} />
         <div className="flex-1" />
         <NewMessageButton />
-      </div>
-
-      <div className="flex items-center gap-[12px] w-full flex-wrap">
-        <SearchInput value={search} onChange={setSearch} />
-        <div className="flex items-center gap-[8px]">
-          {FILTERS.map((f) => (
-            <FilterTab key={f} label={f === 'Draft' ? 'Drafts' : f} active={filter === f} onClick={() => setFilter(f)} />
-          ))}
-        </div>
       </div>
 
       <MessageTable rows={filteredRows} />
