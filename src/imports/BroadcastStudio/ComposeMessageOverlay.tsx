@@ -330,14 +330,8 @@ export default function ComposeMessageOverlay({ onClose }: { onClose: () => void
   const [dismissible, setDismissible] = useState<Dismissible>('Dismissible');
   const [pushNotification, setPushNotification] = useState(false);
 
-  const [audienceSearch, setAudienceSearch] = useState('');
-
   const isAnnouncement = messageType === 'Announcement';
   const isEmergency = messageType === 'Emergency';
-
-  const audienceOptions = (searchMode === 'Agency' ? AGENCIES.map((a) => a.name) : STATES).filter((opt) =>
-    opt.toLowerCase().includes(audienceSearch.trim().toLowerCase())
-  );
 
   let matching = searchMode === 'State'
     ? (statesOrAgencies.length > 0 ? AGENCIES.filter((a) => statesOrAgencies.includes(a.state)) : [])
@@ -349,13 +343,12 @@ export default function ComposeMessageOverlay({ onClose }: { onClose: () => void
   const handleSearchModeChange = (v: string) => {
     setSearchMode(v as SearchMode);
     setStatesOrAgencies([]);
-    setAudienceSearch('');
   };
 
   const handleSubmit = () => {
     console.log('Create Message', {
       title, body, reason, messageType, displayFormat, placement, featurePath,
-      hasCta, ctaLabel, ctaDestination, searchMode, audienceSearch, statesOrAgencies, packages, roles,
+      hasCta, ctaLabel, ctaDestination, searchMode, statesOrAgencies, packages, roles,
       startDate, endDate, frequency, dismissible, pushNotification,
     });
     onClose();
@@ -409,18 +402,12 @@ export default function ComposeMessageOverlay({ onClose }: { onClose: () => void
             <div className="flex flex-col gap-[16px] w-full">
               <SectionHeader>Search Mode</SectionHeader>
               <RadioField label="Search By *" value={searchMode} onChange={handleSearchModeChange} options={['Agency', 'State']} />
-              <TextField
-                label="Search By"
-                value={audienceSearch}
-                onChange={setAudienceSearch}
-                placeholder={searchMode === 'Agency' ? 'Search agencies by name...' : 'Search states by name...'}
-              />
               <MultiSelectField
                 label="States / Agency *"
                 values={statesOrAgencies}
                 onChange={setStatesOrAgencies}
                 placeholder={searchMode === 'State' ? 'Select states...' : 'Select agencies...'}
-                options={audienceOptions}
+                options={searchMode === 'Agency' ? AGENCIES.map((a) => a.name) : STATES}
                 caption={`${audienceCount} ${audienceCount === 1 ? 'agency' : 'agencies'} will see this message`}
               />
               <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} />
@@ -429,19 +416,15 @@ export default function ComposeMessageOverlay({ onClose }: { onClose: () => void
 
             <div className="flex flex-col gap-[16px] w-full">
               <SectionHeader>Display Settings</SectionHeader>
-              {isAnnouncement && displayFormat === 'Banner' && (
-                <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} />
-              )}
-              {isAnnouncement && (
-                <CtaBox
-                  checked={hasCta}
-                  onChange={setHasCta}
-                  label={ctaLabel}
-                  destination={ctaDestination}
-                  onLabelChange={setCtaLabel}
-                  onDestinationChange={setCtaDestination}
-                />
-              )}
+              <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} />
+              <CtaBox
+                checked={hasCta}
+                onChange={setHasCta}
+                label={ctaLabel}
+                destination={ctaDestination}
+                onLabelChange={setCtaLabel}
+                onDestinationChange={setCtaDestination}
+              />
               {isEmergency && <ToggleRow label="Also send as push notification" checked={pushNotification} onChange={setPushNotification} />}
             </div>
           </div>
