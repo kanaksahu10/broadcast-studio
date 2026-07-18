@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BsSearch } from 'react-icons/bs';
 import { MdAdd, MdTableRows, MdViewKanban } from 'react-icons/md';
 import ComposeMessageOverlay from './ComposeMessageOverlay';
@@ -344,13 +344,25 @@ function KanbanBoard({ rows, onEdit }: {
   );
 }
 
-export default function BroadcastStudioDashboard() {
+export default function BroadcastStudioDashboard({ sidebarCollapsed = false, onOverlayOpen, onOverlayClose }: { sidebarCollapsed?: boolean; onOverlayOpen?: (closeFn: () => void) => void; onOverlayClose?: () => void }) {
   const [messages, setMessages] = useState<BroadcastMessageRow[]>(INITIAL_MESSAGES);
   const [selectedStatus, setSelectedStatus] = useState<MessageStatus>('Live');
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('datagrid');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<BroadcastMessageRow | null>(null);
+
+  useEffect(() => {
+    if (isComposeOpen || editingRow !== null) {
+      onOverlayOpen?.(() => {
+        setIsComposeOpen(false);
+        setEditingRow(null);
+      });
+    } else {
+      onOverlayClose?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isComposeOpen, editingRow]);
 
   const handleMessageCreated = (data: {
     title: string;
@@ -429,6 +441,7 @@ export default function BroadcastStudioDashboard() {
 
       {editingRow && (
         <ComposeMessageOverlay
+          sidebarCollapsed={sidebarCollapsed}
           onClose={() => setEditingRow(null)}
           initialData={{
             title: editingRow.subject,
@@ -461,6 +474,7 @@ export default function BroadcastStudioDashboard() {
 
       {isComposeOpen && (
         <ComposeMessageOverlay
+          sidebarCollapsed={sidebarCollapsed}
           onClose={() => setIsComposeOpen(false)}
           onMessageCreated={handleMessageCreated}
           onSaveAsDraft={(data) => {

@@ -1398,6 +1398,8 @@ function Container({ goalTemplates }: { goalTemplates: GoalTemplate[] }) {
 export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioProps) {
   const [expandedSection, setExpandedSection] = useState<'clients' | 'agency' | 'superAdmin' | null>('superAdmin');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [overlayOpen, setOverlayOpen] = useState(false);
+  const overlayCloseRef = useRef<(() => void) | null>(null);
 
   const handleClientsClick = () => {
     setExpandedSection('clients');
@@ -1820,10 +1822,14 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
       </div>
       {/* Main content area: fixed breadcrumb toolbar + its own independent scroll region,
           so content taller than the viewport scrolls instead of being clipped. */}
-      <div className={`absolute bg-[#f8f8f8] flex gap-[14px] h-[48px] items-center right-[60px] p-[16px] top-[59px] z-10 transition-[left] duration-200 ${sidebarCollapsed ? 'left-[72px]' : 'left-[329px]'}`} data-name="Toolbar">
+      <div
+        className={`absolute bg-[#f8f8f8] flex gap-[14px] h-[48px] items-center right-[60px] p-[16px] top-[59px] z-10 transition-[left] duration-200 ${sidebarCollapsed ? 'left-[72px]' : 'left-[329px]'} ${overlayOpen ? 'cursor-pointer hover:bg-[#f0f0f0]' : ''}`}
+        data-name="Toolbar"
+        onClick={overlayOpen ? () => overlayCloseRef.current?.() : undefined}
+      >
         <MdArrowBack size={21} color="#27496D" />
         <span className="font-['Montserrat',sans-serif] font-medium text-[15px] text-black leading-[15px]">
-          {expandedSection === 'agency' ? 'View Goals' : 'Broadcast Studio'}
+          {overlayOpen ? 'New Message' : expandedSection === 'agency' ? 'View Goals' : 'Broadcast Studio'}
         </span>
       </div>
       <div className={`absolute right-[60px] top-[107px] bottom-0 overflow-y-auto transition-[left] duration-200 ${sidebarCollapsed ? 'left-[72px]' : 'left-[329px]'}`}>
@@ -1831,7 +1837,11 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
           {expandedSection === 'agency' ? (
             <Container goalTemplates={goalTemplates} />
           ) : (
-            <BroadcastStudioDashboard />
+            <BroadcastStudioDashboard
+              sidebarCollapsed={sidebarCollapsed}
+              onOverlayOpen={(closeFn) => { setOverlayOpen(true); overlayCloseRef.current = closeFn; }}
+              onOverlayClose={() => { setOverlayOpen(false); overlayCloseRef.current = null; }}
+            />
           )}
         </div>
       </div>

@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdPreview, MdSend } from 'react-icons/md';
+import { MdArrowBack, MdCheck, MdPreview, MdSend } from 'react-icons/md';
 import { GrAnnounce } from 'react-icons/gr';
 
 type MessageType = '' | 'Announcement' | 'Emergency';
@@ -362,11 +361,12 @@ function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestin
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, sidebarCollapsed = false }: {
   onClose: () => void;
   onMessageCreated?: (data: { title: string; messageType: string; statesOrAgencies: string[]; searchMode: string; startDate: string; endDate: string; }) => void;
   onSaveAsDraft?: (data: { title: string; messageType: string; statesOrAgencies: string[]; searchMode: string; startDate: string; endDate: string; }) => void;
   initialData?: { title?: string; messageType?: string; startDate?: string; endDate?: string; };
+  sidebarCollapsed?: boolean;
 }) {
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [body, setBody] = useState('');
@@ -432,26 +432,31 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const hasPreview = isFormValid;
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col">
+    <div className="fixed z-50 flex flex-col" style={{ top: 59, bottom: 0, right: 60, left: sidebarCollapsed ? 72 : 329 }}>
       <style>{`.date-input-no-native-icon::-webkit-calendar-picker-indicator { opacity: 0; position: absolute; right: 0; width: 24px; height: 100%; cursor: pointer; }`}</style>
-
-      {/* Top header bar */}
-      <div className="flex items-center justify-between h-[56px] px-[24px] border-b shrink-0" style={{ borderColor: BORDER }}>
-        <h2 className="font-['Montserrat',sans-serif] font-semibold text-[16px] text-black">New Message</h2>
-        <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
-          <IoIosClose size={26} color="#000000" />
-        </button>
-      </div>
 
       {/* Body: left form + right preview */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
-        {/* LEFT — scrollable form, fixed 399px */}
-        <div style={{ width: '399px', minWidth: '399px', maxWidth: '399px', overflowY: 'auto', borderRight: `1px solid ${BORDER}` }} className="p-[24px] flex flex-col gap-[16px]">
+        {/* LEFT — white panel, fixed 399px, with sticky header */}
+        <div style={{ width: '399px', minWidth: '399px', maxWidth: '399px', borderRight: `1px solid ${BORDER}`, display: 'flex', flexDirection: 'column', backgroundColor: 'white' }}>
 
-          {/* Message Basics card */}
+          {/* Breadcrumb header */}
+          <div
+            className="flex items-center gap-[14px] shrink-0 px-[20px] cursor-pointer"
+            style={{ height: '48px', backgroundColor: 'white' }}
+            onClick={onClose}
+          >
+            <MdArrowBack size={18} color="#27496D" />
+            <span className="font-['Montserrat',sans-serif] font-medium text-[15px] text-black">New Message</span>
+          </div>
+
+          {/* Scrollable form */}
+          <div style={{ flex: 1, overflowY: 'auto' }} className="pt-[8px] px-[24px] pb-[24px] flex flex-col gap-[16px]">
+
+          {/* Details card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
-            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Message Basics</p>
+            <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px] text-black">Details</p>
             <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Type message title" />
             <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Type the message body" />
             <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Why is this message being sent?" />
@@ -474,7 +479,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
           {/* Date & Time card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
-            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Date &amp; Time</p>
+            <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px] text-black">Date &amp; Time</p>
             <DateField label="Start Date *" value={startDate} onChange={setStartDate} />
             <DateField label="End Date" value={endDate} onChange={setEndDate} />
             <SelectField label="Frequency *" value={frequency} onChange={setFrequency} placeholder="Select frequency..." options={FREQUENCY_OPTIONS} />
@@ -483,7 +488,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           {/* Audience card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <div className="flex flex-wrap items-center justify-between gap-x-[8px] gap-y-[2px]">
-              <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Audience</p>
+              <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px] text-black">Audience</p>
               <span className="font-['Montserrat',sans-serif] font-medium text-[12px] shrink-0" style={{ color: NAVY }}>
                 {audienceCount} {audienceCount === 1 ? 'agency' : 'agencies'} will see this message
               </span>
@@ -502,7 +507,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
           {/* Display Settings card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
-            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Display Settings</p>
+            <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px] text-black">Display Settings</p>
             <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} />
             <CtaBox
               checked={hasCta}
@@ -514,14 +519,15 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             />
             {isEmergency && <ToggleRow label="Also send as push notification" checked={pushNotification} onChange={setPushNotification} />}
           </div>
-        </div>
+          </div>{/* end scrollable form */}
+        </div>{/* end left panel */}
 
         {/* RIGHT — preview + actions */}
         <div style={{ flex: 1, minWidth: 0, backgroundColor: '#f8f8f8' }} className="flex flex-col p-[24px] gap-[16px]">
           {/* Preview card */}
           <div className="bg-white rounded-[8px] border flex flex-col flex-1 overflow-hidden" style={{ borderColor: BORDER }}>
             <div className="px-[16px] py-[12px] border-b" style={{ borderColor: BORDER }}>
-              <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] text-black">Message Preview</p>
+              <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px] text-black">Preview</p>
             </div>
             <div className="flex-1 flex flex-col p-[16px]">
               {hasPreview ? (
@@ -530,7 +536,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                   {isEmergency && (
                     <div className="rounded-[8px] border-l-[4px] p-[14px] flex flex-col gap-[6px]" style={{ borderLeftColor: '#DA4040', backgroundColor: '#fff5f5' }}>
                       <p className="font-['Montserrat',sans-serif] font-semibold text-[13px]" style={{ color: '#DA4040' }}>⚠ Emergency</p>
-                      <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">{title}</p>
+                      <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px] text-black">{title}</p>
                       <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-[#383838]">{body}</p>
                       {hasCta && ctaLabel && (
                         <button className="self-start mt-[4px] rounded-[6px] px-[12px] py-[6px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: '#DA4040' }}>{ctaLabel}</button>
@@ -541,7 +547,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                   {isAnnouncement && displayFormat === 'Banner' && (
                     <div className="rounded-[8px] border-l-[4px] p-[14px] flex flex-col gap-[6px]" style={{ borderLeftColor: PRIMARY, backgroundColor: '#e8f4ff' }}>
                       <p className="font-['Montserrat',sans-serif] font-semibold text-[13px]" style={{ color: PRIMARY }}>Announcement</p>
-                      <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">{title}</p>
+                      <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px] text-black">{title}</p>
                       <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-[#383838]">{body}</p>
                       {hasCta && ctaLabel && (
                         <button className="self-start mt-[4px] rounded-[6px] px-[12px] py-[6px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: PRIMARY }}>{ctaLabel}</button>
