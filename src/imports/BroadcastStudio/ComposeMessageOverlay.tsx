@@ -53,7 +53,7 @@ function FieldShell({ label, height, children }: { label: string; height?: numbe
   return (
     <div
       className="bg-white border rounded-[4px] px-[12px] py-[8px] flex flex-col gap-[8px] justify-center w-full"
-      style={{ borderColor: BORDER, borderWidth: '1px', height: height ?? 70 }}
+      style={{ borderColor: BORDER, borderWidth: '1px', minHeight: height ?? 70 }}
     >
       <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: LABEL_GREY }}>
         {label}
@@ -77,14 +77,24 @@ function TextField({ label, value, onChange, placeholder }: { label: string; val
 }
 
 function TextAreaField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
   return (
     <FieldShell label={label}>
       <textarea
+        ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={1}
-        className="font-['Montserrat',sans-serif] font-normal text-[13px] text-black placeholder:text-[#b8b8b8] outline-none bg-transparent w-full resize-none"
+        className="font-['Montserrat',sans-serif] font-normal text-[13px] text-black placeholder:text-[#b8b8b8] outline-none bg-transparent w-full resize-none overflow-hidden"
       />
     </FieldShell>
   );
@@ -368,15 +378,20 @@ function BannerPreview({
   dismissible,
   hasCta,
   ctaLabel,
+  rounded = true,
 }: {
   body: string;
   color: string;
   dismissible: boolean;
   hasCta: boolean;
   ctaLabel: string;
+  rounded?: boolean;
 }) {
   return (
-    <div className="rounded-[6px] flex items-center justify-between gap-[16px] px-[16px] py-[12px] w-full" style={{ backgroundColor: color }}>
+    <div
+      className={`flex items-center justify-between gap-[16px] px-[16px] py-[12px] w-full ${rounded ? 'rounded-[6px]' : ''}`}
+      style={{ backgroundColor: color }}
+    >
       <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-white flex-1">
         {body || 'Your message body will appear here.'}
         {hasCta && ctaLabel && (
@@ -397,15 +412,20 @@ function OverlayPreview({
   dismissible,
   hasCta,
   ctaLabel,
+  rounded = true,
 }: {
   title: string;
   body: string;
   dismissible: boolean;
   hasCta: boolean;
   ctaLabel: string;
+  rounded?: boolean;
 }) {
   return (
-    <div className="rounded-[8px] border shadow-md flex flex-col w-[320px] h-full" style={{ borderColor: BORDER }}>
+    <div
+      className={`border flex flex-col w-[320px] h-full ${rounded ? 'rounded-[8px] shadow-md' : 'border-t-0 border-r-0 border-b-0'}`}
+      style={{ borderColor: BORDER }}
+    >
       <div className="flex items-center justify-between px-[16px] py-[12px] border-b shrink-0" style={{ borderColor: BORDER }}>
         <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">{title || 'Message Title'}</p>
         {dismissible && <MdClose size={18} color="#000000" className="cursor-pointer shrink-0" />}
@@ -432,6 +452,73 @@ function OverlayPreview({
           >
             <MdCheck size={14} /> Dismiss
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SkeletonBar({ width, height = 8 }: { width: string; height?: number }) {
+  return <div className="rounded-[2px] shrink-0" style={{ width, height, backgroundColor: '#eeeeee' }} />;
+}
+
+function ScreenSkeleton({
+  effectiveFormat,
+  title,
+  body,
+  color,
+  dismissible,
+  hasCta,
+  ctaLabel,
+}: {
+  effectiveFormat: DisplayFormat;
+  title: string;
+  body: string;
+  color: string;
+  dismissible: boolean;
+  hasCta: boolean;
+  ctaLabel: string;
+}) {
+  return (
+    <div className="relative w-full h-full bg-white rounded-[8px] border overflow-hidden" style={{ borderColor: BORDER }}>
+      <div className="flex flex-col h-full">
+        {/* Topbar skeleton */}
+        <div className="h-[32px] border-b flex items-center gap-[8px] px-[10px] shrink-0" style={{ borderColor: BORDER }}>
+          <div className="w-[14px] h-[14px] rounded-[3px]" style={{ backgroundColor: '#e0e0e0' }} />
+          <div className="h-[8px] rounded-[3px] flex-1 max-w-[140px]" style={{ backgroundColor: '#eeeeee' }} />
+          <div className="ml-auto w-[16px] h-[16px] rounded-full" style={{ backgroundColor: '#d8d8d8' }} />
+        </div>
+        <div className="flex flex-1 min-h-0">
+          {/* Sidebar skeleton */}
+          <div className="w-[56px] border-r flex flex-col gap-[8px] p-[8px] shrink-0" style={{ borderColor: BORDER }}>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <SkeletonBar key={i} width={i === 2 ? '100%' : '65%'} height={6} />
+            ))}
+          </div>
+          {/* Main content skeleton */}
+          <div className="flex-1 min-w-0 p-[12px] flex flex-col gap-[10px]">
+            <div className="flex items-center justify-between">
+              <SkeletonBar width="80px" />
+              <div className="w-[54px] h-[14px] rounded-[4px]" style={{ backgroundColor: PRIMARY, opacity: 0.55 }} />
+            </div>
+            <div className="flex flex-col gap-[6px]">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <SkeletonBar key={i} width="100%" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {effectiveFormat === 'Overlay' && (
+        <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
+          <OverlayPreview title={title} body={body} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+        </div>
+      )}
+
+      {effectiveFormat === 'Banner' && (
+        <div className="absolute left-0 right-0 bottom-0">
+          <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
         </div>
       )}
     </div>
@@ -620,12 +707,28 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             </div>
             <div className="flex-1 min-h-0 flex flex-col p-[16px] gap-[12px]">
               {previewTab === 'screen' ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-[10px]">
-                  <MdPreview size={40} color="#d1d3d4" />
-                  <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8] text-center max-w-[220px]">
-                    Full-screen preview coming soon.
-                  </p>
-                </div>
+                hasPreview ? (
+                  <div className="flex-1 min-h-0">
+                    <ScreenSkeleton
+                      effectiveFormat={effectiveFormat}
+                      title={title}
+                      body={body}
+                      color={isEmergency ? '#d4183d' : NAVY}
+                      dismissible={effectiveDismissible}
+                      hasCta={hasCta}
+                      ctaLabel={ctaLabel}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-[10px] py-[40px]">
+                    <MdPreview size={40} color="#d1d3d4" />
+                    <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8] text-center max-w-[220px]">
+                      {messageType === ''
+                        ? 'Preview will appear here once you select a message type.'
+                        : 'Preview will appear here once you select a display format.'}
+                    </p>
+                  </div>
+                )
               ) : hasPreview ? (
                 <>
                   <div
