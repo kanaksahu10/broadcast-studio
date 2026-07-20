@@ -574,7 +574,7 @@ function ScreenSkeleton({
                   <div
                     key={i}
                     className="flex items-center gap-[6px] px-[10px] relative shrink-0"
-                    style={{ backgroundColor: active ? '#cfcfcf' : expanded ? '#dcdcdc' : 'transparent', height: 16 }}
+                    style={{ backgroundColor: active ? '#cfcfcf' : expanded ? '#dcdcdc' : 'transparent', height: 30 }}
                   >
                     {active && <div className="absolute left-0 top-0 bottom-0" style={{ width: 3, backgroundColor: '#0078d4' }} />}
                     <div className="w-[8px] h-[8px] rounded-[2px] shrink-0" style={{ backgroundColor: '#b3b3b3' }} />
@@ -748,15 +748,20 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Type the message body" />
             <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Why is this message being sent?" />
             <SelectField label="Message Type *" value={messageType} onChange={(v) => setMessageType(v as MessageType)} placeholder="Select message type..." options={['Announcement', 'Emergency']} />
-            <ColorField label="Message Color" value={messageColor} onChange={setMessageColor} options={MESSAGE_COLOR_OPTIONS} />
             {isEmergency && (
-              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#717182]">
-                Emergency messages are always sent as a non-dismissible, app-wide banner.
-              </p>
+              <>
+                <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#717182]">
+                  Emergency messages are always sent as a non-dismissible, app-wide banner.
+                </p>
+                <ColorField label="Message Color" value={messageColor} onChange={setMessageColor} options={MESSAGE_COLOR_OPTIONS} />
+              </>
             )}
             {isAnnouncement && (
               <>
                 <SelectField label="Display Format *" value={displayFormat} onChange={(v) => setDisplayFormat(v as DisplayFormat)} placeholder="Select display format..." options={['Overlay', 'Banner']} />
+                {displayFormat === 'Banner' && (
+                  <ColorField label="Message Color" value={messageColor} onChange={setMessageColor} options={MESSAGE_COLOR_OPTIONS} />
+                )}
                 <SelectField label="Placement *" value={placement} onChange={(v) => setPlacement(v as Placement)} placeholder="Select placement..." options={['App-wide', 'Feature Specific']} />
                 {placement === 'Feature Specific' && (
                   <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} />
