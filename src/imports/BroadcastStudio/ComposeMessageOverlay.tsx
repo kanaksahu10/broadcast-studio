@@ -405,12 +405,12 @@ function OverlayPreview({
   ctaLabel: string;
 }) {
   return (
-    <div className="rounded-[8px] border shadow-md flex flex-col w-full max-w-[320px]" style={{ borderColor: BORDER }}>
-      <div className="flex items-center justify-between px-[16px] py-[12px] border-b" style={{ borderColor: BORDER }}>
+    <div className="rounded-[8px] border shadow-md flex flex-col w-[320px] h-full" style={{ borderColor: BORDER }}>
+      <div className="flex items-center justify-between px-[16px] py-[12px] border-b shrink-0" style={{ borderColor: BORDER }}>
         <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">{title || 'Message Title'}</p>
         {dismissible && <MdClose size={18} color="#000000" className="cursor-pointer shrink-0" />}
       </div>
-      <div className="px-[16px] py-[14px] flex flex-col gap-[10px]">
+      <div className="px-[16px] py-[14px] flex flex-col gap-[10px] flex-1 overflow-y-auto">
         <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-[#383838] whitespace-pre-wrap">
           {body || 'Your message body will appear here.'}
         </p>
@@ -421,7 +421,7 @@ function OverlayPreview({
         )}
       </div>
       {dismissible && (
-        <div className="flex items-center justify-between px-[16px] py-[10px] border-t" style={{ borderColor: BORDER, backgroundColor: '#fafafa' }}>
+        <div className="flex items-center justify-between px-[16px] py-[10px] border-t shrink-0" style={{ borderColor: BORDER, backgroundColor: '#fafafa' }}>
           <span className="font-['Montserrat',sans-serif] font-medium text-[11px] uppercase tracking-wide cursor-pointer" style={{ color: NAVY }}>
             Don't show again
           </span>
@@ -465,6 +465,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [frequency, setFrequency] = useState('');
   const [dismissible, setDismissible] = useState<Dismissible>('Dismissible');
   const [pushNotification, setPushNotification] = useState(false);
+  const [previewTab, setPreviewTab] = useState<'banner' | 'screen'>('banner');
 
   const isAnnouncement = messageType === 'Announcement';
   const isEmergency = messageType === 'Emergency';
@@ -598,36 +599,66 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
         <div style={{ flex: 1, minWidth: 0, backgroundColor: '#f8f8f8' }} className="flex flex-col p-[24px] gap-[16px]">
           {/* Preview card */}
           <div className="bg-white rounded-[8px] border flex flex-col flex-1 overflow-hidden" style={{ borderColor: BORDER }}>
-            <div className="px-[16px] py-[12px] border-b" style={{ borderColor: BORDER }}>
+            <div className="px-[16px] py-[12px] border-b flex items-center justify-between gap-[12px] shrink-0" style={{ borderColor: BORDER }}>
               <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] text-black">Message Preview</p>
+              <div className="flex items-center gap-[2px] bg-[#f0f0f0] rounded-[6px] p-[2px] shrink-0">
+                {(['banner', 'screen'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setPreviewTab(tab)}
+                    className="rounded-[4px] px-[10px] py-[5px] font-['Montserrat',sans-serif] font-medium text-[12px] cursor-pointer whitespace-nowrap"
+                    style={{
+                      backgroundColor: previewTab === tab ? NAVY : 'transparent',
+                      color: previewTab === tab ? '#ffffff' : LABEL_GREY,
+                    }}
+                  >
+                    {tab === 'banner' ? 'Just the banner' : 'With screen'}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex-1 flex flex-col p-[16px]">
-              {hasPreview ? (
-                <div className="flex flex-col gap-[16px] items-start">
-                  {effectiveFormat === 'Banner' && (
-                    <BannerPreview
-                      body={body}
-                      color={isEmergency ? '#d4183d' : NAVY}
-                      dismissible={effectiveDismissible}
-                      hasCta={hasCta}
-                      ctaLabel={ctaLabel}
-                    />
-                  )}
-                  {effectiveFormat === 'Overlay' && (
-                    <OverlayPreview
-                      title={title}
-                      body={body}
-                      dismissible={effectiveDismissible}
-                      hasCta={hasCta}
-                      ctaLabel={ctaLabel}
-                    />
-                  )}
+            <div className="flex-1 min-h-0 flex flex-col p-[16px] gap-[12px]">
+              {previewTab === 'screen' ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-[10px]">
+                  <MdPreview size={40} color="#d1d3d4" />
+                  <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8] text-center max-w-[220px]">
+                    Full-screen preview coming soon.
+                  </p>
+                </div>
+              ) : hasPreview ? (
+                <>
+                  <div
+                    className="flex-1 min-h-0 flex justify-center"
+                    style={{ alignItems: effectiveFormat === 'Overlay' ? 'stretch' : 'center' }}
+                  >
+                    {effectiveFormat === 'Banner' && (
+                      <div className="w-full self-center">
+                        <BannerPreview
+                          body={body}
+                          color={isEmergency ? '#d4183d' : NAVY}
+                          dismissible={effectiveDismissible}
+                          hasCta={hasCta}
+                          ctaLabel={ctaLabel}
+                        />
+                      </div>
+                    )}
+                    {effectiveFormat === 'Overlay' && (
+                      <OverlayPreview
+                        title={title}
+                        body={body}
+                        dismissible={effectiveDismissible}
+                        hasCta={hasCta}
+                        ctaLabel={ctaLabel}
+                      />
+                    )}
+                  </div>
                   {/* Meta */}
-                  <div className="flex flex-wrap gap-[8px]">
+                  <div className="flex flex-wrap gap-[8px] shrink-0">
                     {startDate && <span className="text-[11px] font-['Montserrat',sans-serif] text-[#8b8b8b]">Starts {startDate}</span>}
                     {audienceCount > 0 && <span className="text-[11px] font-['Montserrat',sans-serif] text-[#8b8b8b]">• {audienceCount} {audienceCount === 1 ? 'agency' : 'agencies'}</span>}
                   </div>
-                </div>
+                </>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center gap-[10px] py-[40px]">
                   <MdPreview size={40} color="#d1d3d4" />
