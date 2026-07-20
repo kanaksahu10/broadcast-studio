@@ -389,10 +389,11 @@ function BannerPreview({
 }) {
   return (
     <div
-      className={`flex items-center justify-between gap-[16px] px-[16px] py-[12px] w-full ${rounded ? 'rounded-[6px]' : ''}`}
+      className={`flex items-center gap-[16px] px-[16px] py-[12px] w-full ${rounded ? 'rounded-[6px]' : ''}`}
       style={{ backgroundColor: color }}
     >
-      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-white flex-1">
+      {dismissible && <div className="shrink-0" style={{ width: 18 }} />}
+      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-white flex-1 text-center">
         {body || 'Your message body will appear here.'}
         {hasCta && ctaLabel && (
           <>
@@ -463,34 +464,44 @@ const SKELETON = {
   greyLight: '#ececec',
   avatar: '#8b3fe0',
   statBlue: '#dceafd',
+  statBlueBorder: '#a9cdf7',
   statRed: '#fbdcdc',
+  statRedBorder: '#f0a8a8',
   rowTint: '#eef5ff',
-  badgeRed: '#f2a8a8',
-  checkboxBlue: '#bcdcfc',
+  badgeRed: '#e05c5c',
+  checkbox: '#2699fb',
 };
 
 function SkeletonBar({ width, height = 8, color }: { width: string; height?: number; color?: string }) {
   return <div className="rounded-[2px] shrink-0" style={{ width, height, backgroundColor: color ?? SKELETON.grey }} />;
 }
 
-function StatCardSkeleton({ color }: { color?: string }) {
+function CheckboxSkeleton() {
+  return <div className="w-[9px] h-[9px] rounded-[2px] border-[1.5px] shrink-0" style={{ borderColor: SKELETON.checkbox }} />;
+}
+
+function StatCardSkeleton({ color, borderColor }: { color?: string; borderColor?: string }) {
   return (
     <div
       className="rounded-[4px] border flex-1"
-      style={{ height: 42, backgroundColor: color ?? '#ffffff', borderColor: color ? 'transparent' : BORDER }}
+      style={{ height: 42, backgroundColor: color ?? '#ffffff', borderColor: borderColor ?? BORDER }}
     />
   );
 }
 
 function TableRowSkeleton({ index }: { index: number }) {
   return (
-    <div className="flex items-center gap-[8px] px-[6px] py-[6px] shrink-0" style={{ backgroundColor: index % 2 === 0 ? SKELETON.rowTint : '#ffffff' }}>
-      <div className="w-[8px] h-[8px] rounded-[2px] shrink-0" style={{ backgroundColor: SKELETON.checkboxBlue }} />
-      <SkeletonBar width="20%" />
-      <SkeletonBar width="16%" height={9} color={SKELETON.badgeRed} />
-      <SkeletonBar width="18%" />
-      <div className="w-[8px] h-[8px] rounded-[2px] shrink-0" style={{ backgroundColor: SKELETON.grey }} />
-      <SkeletonBar width="20%" />
+    <div className="flex items-center gap-[8px] px-[8px] py-[10px] shrink-0" style={{ backgroundColor: index % 2 === 0 ? SKELETON.rowTint : '#ffffff' }}>
+      <CheckboxSkeleton />
+      <SkeletonBar width="15%" />
+      <SkeletonBar width="17%" height={11} color={SKELETON.badgeRed} />
+      <SkeletonBar width="15%" />
+      <div className="w-[9px] h-[9px] rounded-[2px] border shrink-0" style={{ borderColor: SKELETON.grey }} />
+      <div className="flex flex-col gap-[3px]" style={{ width: '24%' }}>
+        <SkeletonBar width="100%" />
+        <SkeletonBar width="45%" height={6} />
+      </div>
+      <div style={{ width: '19%' }} />
     </div>
   );
 }
@@ -523,7 +534,7 @@ function ScreenSkeleton({
         </div>
         <div className="flex flex-1 min-h-0">
           {/* Sidebar skeleton */}
-          <div className="w-[100px] border-r flex flex-col gap-[10px] p-[10px] shrink-0" style={{ borderColor: BORDER }}>
+          <div className="w-[140px] border-r flex flex-col gap-[10px] p-[10px] shrink-0" style={{ borderColor: BORDER }}>
             <div className="flex items-center gap-[6px]">
               <div className="w-[20px] h-[20px] rounded-[5px] shrink-0" style={{ backgroundColor: SKELETON.avatar }} />
               <SkeletonBar width="60%" height={8} />
@@ -548,8 +559,8 @@ function ScreenSkeleton({
           <div className="flex-1 min-w-0 p-[12px] flex flex-col gap-[10px] overflow-hidden">
             {/* Stat cards */}
             <div className="flex gap-[8px]">
-              <StatCardSkeleton color={SKELETON.statBlue} />
-              <StatCardSkeleton color={SKELETON.statRed} />
+              <StatCardSkeleton color={SKELETON.statBlue} borderColor={SKELETON.statBlueBorder} />
+              <StatCardSkeleton color={SKELETON.statRed} borderColor={SKELETON.statRedBorder} />
               <StatCardSkeleton />
               <StatCardSkeleton />
               <StatCardSkeleton />
@@ -569,16 +580,17 @@ function ScreenSkeleton({
             </div>
             {/* Table */}
             <div className="rounded-[4px] border flex-1 min-h-0 overflow-hidden flex flex-col" style={{ borderColor: BORDER }}>
-              <div className="flex items-center gap-[8px] px-[6px] py-[6px] border-b shrink-0" style={{ borderColor: BORDER }}>
-                <div className="w-[8px] h-[8px] rounded-[2px] shrink-0" style={{ backgroundColor: SKELETON.checkboxBlue }} />
-                <SkeletonBar width="20%" height={6} />
-                <SkeletonBar width="16%" height={6} />
-                <SkeletonBar width="18%" height={6} />
-                <SkeletonBar width="10%" height={6} />
-                <SkeletonBar width="20%" height={6} />
+              <div className="flex items-center gap-[8px] px-[8px] py-[8px] border-b shrink-0" style={{ borderColor: BORDER }}>
+                <CheckboxSkeleton />
+                <SkeletonBar width="15%" height={6} />
+                <SkeletonBar width="17%" height={6} />
+                <SkeletonBar width="15%" height={6} />
+                <SkeletonBar width="9%" height={6} />
+                <SkeletonBar width="24%" height={6} />
+                <SkeletonBar width="19%" height={6} />
               </div>
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-                {Array.from({ length: 8 }).map((_, i) => (
+                {Array.from({ length: 6 }).map((_, i) => (
                   <TableRowSkeleton key={i} index={i} />
                 ))}
               </div>
