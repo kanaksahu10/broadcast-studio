@@ -423,7 +423,7 @@ function OverlayPreview({
 }) {
   return (
     <div
-      className={`border flex flex-col w-[320px] h-full ${rounded ? 'rounded-[8px] shadow-md' : 'border-t-0 border-r-0 border-b-0'}`}
+      className={`bg-white border flex flex-col w-[320px] h-full ${rounded ? 'rounded-[8px] shadow-md' : 'border-t-0 border-r-0 border-b-0'}`}
       style={{ borderColor: BORDER }}
     >
       <div className="flex items-center justify-between px-[16px] py-[12px] border-b shrink-0" style={{ borderColor: BORDER }}>
@@ -458,8 +458,41 @@ function OverlayPreview({
   );
 }
 
-function SkeletonBar({ width, height = 8 }: { width: string; height?: number }) {
-  return <div className="rounded-[2px] shrink-0" style={{ width, height, backgroundColor: '#eeeeee' }} />;
+const SKELETON = {
+  grey: '#e2e2e2',
+  greyLight: '#ececec',
+  avatar: '#8b3fe0',
+  statBlue: '#dceafd',
+  statRed: '#fbdcdc',
+  rowTint: '#eef5ff',
+  badgeRed: '#f2a8a8',
+  checkboxBlue: '#bcdcfc',
+};
+
+function SkeletonBar({ width, height = 8, color }: { width: string; height?: number; color?: string }) {
+  return <div className="rounded-[2px] shrink-0" style={{ width, height, backgroundColor: color ?? SKELETON.grey }} />;
+}
+
+function StatCardSkeleton({ color }: { color?: string }) {
+  return (
+    <div
+      className="rounded-[4px] border flex-1"
+      style={{ height: 42, backgroundColor: color ?? '#ffffff', borderColor: color ? 'transparent' : BORDER }}
+    />
+  );
+}
+
+function TableRowSkeleton({ index }: { index: number }) {
+  return (
+    <div className="flex items-center gap-[8px] px-[6px] py-[6px] shrink-0" style={{ backgroundColor: index % 2 === 0 ? SKELETON.rowTint : '#ffffff' }}>
+      <div className="w-[8px] h-[8px] rounded-[2px] shrink-0" style={{ backgroundColor: SKELETON.checkboxBlue }} />
+      <SkeletonBar width="20%" />
+      <SkeletonBar width="16%" height={9} color={SKELETON.badgeRed} />
+      <SkeletonBar width="18%" />
+      <div className="w-[8px] h-[8px] rounded-[2px] shrink-0" style={{ backgroundColor: SKELETON.grey }} />
+      <SkeletonBar width="20%" />
+    </div>
+  );
 }
 
 function ScreenSkeleton({
@@ -480,34 +513,85 @@ function ScreenSkeleton({
   ctaLabel: string;
 }) {
   return (
-    <div className="relative w-full h-full bg-white rounded-[8px] border overflow-hidden" style={{ borderColor: BORDER }}>
-      <div className="flex flex-col h-full">
+    <div className="relative w-full h-full bg-white rounded-[8px] border overflow-hidden flex" style={{ borderColor: BORDER }}>
+      <div className="flex flex-col flex-1 min-w-0 h-full">
         {/* Topbar skeleton */}
-        <div className="h-[32px] border-b flex items-center gap-[8px] px-[10px] shrink-0" style={{ borderColor: BORDER }}>
-          <div className="w-[14px] h-[14px] rounded-[3px]" style={{ backgroundColor: '#e0e0e0' }} />
-          <div className="h-[8px] rounded-[3px] flex-1 max-w-[140px]" style={{ backgroundColor: '#eeeeee' }} />
-          <div className="ml-auto w-[16px] h-[16px] rounded-full" style={{ backgroundColor: '#d8d8d8' }} />
+        <div className="h-[36px] border-b flex items-center gap-[10px] px-[12px] shrink-0" style={{ borderColor: BORDER }}>
+          <div className="w-[14px] h-[14px] rounded-[3px]" style={{ backgroundColor: SKELETON.grey }} />
+          <div className="h-[16px] rounded-[4px] w-[180px]" style={{ backgroundColor: SKELETON.greyLight }} />
+          <div className="ml-auto w-[18px] h-[18px] rounded-full" style={{ backgroundColor: SKELETON.avatar }} />
         </div>
         <div className="flex flex-1 min-h-0">
           {/* Sidebar skeleton */}
-          <div className="w-[56px] border-r flex flex-col gap-[8px] p-[8px] shrink-0" style={{ borderColor: BORDER }}>
-            {Array.from({ length: 8 }).map((_, i) => (
-              <SkeletonBar key={i} width={i === 2 ? '100%' : '65%'} height={6} />
-            ))}
+          <div className="w-[100px] border-r flex flex-col gap-[10px] p-[10px] shrink-0" style={{ borderColor: BORDER }}>
+            <div className="flex items-center gap-[6px]">
+              <div className="w-[20px] h-[20px] rounded-[5px] shrink-0" style={{ backgroundColor: SKELETON.avatar }} />
+              <SkeletonBar width="60%" height={8} />
+            </div>
+            <div className="flex flex-col gap-[7px] mt-[4px]">
+              {Array.from({ length: 9 }).map((_, i) => {
+                const active = i === 1 || i === 2;
+                return (
+                  <div
+                    key={i}
+                    className="rounded-[2px] flex items-center relative"
+                    style={{ backgroundColor: active ? '#e2e2e2' : 'transparent', height: 10 }}
+                  >
+                    {i === 2 && <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ backgroundColor: PRIMARY }} />}
+                    <SkeletonBar width={i === 2 ? '85%' : i % 3 === 0 ? '95%' : '70%'} height={7} color={active ? '#d4d4d4' : SKELETON.greyLight} />
+                  </div>
+                );
+              })}
+            </div>
           </div>
           {/* Main content skeleton */}
-          <div className="flex-1 min-w-0 p-[12px] flex flex-col gap-[10px]">
-            <div className="flex items-center justify-between">
-              <SkeletonBar width="80px" />
-              <div className="w-[54px] h-[14px] rounded-[4px]" style={{ backgroundColor: PRIMARY, opacity: 0.55 }} />
+          <div className="flex-1 min-w-0 p-[12px] flex flex-col gap-[10px] overflow-hidden">
+            {/* Stat cards */}
+            <div className="flex gap-[8px]">
+              <StatCardSkeleton color={SKELETON.statBlue} />
+              <StatCardSkeleton color={SKELETON.statRed} />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
             </div>
-            <div className="flex flex-col gap-[6px]">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <SkeletonBar key={i} width="100%" />
-              ))}
+            <div className="flex gap-[8px]">
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <div className="flex-1" style={{ visibility: 'hidden' }} />
+              <div className="flex-1" style={{ visibility: 'hidden' }} />
+              <div className="flex-1" style={{ visibility: 'hidden' }} />
+            </div>
+            {/* Toolbar */}
+            <div className="flex items-center gap-[8px] mt-[2px]">
+              <div className="h-[18px] rounded-[4px] border flex-1 max-w-[160px]" style={{ borderColor: BORDER }} />
+              <div className="h-[12px] w-[54px] rounded-[3px]" style={{ backgroundColor: SKELETON.greyLight }} />
+              <div className="h-[12px] w-[54px] rounded-[3px]" style={{ backgroundColor: SKELETON.greyLight }} />
+            </div>
+            {/* Table */}
+            <div className="rounded-[4px] border flex-1 min-h-0 overflow-hidden flex flex-col" style={{ borderColor: BORDER }}>
+              <div className="flex items-center gap-[8px] px-[6px] py-[6px] border-b shrink-0" style={{ borderColor: BORDER }}>
+                <div className="w-[8px] h-[8px] rounded-[2px] shrink-0" style={{ backgroundColor: SKELETON.checkboxBlue }} />
+                <SkeletonBar width="20%" height={6} />
+                <SkeletonBar width="16%" height={6} />
+                <SkeletonBar width="18%" height={6} />
+                <SkeletonBar width="10%" height={6} />
+                <SkeletonBar width="20%" height={6} />
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <TableRowSkeleton key={i} index={i} />
+                ))}
+              </div>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Notification rail skeleton */}
+      <div className="w-[28px] border-l flex flex-col items-center gap-[10px] py-[10px] shrink-0" style={{ borderColor: BORDER }}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="w-[14px] h-[14px] rounded-[3px]" style={{ backgroundColor: SKELETON.greyLight }} />
+        ))}
       </div>
 
       {effectiveFormat === 'Overlay' && (
