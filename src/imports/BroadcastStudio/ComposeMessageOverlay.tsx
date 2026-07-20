@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdPreview, MdSend } from 'react-icons/md';
+import { MdCheck, MdClose, MdPreview, MdSend } from 'react-icons/md';
 import { GrAnnounce } from 'react-icons/gr';
 
 type MessageType = '' | 'Announcement' | 'Emergency';
@@ -362,6 +362,82 @@ function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestin
   );
 }
 
+function BannerPreview({
+  body,
+  color,
+  dismissible,
+  hasCta,
+  ctaLabel,
+}: {
+  body: string;
+  color: string;
+  dismissible: boolean;
+  hasCta: boolean;
+  ctaLabel: string;
+}) {
+  return (
+    <div className="rounded-[6px] flex items-center justify-between gap-[16px] px-[16px] py-[12px] w-full" style={{ backgroundColor: color }}>
+      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-white flex-1">
+        {body || 'Your message body will appear here.'}
+        {hasCta && ctaLabel && (
+          <>
+            {' '}
+            <span className="font-medium underline cursor-pointer">{ctaLabel}</span>
+          </>
+        )}
+      </p>
+      {dismissible && <MdClose size={18} color="white" className="shrink-0 cursor-pointer" />}
+    </div>
+  );
+}
+
+function OverlayPreview({
+  title,
+  body,
+  dismissible,
+  hasCta,
+  ctaLabel,
+}: {
+  title: string;
+  body: string;
+  dismissible: boolean;
+  hasCta: boolean;
+  ctaLabel: string;
+}) {
+  return (
+    <div className="rounded-[8px] border shadow-md flex flex-col w-full max-w-[320px]" style={{ borderColor: BORDER }}>
+      <div className="flex items-center justify-between px-[16px] py-[12px] border-b" style={{ borderColor: BORDER }}>
+        <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">{title || 'Message Title'}</p>
+        {dismissible && <MdClose size={18} color="#000000" className="cursor-pointer shrink-0" />}
+      </div>
+      <div className="px-[16px] py-[14px] flex flex-col gap-[10px]">
+        <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-[#383838] whitespace-pre-wrap">
+          {body || 'Your message body will appear here.'}
+        </p>
+        {hasCta && ctaLabel && (
+          <p className="font-['Montserrat',sans-serif] font-medium text-[13px] underline cursor-pointer" style={{ color: PRIMARY }}>
+            {ctaLabel}
+          </p>
+        )}
+      </div>
+      {dismissible && (
+        <div className="flex items-center justify-between px-[16px] py-[10px] border-t" style={{ borderColor: BORDER, backgroundColor: '#fafafa' }}>
+          <span className="font-['Montserrat',sans-serif] font-medium text-[11px] uppercase tracking-wide cursor-pointer" style={{ color: NAVY }}>
+            Don't show again
+          </span>
+          <button
+            type="button"
+            className="rounded-[6px] px-[12px] py-[6px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white flex items-center gap-[4px] cursor-pointer"
+            style={{ backgroundColor: PRIMARY }}
+          >
+            <MdCheck size={14} /> Dismiss
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData }: {
   onClose: () => void;
   onMessageCreated?: (data: { title: string; messageType: string; statesOrAgencies: string[]; searchMode: string; startDate: string; endDate: string; }) => void;
@@ -429,7 +505,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     onClose();
   };
 
-  const hasPreview = isFormValid;
+  const effectiveFormat: DisplayFormat = isEmergency ? 'Banner' : isAnnouncement ? displayFormat : '';
+  const effectiveDismissible = isEmergency ? false : dismissible === 'Dismissible';
+  const hasPreview = effectiveFormat !== '';
 
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
@@ -525,41 +603,27 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             </div>
             <div className="flex-1 flex flex-col p-[16px]">
               {hasPreview ? (
-                <div className="flex flex-col gap-[12px]">
-                  {/* Emergency banner style */}
-                  {isEmergency && (
-                    <div className="rounded-[8px] border-l-[4px] p-[14px] flex flex-col gap-[6px]" style={{ borderLeftColor: '#DA4040', backgroundColor: '#fff5f5' }}>
-                      <p className="font-['Montserrat',sans-serif] font-semibold text-[13px]" style={{ color: '#DA4040' }}>⚠ Emergency</p>
-                      <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">{title}</p>
-                      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-[#383838]">{body}</p>
-                      {hasCta && ctaLabel && (
-                        <button className="self-start mt-[4px] rounded-[6px] px-[12px] py-[6px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: '#DA4040' }}>{ctaLabel}</button>
-                      )}
-                    </div>
+                <div className="flex flex-col gap-[16px] items-start">
+                  {effectiveFormat === 'Banner' && (
+                    <BannerPreview
+                      body={body}
+                      color={isEmergency ? '#d4183d' : NAVY}
+                      dismissible={effectiveDismissible}
+                      hasCta={hasCta}
+                      ctaLabel={ctaLabel}
+                    />
                   )}
-                  {/* Announcement banner style */}
-                  {isAnnouncement && displayFormat === 'Banner' && (
-                    <div className="rounded-[8px] border-l-[4px] p-[14px] flex flex-col gap-[6px]" style={{ borderLeftColor: PRIMARY, backgroundColor: '#e8f4ff' }}>
-                      <p className="font-['Montserrat',sans-serif] font-semibold text-[13px]" style={{ color: PRIMARY }}>Announcement</p>
-                      <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">{title}</p>
-                      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-[#383838]">{body}</p>
-                      {hasCta && ctaLabel && (
-                        <button className="self-start mt-[4px] rounded-[6px] px-[12px] py-[6px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: PRIMARY }}>{ctaLabel}</button>
-                      )}
-                    </div>
-                  )}
-                  {/* Announcement overlay style */}
-                  {isAnnouncement && displayFormat === 'Overlay' && (
-                    <div className="rounded-[8px] border p-[16px] flex flex-col gap-[8px] shadow-md" style={{ borderColor: BORDER }}>
-                      <p className="font-['Montserrat',sans-serif] font-semibold text-[15px] text-black">{title}</p>
-                      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-[#383838]">{body}</p>
-                      {hasCta && ctaLabel && (
-                        <button className="self-start mt-[4px] rounded-[6px] px-[12px] py-[6px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: PRIMARY }}>{ctaLabel}</button>
-                      )}
-                    </div>
+                  {effectiveFormat === 'Overlay' && (
+                    <OverlayPreview
+                      title={title}
+                      body={body}
+                      dismissible={effectiveDismissible}
+                      hasCta={hasCta}
+                      ctaLabel={ctaLabel}
+                    />
                   )}
                   {/* Meta */}
-                  <div className="flex flex-wrap gap-[8px] mt-[4px]">
+                  <div className="flex flex-wrap gap-[8px]">
                     {startDate && <span className="text-[11px] font-['Montserrat',sans-serif] text-[#8b8b8b]">Starts {startDate}</span>}
                     {audienceCount > 0 && <span className="text-[11px] font-['Montserrat',sans-serif] text-[#8b8b8b]">• {audienceCount} {audienceCount === 1 ? 'agency' : 'agencies'}</span>}
                   </div>
@@ -568,7 +632,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 <div className="flex-1 flex flex-col items-center justify-center gap-[10px] py-[40px]">
                   <MdPreview size={40} color="#d1d3d4" />
                   <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8] text-center max-w-[220px]">
-                    Preview will appear here once all required fields are completed.
+                    {messageType === ''
+                      ? 'Preview will appear here once you select a message type.'
+                      : 'Preview will appear here once you select a display format.'}
                   </p>
                 </div>
               )}
