@@ -37,6 +37,7 @@ const PACKAGES = Array.from(new Set(AGENCIES.map((a) => a.package)));
 const ROLES = Array.from(new Set(AGENCIES.map((a) => a.role)));
 const FEATURE_PATHS = ['Dashboard', 'Scheduling', 'Billing', 'Clients', 'Employees', 'Broadcast Studio'];
 const FREQUENCY_OPTIONS = ['Once', 'Every Login', 'Daily', 'Weekly'];
+const MESSAGE_COLOR_OPTIONS = ['#DA4040', '#27496D'];
 
 /* -- Design tokens copied from the GEOH "Overlay - New Message" Figma frame -- */
 const BORDER = '#e5e5e5';
@@ -322,6 +323,32 @@ function RadioField({ label, value, onChange, options }: { label: string; value:
   );
 }
 
+function ColorField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <FieldShell label={label}>
+      <div className="flex gap-[12px] items-center w-full">
+        {options.map((opt) => (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onChange(opt)}
+            className="flex items-center justify-center rounded-full cursor-pointer shrink-0"
+            style={{
+              width: 26,
+              height: 26,
+              backgroundColor: opt,
+              boxShadow: value === opt ? `0 0 0 2px #ffffff, 0 0 0 4px ${opt}` : 'none',
+            }}
+            aria-label={opt}
+          >
+            {value === opt && <MdCheck size={14} color="white" />}
+          </button>
+        ))}
+      </div>
+    </FieldShell>
+  );
+}
+
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
@@ -436,7 +463,7 @@ function OverlayPreview({
           {body || 'Your message body will appear here.'}
         </p>
         {hasCta && ctaLabel && (
-          <p className="font-['Montserrat',sans-serif] font-medium text-[13px] underline cursor-pointer" style={{ color: PRIMARY }}>
+          <p className="font-['Montserrat',sans-serif] font-medium text-[13px] underline cursor-pointer" style={{ color: '#27496D' }}>
             {ctaLabel}
           </p>
         )}
@@ -533,23 +560,25 @@ function ScreenSkeleton({
           <div className="ml-auto w-[18px] h-[18px] rounded-full" style={{ backgroundColor: SKELETON.avatar }} />
         </div>
         <div className="flex flex-1 min-h-0">
-          {/* Sidebar skeleton */}
-          <div className="w-[140px] border-r flex flex-col gap-[10px] p-[10px] shrink-0" style={{ borderColor: BORDER }}>
-            <div className="flex items-center gap-[6px]">
+          {/* Sidebar skeleton — matches GEOH's real sidebar: #eaeaea bg, ~23% width, #dcdcdc/#cfcfcf active states, #0078d4 accent bar */}
+          <div className="border-r flex flex-col shrink-0" style={{ width: '23%', backgroundColor: '#eaeaea', borderColor: BORDER }}>
+            <div className="flex items-center gap-[6px] p-[10px]" style={{ borderBottom: `1px solid ${BORDER}` }}>
               <div className="w-[20px] h-[20px] rounded-[5px] shrink-0" style={{ backgroundColor: SKELETON.avatar }} />
-              <SkeletonBar width="60%" height={8} />
+              <SkeletonBar width="60%" height={8} color="#c7c7c7" />
             </div>
-            <div className="flex flex-col gap-[7px] mt-[4px]">
+            <div className="flex flex-col">
               {Array.from({ length: 9 }).map((_, i) => {
-                const active = i === 1 || i === 2;
+                const expanded = i === 1;
+                const active = i === 2;
                 return (
                   <div
                     key={i}
-                    className="rounded-[2px] flex items-center relative"
-                    style={{ backgroundColor: active ? '#e2e2e2' : 'transparent', height: 10 }}
+                    className="flex items-center gap-[6px] px-[10px] relative shrink-0"
+                    style={{ backgroundColor: active ? '#cfcfcf' : expanded ? '#dcdcdc' : 'transparent', height: 16 }}
                   >
-                    {i === 2 && <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ backgroundColor: PRIMARY }} />}
-                    <SkeletonBar width={i === 2 ? '85%' : i % 3 === 0 ? '95%' : '70%'} height={7} color={active ? '#d4d4d4' : SKELETON.greyLight} />
+                    {active && <div className="absolute left-0 top-0 bottom-0" style={{ width: 3, backgroundColor: '#0078d4' }} />}
+                    <div className="w-[8px] h-[8px] rounded-[2px] shrink-0" style={{ backgroundColor: '#b3b3b3' }} />
+                    <SkeletonBar width={i % 3 === 0 ? '75%' : '55%'} height={6} color="#c7c7c7" />
                   </div>
                 );
               })}
@@ -631,6 +660,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [body, setBody] = useState('');
   const [reason, setReason] = useState('');
   const [messageType, setMessageType] = useState<MessageType>((initialData?.messageType as MessageType) ?? '');
+  const [messageColor, setMessageColor] = useState(MESSAGE_COLOR_OPTIONS[1]);
   const [displayFormat, setDisplayFormat] = useState<DisplayFormat>('');
   const [placement, setPlacement] = useState<Placement>('');
   const [featurePath, setFeaturePath] = useState('');
@@ -648,7 +678,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [frequency, setFrequency] = useState('');
   const [dismissible, setDismissible] = useState<Dismissible>('Dismissible');
   const [pushNotification, setPushNotification] = useState(false);
-  const [previewTab, setPreviewTab] = useState<'banner' | 'screen'>('banner');
+  const [hideScreenPreview, setHideScreenPreview] = useState(false);
 
   const isAnnouncement = messageType === 'Announcement';
   const isEmergency = messageType === 'Emergency';
@@ -718,6 +748,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Type the message body" />
             <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Why is this message being sent?" />
             <SelectField label="Message Type *" value={messageType} onChange={(v) => setMessageType(v as MessageType)} placeholder="Select message type..." options={['Announcement', 'Emergency']} />
+            <ColorField label="Message Color" value={messageColor} onChange={setMessageColor} options={MESSAGE_COLOR_OPTIONS} />
             {isEmergency && (
               <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#717182]">
                 Emergency messages are always sent as a non-dismissible, app-wide banner.
@@ -784,32 +815,22 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           <div className="bg-white rounded-[8px] border flex flex-col flex-1 overflow-hidden" style={{ borderColor: BORDER }}>
             <div className="px-[16px] py-[12px] border-b flex items-center justify-between gap-[12px] shrink-0" style={{ borderColor: BORDER }}>
               <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] text-black">Message Preview</p>
-              <div className="flex items-center gap-[2px] bg-[#f0f0f0] rounded-[6px] p-[2px] shrink-0">
-                {(['banner', 'screen'] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setPreviewTab(tab)}
-                    className="rounded-[4px] px-[10px] py-[5px] font-['Montserrat',sans-serif] font-medium text-[12px] cursor-pointer whitespace-nowrap"
-                    style={{
-                      backgroundColor: previewTab === tab ? NAVY : 'transparent',
-                      color: previewTab === tab ? '#ffffff' : LABEL_GREY,
-                    }}
-                  >
-                    {tab === 'banner' ? 'Just the banner' : 'With screen'}
-                  </button>
-                ))}
+              <div className="flex items-center gap-[8px] shrink-0">
+                <span className="font-['Montserrat',sans-serif] font-medium text-[12px] whitespace-nowrap" style={{ color: LABEL_GREY }}>
+                  Do not show screen
+                </span>
+                <ToggleSwitch checked={hideScreenPreview} onChange={setHideScreenPreview} />
               </div>
             </div>
             <div className="flex-1 min-h-0 flex flex-col p-[16px] gap-[12px]">
-              {previewTab === 'screen' ? (
+              {!hideScreenPreview ? (
                 hasPreview ? (
                   <div className="flex-1 min-h-0">
                     <ScreenSkeleton
                       effectiveFormat={effectiveFormat}
                       title={title}
                       body={body}
-                      color={isEmergency ? '#d4183d' : NAVY}
+                      color={messageColor}
                       dismissible={effectiveDismissible}
                       hasCta={hasCta}
                       ctaLabel={ctaLabel}
@@ -835,7 +856,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                       <div className="w-full self-center">
                         <BannerPreview
                           body={body}
-                          color={isEmergency ? '#d4183d' : NAVY}
+                          color={messageColor}
                           dismissible={effectiveDismissible}
                           hasCta={hasCta}
                           ctaLabel={ctaLabel}
