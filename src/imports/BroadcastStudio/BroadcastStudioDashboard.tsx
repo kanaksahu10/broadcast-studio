@@ -1,9 +1,32 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BsSearch } from 'react-icons/bs';
 import { MdAdd, MdTableRows, MdViewKanban } from 'react-icons/md';
 import ComposeMessageOverlay from './ComposeMessageOverlay';
 
+type UserRole = 'super-admin' | 'extra-super-admin';
+
+function useRole(): UserRole {
+  const param = new URLSearchParams(window.location.search).get('role');
+  return param === 'extra-super-admin' ? 'extra-super-admin' : 'super-admin';
+}
+
+function RoleBadge({ role }: { role: UserRole }) {
+  if (import.meta.env.PROD) return null;
+  const isExtra = role === 'extra-super-admin';
+  return (
+    <div
+      className="fixed bottom-[16px] left-[16px] z-[9999] px-[10px] py-[5px] rounded-[6px] font-['Montserrat',sans-serif] font-medium text-[11px] pointer-events-none"
+      style={{ backgroundColor: isExtra ? '#27496D' : '#2699fb', color: 'white', opacity: 0.9 }}
+    >
+      {isExtra ? 'Extra Super Admin' : 'Super Admin'}
+    </div>
+  );
+}
+
 type ViewMode = 'datagrid' | 'kanban';
+
+// FEATURE FLAG: set to true to restore the datagrid/kanban toggle button
+const SHOW_VIEW_TOGGLE = false;
 
 type MessageStatus = 'Live' | 'Pending' | 'Draft';
 type MessageType = '' | 'Announcement' | 'Emergency';
@@ -265,9 +288,16 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
   Draft: 'Edit',
 };
 
-function KanbanCard({ row, onAction }: { row: BroadcastMessageRow; onAction?: () => void }) {
+function KanbanCard({ row, role, onAction, onApprove, onReject }: {
+  row: BroadcastMessageRow;
+  role: UserRole;
+  onAction?: () => void;
+  onApprove?: () => void;
+  onReject?: () => void;
+}) {
   const color = STATUS_COLOR[row.status];
   const dateRange = row.startDate === '—' ? '—' : `${row.startDate} – ${row.endDate}`;
+  const canApprove = role === 'extra-super-admin' && row.status === 'Pending';
   return (
     <div className="bg-white rounded-[8px] border border-[#e5e5e5] overflow-hidden flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div className="w-[4px] shrink-0" style={{ backgroundColor: color }} />
@@ -283,7 +313,27 @@ function KanbanCard({ row, onAction }: { row: BroadcastMessageRow; onAction?: ()
         {row.recipients !== null && (
           <span className="font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px] bg-[#e8f3ff] text-[#2699fb] whitespace-nowrap self-start">{row.recipients.toLocaleString()} Agencies</span>
         )}
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-[8px]">
+          {canApprove && (
+            <>
+              <button
+                type="button"
+                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] h-[32px] rounded-[6px] border transition-colors duration-100"
+                style={{ color: '#00AA00', borderColor: '#00AA00', backgroundColor: 'white' }}
+                onClick={onApprove}
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] h-[32px] rounded-[6px] border transition-colors duration-100"
+                style={{ color: '#DA4040', borderColor: '#DA4040', backgroundColor: 'white' }}
+                onClick={onReject}
+              >
+                Reject
+              </button>
+            </>
+          )}
           <button
             type="button"
             className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] h-[32px] rounded-[6px] border transition-colors duration-100"
@@ -304,9 +354,12 @@ const KANBAN_COLUMNS: Array<{ status: MessageStatus; label: string }> = [
   { status: 'Live', label: 'Live' },
 ];
 
-function KanbanBoard({ rows, onEdit }: {
+function KanbanBoard({ rows, role, onEdit, onApprove, onReject }: {
   rows: BroadcastMessageRow[];
+  role: UserRole;
   onEdit: (row: BroadcastMessageRow) => void;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
 }) {
   return (
     <div className="flex gap-[16px] w-full items-start">
@@ -332,7 +385,10 @@ function KanbanBoard({ rows, onEdit }: {
                   <KanbanCard
                     key={row.id}
                     row={row}
-                    onAction={row.status === 'Draft' ? () => onEdit(row) : undefined}
+                    role={role}
+                    onAction={row.status === 'Draft' ? () => onEdit(row) : () => onEdit(row)}
+                    onApprove={() => onApprove(row.id)}
+                    onReject={() => onReject(row.id)}
                   />
                 ))
               )}
@@ -345,12 +401,26 @@ function KanbanBoard({ rows, onEdit }: {
 }
 
 export default function BroadcastStudioDashboard() {
+  const role = useRole();
+
+  useEffect(() => {
+    document.title = role === 'extra-super-admin' ? 'BS - Extra Super Admin' : 'BS - Super Admin';
+  }, [role]);
+
   const [messages, setMessages] = useState<BroadcastMessageRow[]>(INITIAL_MESSAGES);
   const [selectedStatus, setSelectedStatus] = useState<MessageStatus>('Live');
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('datagrid');
+  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<BroadcastMessageRow | null>(null);
+
+  const handleApprove = (id: string) => {
+    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Live' } : m));
+  };
+
+  const handleReject = (id: string) => {
+    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Draft' } : m));
+  };
 
   const handleMessageCreated = (data: {
     title: string;
@@ -412,7 +482,7 @@ export default function BroadcastStudioDashboard() {
         <SearchInput value={search} onChange={setSearch} />
         <NewMessageButton onClick={() => setIsComposeOpen(true)} />
         <div className="flex-1" />
-        <ViewToggle view={viewMode} onChange={setViewMode} />
+        {SHOW_VIEW_TOGGLE && <ViewToggle view={viewMode} onChange={setViewMode} />}
       </div>
 
       {viewMode === 'datagrid' ? (
@@ -420,10 +490,13 @@ export default function BroadcastStudioDashboard() {
       ) : (
         <KanbanBoard
           rows={searchFiltered}
+          role={role}
           onEdit={(row) => {
             setMessages((prev) => prev.filter((m) => m.id !== row.id));
             setEditingRow(row);
           }}
+          onApprove={handleApprove}
+          onReject={handleReject}
         />
       )}
 
@@ -458,6 +531,8 @@ export default function BroadcastStudioDashboard() {
           }}
         />
       )}
+
+      <RoleBadge role={role} />
 
       {isComposeOpen && (
         <ComposeMessageOverlay
