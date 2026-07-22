@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdClose, MdPreview, MdSend, MdArrowForward } from 'react-icons/md';
+import { MdCheck, MdClose, MdPreview, MdSend } from 'react-icons/md';
+import { FiExternalLink } from 'react-icons/fi';
 import { GrAnnounce } from 'react-icons/gr';
 
 type MessageType = '' | 'Announcement' | 'Emergency';
@@ -391,7 +392,7 @@ function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestin
       </div>
       {checked && (
         <div className="flex flex-col gap-[16px] w-full">
-          <TextField label="Label" value={label} onChange={onLabelChange} placeholder="e.g. Learn More" />
+          <TextAreaField label="Label" value={label} onChange={onLabelChange} placeholder="e.g. Learn More" />
           <TextField label="Destination URL" value={destination} onChange={onDestinationChange} placeholder="https://..." />
         </div>
       )}
@@ -464,7 +465,7 @@ function OverlayPreview({
         </p>
         {hasCta && ctaLabel && (
           <div className="flex items-start gap-[6px] min-w-0 cursor-pointer" style={{ color: '#27496D' }}>
-            <MdArrowForward size={14} className="shrink-0 mt-[2px]" />
+            <FiExternalLink size={14} className="shrink-0 mt-[2px]" />
             <p className="font-['Montserrat',sans-serif] font-medium text-[13px] underline break-words min-w-0">{ctaLabel}</p>
           </div>
         )}
@@ -743,9 +744,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
         {/* LEFT — scrollable form, fixed 399px */}
         <div style={{ width: '399px', minWidth: '399px', maxWidth: '399px', overflowY: 'auto', borderRight: `1px solid ${BORDER}` }} className="p-[24px] flex flex-col gap-[16px]">
 
-          {/* Message Basics card */}
+          {/* Message Details card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
-            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Message Basics</p>
+            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Message Details</p>
             <SelectField label="Message Type *" value={messageType} onChange={(v) => setMessageType(v as MessageType)} placeholder="Select message type..." options={['Announcement', 'Emergency']} />
             {isEmergency && (
               <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#717182]">
@@ -764,9 +765,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 )}
               </>
             )}
-            <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shown in the overlay header and message list" />
-            <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shown in the banner text and overlay body" />
-            <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only — why is this message being sent?" />
+            <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" />
+            <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" />
+            <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" />
           </div>
 
           {/* Date & Time card */}
