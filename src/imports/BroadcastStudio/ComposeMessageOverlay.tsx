@@ -392,7 +392,7 @@ function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestin
       </div>
       {checked && (
         <div className="flex flex-col gap-[16px] w-full">
-          <TextAreaField label="Label" value={label} onChange={onLabelChange} placeholder="e.g. Learn More" />
+          <TextAreaField label="Label" value={label} onChange={onLabelChange} placeholder="Link text shown in banner & overlay" />
           <TextField label="Destination URL" value={destination} onChange={onDestinationChange} placeholder="https://..." />
         </div>
       )}
