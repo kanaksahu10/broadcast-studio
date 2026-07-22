@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdClose, MdPreview, MdSend } from 'react-icons/md';
+import { MdCheck, MdClose, MdPreview, MdSend, MdArrowForward } from 'react-icons/md';
 import { GrAnnounce } from 'react-icons/gr';
 
 type MessageType = '' | 'Announcement' | 'Emergency';
@@ -458,14 +458,15 @@ function OverlayPreview({
         <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">{title || 'Message Title'}</p>
         {dismissible && <MdClose size={18} color="#000000" className="cursor-pointer shrink-0" />}
       </div>
-      <div className="px-[16px] py-[14px] flex flex-col gap-[10px] flex-1 overflow-y-auto">
-        <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-[#383838] whitespace-pre-wrap">
+      <div className="px-[16px] py-[14px] flex flex-col gap-[10px] flex-1 min-w-0 overflow-y-auto">
+        <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-[#383838] whitespace-pre-wrap break-words">
           {body || 'Your message body will appear here.'}
         </p>
         {hasCta && ctaLabel && (
-          <p className="font-['Montserrat',sans-serif] font-medium text-[13px] underline cursor-pointer" style={{ color: '#27496D' }}>
-            {ctaLabel}
-          </p>
+          <div className="flex items-start gap-[6px] min-w-0 cursor-pointer" style={{ color: '#27496D' }}>
+            <MdArrowForward size={14} className="shrink-0 mt-[2px]" />
+            <p className="font-['Montserrat',sans-serif] font-medium text-[13px] underline break-words min-w-0">{ctaLabel}</p>
+          </div>
         )}
       </div>
       {dismissible && (
@@ -721,6 +722,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
   const effectiveFormat: DisplayFormat = isEmergency ? 'Banner' : isAnnouncement ? displayFormat : '';
   const effectiveDismissible = isEmergency ? false : dismissible === 'Dismissible';
+  const effectiveBannerColor = isEmergency ? '#DA4040' : messageColor;
   const hasPreview = effectiveFormat !== '';
 
   return (
@@ -744,17 +746,11 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           {/* Message Basics card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Message Basics</p>
-            <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Type message title" />
-            <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Type the message body" />
-            <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Why is this message being sent?" />
             <SelectField label="Message Type *" value={messageType} onChange={(v) => setMessageType(v as MessageType)} placeholder="Select message type..." options={['Announcement', 'Emergency']} />
             {isEmergency && (
-              <>
-                <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#717182]">
-                  Emergency messages are always sent as a non-dismissible, app-wide banner.
-                </p>
-                <ColorField label="Message Color" value={messageColor} onChange={setMessageColor} options={MESSAGE_COLOR_OPTIONS} />
-              </>
+              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#717182]">
+                Emergency messages are always sent as a non-dismissible, app-wide red banner.
+              </p>
             )}
             {isAnnouncement && (
               <>
@@ -768,6 +764,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 )}
               </>
             )}
+            <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shown in the overlay header and message list" />
+            <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shown in the banner text and overlay body" />
+            <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only — why is this message being sent?" />
           </div>
 
           {/* Date & Time card */}
@@ -801,7 +800,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           {/* Display Settings card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Display Settings</p>
-            <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} />
+            {!isEmergency && (
+              <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} />
+            )}
             <CtaBox
               checked={hasCta}
               onChange={setHasCta}
@@ -835,7 +836,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                       effectiveFormat={effectiveFormat}
                       title={title}
                       body={body}
-                      color={messageColor}
+                      color={effectiveBannerColor}
                       dismissible={effectiveDismissible}
                       hasCta={hasCta}
                       ctaLabel={ctaLabel}
@@ -861,7 +862,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                       <div className="w-full self-center">
                         <BannerPreview
                           body={body}
-                          color={messageColor}
+                          color={effectiveBannerColor}
                           dismissible={effectiveDismissible}
                           hasCta={hasCta}
                           ctaLabel={ctaLabel}
