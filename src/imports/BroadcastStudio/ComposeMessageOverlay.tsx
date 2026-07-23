@@ -4,6 +4,7 @@ import { IoMdArrowDropdown } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
 import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone } from 'react-icons/md';
 import { FiExternalLink } from 'react-icons/fi';
+import { FaRegCheckCircle } from 'react-icons/fa';
 import { GrAnnounce } from 'react-icons/gr';
 
 type MessageType = '' | 'Announcement' | 'Emergency';
@@ -51,13 +52,13 @@ function SectionHeader({ children }: { children: string }) {
   return <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px] text-black w-full">{children}</p>;
 }
 
-function FieldShell({ label, height, children }: { label: string; height?: number; children: React.ReactNode }) {
+function FieldShell({ label, height, disabled, children }: { label: string; height?: number; disabled?: boolean; children: React.ReactNode }) {
   return (
     <div
-      className="bg-white border rounded-[4px] px-[12px] py-[8px] flex flex-col gap-[8px] justify-center w-full"
-      style={{ borderColor: BORDER, borderWidth: '1px', minHeight: height ?? 70 }}
+      className="border rounded-[4px] px-[12px] py-[8px] flex flex-col gap-[8px] justify-center w-full"
+      style={{ borderColor: BORDER, borderWidth: '1px', minHeight: height ?? 70, backgroundColor: disabled ? '#f2f2f2' : 'white' }}
     >
-      <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: LABEL_GREY }}>
+      <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: disabled ? '#585858' : LABEL_GREY }}>
         {label}
       </p>
       {children}
@@ -65,20 +66,21 @@ function FieldShell({ label, height, children }: { label: string; height?: numbe
   );
 }
 
-function TextField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+function TextField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
   return (
-    <FieldShell label={label}>
+    <FieldShell label={label} disabled={disabled}>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="font-['Montserrat',sans-serif] font-normal text-[13px] text-black placeholder:text-[#b8b8b8] outline-none bg-transparent w-full"
+        className="font-['Montserrat',sans-serif] font-normal text-[13px] placeholder:text-[#b8b8b8] outline-none bg-transparent w-full"
+        style={{ color: '#000000' }}
       />
     </FieldShell>
   );
 }
 
-function TextAreaField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+function TextAreaField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -89,14 +91,15 @@ function TextAreaField({ label, value, onChange, placeholder }: { label: string;
   }, [value]);
 
   return (
-    <FieldShell label={label}>
+    <FieldShell label={label} disabled={disabled}>
       <textarea
         ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={1}
-        className="font-['Montserrat',sans-serif] font-normal text-[13px] text-black placeholder:text-[#b8b8b8] outline-none bg-transparent w-full resize-none overflow-hidden"
+        className="font-['Montserrat',sans-serif] font-normal text-[13px] placeholder:text-[#b8b8b8] outline-none bg-transparent w-full resize-none overflow-hidden"
+        style={{ color: '#000000' }}
       />
     </FieldShell>
   );
@@ -108,12 +111,14 @@ function SelectField({
   onChange,
   placeholder,
   options,
+  disabled,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   options: string[];
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -135,12 +140,13 @@ function SelectField({
     <div className="relative w-full" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`bg-white w-full flex flex-col gap-[8px] justify-center px-[8px] py-[12px] text-left cursor-pointer border border-[#e5e5e5] ${
+        onClick={() => !disabled && setOpen((o) => !o)}
+        className={`w-full flex flex-col gap-[8px] justify-center px-[8px] py-[12px] text-left cursor-pointer border border-[#e5e5e5] ${
           open ? 'rounded-tl-[4px] rounded-tr-[4px]' : 'rounded-[4px]'
         }`}
+        style={{ backgroundColor: disabled ? '#f2f2f2' : 'white' }}
       >
-        <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: LABEL_GREY }}>
+        <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: disabled ? '#585858' : LABEL_GREY }}>
           {label}
         </p>
         <div className="flex items-center justify-between w-full">
@@ -150,11 +156,13 @@ function SelectField({
           >
             {value || placeholder}
           </span>
-          <IoMdArrowDropdown
-            size={20}
-            color="#27496D"
-            style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 150ms' }}
-          />
+          {!disabled && (
+            <IoMdArrowDropdown
+              size={20}
+              color="#27496D"
+              style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 150ms' }}
+            />
+          )}
         </div>
       </button>
       {open && (
@@ -180,10 +188,10 @@ function SelectField({
   );
 }
 
-function DateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function DateField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (v: string) => void; disabled?: boolean }) {
   const [focused, setFocused] = useState(false);
   return (
-    <FieldShell label={label}>
+    <FieldShell label={label} disabled={disabled}>
       <div className="flex items-center justify-between w-full relative">
         <div className="relative flex-1 pr-[24px]">
           <input
@@ -204,7 +212,7 @@ function DateField({ label, value, onChange }: { label: string; value: string; o
             </span>
           )}
         </div>
-        <BiCalendarEvent className="absolute right-0 pointer-events-none" size={18} color="#27496D" />
+        {!disabled && <BiCalendarEvent className="absolute right-0 pointer-events-none" size={18} color="#27496D" />}
       </div>
     </FieldShell>
   );
@@ -217,6 +225,7 @@ function MultiSelectField({
   placeholder,
   options,
   caption,
+  disabled,
 }: {
   label: string;
   values: string[];
@@ -224,6 +233,7 @@ function MultiSelectField({
   placeholder: string;
   options: string[];
   caption?: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -242,8 +252,8 @@ function MultiSelectField({
 
   return (
     <div className="relative w-full" ref={ref}>
-      <button type="button" onClick={() => setOpen((o) => !o)} className="w-full text-left cursor-pointer">
-        <FieldShell label={label} height={values.length > 0 ? undefined : 70}>
+      <button type="button" onClick={() => !disabled && setOpen((o) => !o)} className="w-full text-left cursor-pointer">
+        <FieldShell label={label} height={values.length > 0 ? undefined : 70} disabled={disabled}>
           <div className="flex items-center justify-between w-full gap-[8px]">
             <div className="flex flex-wrap gap-[6px] flex-1 min-w-0">
               {values.length === 0 ? (
@@ -262,7 +272,7 @@ function MultiSelectField({
                 ))
               )}
             </div>
-            <IoMdArrowDropdown className="shrink-0" size={20} color="#27496D" />
+            {!disabled && <IoMdArrowDropdown className="shrink-0" size={20} color="#27496D" />}
           </div>
         </FieldShell>
       </button>
@@ -309,9 +319,9 @@ function RadioDot({ selected }: { selected: boolean }) {
   );
 }
 
-function RadioField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
+function RadioField({ label, value, onChange, options, disabled }: { label: string; value: string; onChange: (v: string) => void; options: string[]; disabled?: boolean }) {
   return (
-    <FieldShell label={label}>
+    <FieldShell label={label} disabled={disabled}>
       <div className="flex gap-[16px] items-center w-full">
         {options.map((opt) => (
           <button key={opt} type="button" onClick={() => onChange(opt)} className="flex items-center gap-[8px] cursor-pointer">
@@ -324,9 +334,9 @@ function RadioField({ label, value, onChange, options }: { label: string; value:
   );
 }
 
-function ColorField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
+function ColorField({ label, value, onChange, options, disabled }: { label: string; value: string; onChange: (v: string) => void; options: string[]; disabled?: boolean }) {
   return (
-    <FieldShell label={label}>
+    <FieldShell label={label} disabled={disabled}>
       <div className="flex gap-[12px] items-center w-full">
         {options.map((opt) => (
           <button
@@ -350,50 +360,51 @@ function ColorField({ label, value, onChange, options }: { label: string; value:
   );
 }
 
-function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <button
       type="button"
-      onClick={() => onChange(!checked)}
-      className="w-[44px] h-[24px] rounded-full flex items-center px-[2px] transition-colors shrink-0 cursor-pointer"
-      style={{ backgroundColor: checked ? PRIMARY : '#e0e0e0', justifyContent: checked ? 'flex-end' : 'flex-start' }}
+      onClick={() => !disabled && onChange(!checked)}
+      className="w-[44px] h-[24px] rounded-full flex items-center px-[2px] transition-colors shrink-0"
+      style={{ backgroundColor: checked ? PRIMARY : '#e0e0e0', justifyContent: checked ? 'flex-end' : 'flex-start', cursor: disabled ? 'default' : 'pointer' }}
     >
       <span className="size-[20px] rounded-full bg-white shadow" />
     </button>
   );
 }
 
-function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+function ToggleRow({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
-    <div className="bg-[#fcfcfc] border rounded-[4px] px-[12px] py-[16px] flex items-center justify-between w-full" style={{ borderColor: BORDER }}>
+    <div className="border rounded-[4px] px-[12px] py-[16px] flex items-center justify-between w-full" style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : '#fcfcfc' }}>
       <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: NAVY }}>
         {label}
       </p>
-      <ToggleSwitch checked={checked} onChange={onChange} />
+      <ToggleSwitch checked={checked} onChange={onChange} disabled={disabled} />
     </div>
   );
 }
 
-function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestinationChange }: {
+function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestinationChange, disabled }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: string;
   destination: string;
   onLabelChange: (v: string) => void;
   onDestinationChange: (v: string) => void;
+  disabled?: boolean;
 }) {
   return (
-    <div className="bg-[#fcfcfc] border rounded-[4px] px-[12px] py-[16px] flex flex-col gap-[16px] w-full" style={{ borderColor: BORDER }}>
+    <div className="border rounded-[4px] px-[12px] py-[16px] flex flex-col gap-[16px] w-full" style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : '#fcfcfc' }}>
       <div className="flex items-center justify-between w-full">
         <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: NAVY }}>
           Call To Action
         </p>
-        <ToggleSwitch checked={checked} onChange={onChange} />
+        <ToggleSwitch checked={checked} onChange={onChange} disabled={disabled} />
       </div>
       {checked && (
         <div className="flex flex-col gap-[16px] w-full">
-          <TextAreaField label="Label" value={label} onChange={onLabelChange} placeholder="Link text shown in banner & overlay" />
-          <TextField label="Destination URL" value={destination} onChange={onDestinationChange} placeholder="https://..." />
+          <TextAreaField label="Label *" value={label} onChange={onLabelChange} placeholder="Link text shown in banner & overlay" disabled={disabled} />
+          <TextField label="Destination URL *" value={destination} onChange={onDestinationChange} placeholder="https://..." disabled={disabled} />
         </div>
       )}
     </div>
@@ -787,34 +798,62 @@ function PhoneSkeleton({
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData }: {
+type FormData = {
+  title?: string;
+  messageType?: string;
+  startDate?: string;
+  endDate?: string;
+  body?: string;
+  reason?: string;
+  displayFormat?: string;
+  placement?: string;
+  featurePath?: string;
+  messageColor?: string;
+  frequency?: string;
+  searchMode?: string;
+  statesOrAgencies?: string[];
+  packages?: string[];
+  roles?: string[];
+  dismissible?: string;
+  hasCta?: boolean;
+  ctaLabel?: string;
+  ctaDestination?: string;
+  pushNotification?: boolean;
+};
+
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject }: {
   onClose: () => void;
-  onMessageCreated?: (data: { title: string; messageType: string; statesOrAgencies: string[]; searchMode: string; startDate: string; endDate: string; }) => void;
-  onSaveAsDraft?: (data: { title: string; messageType: string; statesOrAgencies: string[]; searchMode: string; startDate: string; endDate: string; }) => void;
-  initialData?: { title?: string; messageType?: string; startDate?: string; endDate?: string; };
+  onMessageCreated?: (data: FormData) => void;
+  onSaveAsDraft?: (data: FormData) => void;
+  initialData?: FormData;
+  submitLabel?: string;
+  overlayTitle?: string;
+  readOnly?: boolean;
+  onApprove?: () => void;
+  onReject?: () => void;
 }) {
   const [title, setTitle] = useState(initialData?.title ?? '');
-  const [body, setBody] = useState('');
-  const [reason, setReason] = useState('');
+  const [body, setBody] = useState(initialData?.body ?? '');
+  const [reason, setReason] = useState(initialData?.reason ?? '');
   const [messageType, setMessageType] = useState<MessageType>((initialData?.messageType as MessageType) ?? '');
-  const [messageColor, setMessageColor] = useState(MESSAGE_COLOR_OPTIONS[1]);
-  const [displayFormat, setDisplayFormat] = useState<DisplayFormat>('');
-  const [placement, setPlacement] = useState<Placement>('');
-  const [featurePath, setFeaturePath] = useState('');
-  const [hasCta, setHasCta] = useState(false);
-  const [ctaLabel, setCtaLabel] = useState('');
-  const [ctaDestination, setCtaDestination] = useState('');
+  const [messageColor, setMessageColor] = useState(initialData?.messageColor ?? MESSAGE_COLOR_OPTIONS[1]);
+  const [displayFormat, setDisplayFormat] = useState<DisplayFormat>((initialData?.displayFormat as DisplayFormat) ?? '');
+  const [placement, setPlacement] = useState<Placement>((initialData?.placement as Placement) ?? '');
+  const [featurePath, setFeaturePath] = useState(initialData?.featurePath ?? '');
+  const [hasCta, setHasCta] = useState(initialData?.hasCta ?? false);
+  const [ctaLabel, setCtaLabel] = useState(initialData?.ctaLabel ?? '');
+  const [ctaDestination, setCtaDestination] = useState(initialData?.ctaDestination ?? '');
 
-  const [searchMode, setSearchMode] = useState<SearchMode>('Agency');
-  const [statesOrAgencies, setStatesOrAgencies] = useState<string[]>([]);
-  const [packages, setPackages] = useState<string[]>([]);
-  const [roles, setRoles] = useState<string[]>([]);
+  const [searchMode, setSearchMode] = useState<SearchMode>((initialData?.searchMode as SearchMode) ?? 'Agency');
+  const [statesOrAgencies, setStatesOrAgencies] = useState<string[]>(initialData?.statesOrAgencies ?? []);
+  const [packages, setPackages] = useState<string[]>(initialData?.packages ?? []);
+  const [roles, setRoles] = useState<string[]>(initialData?.roles ?? []);
 
   const [startDate, setStartDate] = useState(initialData?.startDate ?? '');
   const [endDate, setEndDate] = useState(initialData?.endDate ?? '');
-  const [frequency, setFrequency] = useState('');
-  const [dismissible, setDismissible] = useState<Dismissible>('Dismissible');
-  const [pushNotification, setPushNotification] = useState(false);
+  const [frequency, setFrequency] = useState(initialData?.frequency ?? '');
+  const [dismissible, setDismissible] = useState<Dismissible>((initialData?.dismissible as Dismissible) ?? 'Dismissible');
+  const [pushNotification, setPushNotification] = useState(initialData?.pushNotification ?? false);
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
 
   const isAnnouncement = messageType === 'Announcement';
@@ -835,6 +874,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     startDate !== '' &&
     frequency !== '' &&
     statesOrAgencies.length > 0 &&
+    (!hasCta || (ctaLabel.trim() !== '' && ctaDestination.trim() !== '')) &&
     (messageType !== 'Announcement' || (
       displayFormat !== '' &&
       placement !== '' &&
@@ -846,13 +886,15 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     setStatesOrAgencies([]);
   };
 
+  const allFormData: FormData = { title, messageType, startDate, endDate, body, reason, displayFormat, placement, featurePath, messageColor, frequency, searchMode, statesOrAgencies, packages, roles, dismissible, hasCta, ctaLabel, ctaDestination, pushNotification };
+
   const handleSubmit = () => {
-    onMessageCreated?.({ title, messageType, statesOrAgencies, searchMode, startDate, endDate });
+    onMessageCreated?.(allFormData);
     onClose();
   };
 
   const handleSaveAsDraft = () => {
-    onSaveAsDraft?.({ title, messageType, statesOrAgencies, searchMode, startDate, endDate });
+    onSaveAsDraft?.(allFormData);
     onClose();
   };
 
@@ -867,7 +909,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
       {/* Top header bar */}
       <div className="flex items-center justify-between h-[56px] px-[24px] border-b shrink-0" style={{ borderColor: BORDER }}>
-        <h2 className="font-['Montserrat',sans-serif] font-semibold text-[16px] text-black">New Message</h2>
+        <h2 className="font-['Montserrat',sans-serif] font-semibold text-[16px] text-black">{overlayTitle ?? 'New Message'}</h2>
         <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
           <IoIosClose size={26} color="#000000" />
         </button>
@@ -877,12 +919,13 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
         {/* LEFT — scrollable form, fixed 399px */}
-        <div style={{ width: '399px', minWidth: '399px', maxWidth: '399px', overflowY: 'auto', borderRight: `1px solid ${BORDER}` }} className="p-[24px] flex flex-col gap-[16px]">
+        <div style={{ width: '399px', minWidth: '399px', maxWidth: '399px', overflowY: 'auto', borderRight: `1px solid ${BORDER}`, position: 'relative' }} className="p-[24px] flex flex-col gap-[16px]">
+          {readOnly && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} />}
 
           {/* Message Details card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Message Details</p>
-            <SelectField label="Message Type *" value={messageType} onChange={(v) => setMessageType(v as MessageType)} placeholder="Select message type..." options={['Announcement', 'Emergency']} />
+            <SelectField label="Message Type *" value={messageType} onChange={(v) => setMessageType(v as MessageType)} placeholder="Select message type..." options={['Announcement', 'Emergency']} disabled={readOnly} />
             {isEmergency && (
               <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#717182]">
                 Emergency messages are always sent as a non-dismissible, app-wide red banner.
@@ -890,27 +933,27 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             )}
             {isAnnouncement && (
               <>
-                <SelectField label="Display Format *" value={displayFormat} onChange={(v) => setDisplayFormat(v as DisplayFormat)} placeholder="Select display format..." options={['Overlay', 'Banner']} />
+                <SelectField label="Display Format *" value={displayFormat} onChange={(v) => setDisplayFormat(v as DisplayFormat)} placeholder="Select display format..." options={['Overlay', 'Banner']} disabled={readOnly} />
                 {displayFormat === 'Banner' && (
-                  <ColorField label="Message Color" value={messageColor} onChange={setMessageColor} options={MESSAGE_COLOR_OPTIONS} />
+                  <ColorField label="Message Color" value={messageColor} onChange={setMessageColor} options={MESSAGE_COLOR_OPTIONS} disabled={readOnly} />
                 )}
-                <SelectField label="Placement *" value={placement} onChange={(v) => setPlacement(v as Placement)} placeholder="Select placement..." options={['App-wide', 'Feature Specific']} />
+                <SelectField label="Placement *" value={placement} onChange={(v) => setPlacement(v as Placement)} placeholder="Select placement..." options={['App-wide', 'Feature Specific']} disabled={readOnly} />
                 {placement === 'Feature Specific' && (
-                  <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} />
+                  <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} disabled={readOnly} />
                 )}
               </>
             )}
-            <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" />
-            <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" />
-            <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" />
+            <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={readOnly} />
+            <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={readOnly} />
+            <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={readOnly} />
           </div>
 
           {/* Date & Time card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Date &amp; Time</p>
-            <DateField label="Start Date *" value={startDate} onChange={setStartDate} />
-            <DateField label="End Date" value={endDate} onChange={setEndDate} />
-            <SelectField label="Frequency *" value={frequency} onChange={setFrequency} placeholder="Select frequency..." options={FREQUENCY_OPTIONS} />
+            <DateField label="Start Date *" value={startDate} onChange={setStartDate} disabled={readOnly} />
+            <DateField label="End Date" value={endDate} onChange={setEndDate} disabled={readOnly} />
+            <SelectField label="Frequency *" value={frequency} onChange={setFrequency} placeholder="Select frequency..." options={FREQUENCY_OPTIONS} disabled={readOnly} />
           </div>
 
           {/* Audience card */}
@@ -921,23 +964,24 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 {audienceCount} {audienceCount === 1 ? 'agency' : 'agencies'} will see this message
               </span>
             </div>
-            <RadioField label="Search By *" value={searchMode} onChange={handleSearchModeChange} options={['Agency', 'State']} />
+            <RadioField label="Search By *" value={searchMode} onChange={handleSearchModeChange} options={['Agency', 'State']} disabled={readOnly} />
             <MultiSelectField
               label={searchMode === 'Agency' ? 'Agency *' : 'State *'}
               values={statesOrAgencies}
               onChange={setStatesOrAgencies}
               placeholder={searchMode === 'State' ? 'Select states...' : 'Select agencies...'}
               options={searchMode === 'Agency' ? AGENCIES.map((a) => a.name) : STATES}
+              disabled={readOnly}
             />
-            <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} />
-            <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} />
+            <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} disabled={readOnly} />
+            <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} disabled={readOnly} />
           </div>
 
           {/* Display Settings card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Display Settings</p>
             {!isEmergency && (
-              <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} />
+              <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} disabled={readOnly} />
             )}
             <CtaBox
               checked={hasCta}
@@ -946,8 +990,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               destination={ctaDestination}
               onLabelChange={setCtaLabel}
               onDestinationChange={setCtaDestination}
+              disabled={readOnly}
             />
-            {isEmergency && <ToggleRow label="Also send as push notification" checked={pushNotification} onChange={setPushNotification} />}
+            {isEmergency && <ToggleRow label="Also send as push notification" checked={pushNotification} onChange={setPushNotification} disabled={readOnly} />}
           </div>
         </div>
 
@@ -1026,36 +1071,64 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             >
               Cancel
             </button>
-            <div className="flex items-center gap-[8px]">
-              <button
-                type="button"
-                onClick={handleSaveAsDraft}
-                className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[4px] border cursor-pointer"
-                style={{ backgroundColor: '#e8f4ff', borderColor: PRIMARY, borderWidth: '1px' }}
-              >
-                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: PRIMARY }}>
-                  Save as Draft
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={isFormValid ? handleSubmit : undefined}
-                disabled={!isFormValid}
-                className="rounded-[8px] px-[16px] h-[32px] flex items-center gap-[8px]"
-                style={{
-                  backgroundColor: isFormValid ? PRIMARY : '#e1e3e4',
-                  cursor: isFormValid ? 'pointer' : 'not-allowed',
-                }}
-              >
-                <MdSend size={17} color={isFormValid ? 'white' : '#a1a3a4'} />
-                <span
-                  className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase"
-                  style={{ color: isFormValid ? 'white' : '#a1a3a4' }}
+            {readOnly ? (
+              onApprove && onReject ? (
+                <div className="flex items-center gap-[8px]">
+                  <button
+                    type="button"
+                    onClick={onReject}
+                    className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[4px] border cursor-pointer"
+                    style={{ backgroundColor: '#fdeaea', borderColor: '#DA4040', borderWidth: '1px' }}
+                  >
+                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: '#DA4040' }}>
+                      Reject
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onApprove}
+                    className="rounded-[8px] px-[16px] h-[32px] flex items-center gap-[8px] cursor-pointer"
+                    style={{ backgroundColor: '#00AA00' }}
+                  >
+                    <FaRegCheckCircle size={15} color="white" />
+                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: 'white' }}>
+                      Approve
+                    </span>
+                  </button>
+                </div>
+              ) : null
+            ) : (
+              <div className="flex items-center gap-[8px]">
+                <button
+                  type="button"
+                  onClick={handleSaveAsDraft}
+                  className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[4px] border cursor-pointer"
+                  style={{ backgroundColor: '#e8f4ff', borderColor: PRIMARY, borderWidth: '1px' }}
                 >
-                  Send for Approval
-                </span>
-              </button>
-            </div>
+                  <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: PRIMARY }}>
+                    Save as Draft
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={isFormValid ? handleSubmit : undefined}
+                  disabled={!isFormValid}
+                  className="rounded-[8px] px-[16px] h-[32px] flex items-center gap-[8px]"
+                  style={{
+                    backgroundColor: isFormValid ? PRIMARY : '#e1e3e4',
+                    cursor: isFormValid ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  <MdSend size={17} color={isFormValid ? 'white' : '#a1a3a4'} />
+                  <span
+                    className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase"
+                    style={{ color: isFormValid ? 'white' : '#a1a3a4' }}
+                  >
+                    {submitLabel ?? 'Send for Approval'}
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

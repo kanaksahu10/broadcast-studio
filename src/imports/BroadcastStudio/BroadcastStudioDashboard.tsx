@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BsSearch } from 'react-icons/bs';
+import { FiExternalLink } from 'react-icons/fi';
+import { IoIosClose } from 'react-icons/io';
 import { MdAdd, MdTableRows, MdViewKanban } from 'react-icons/md';
 import ComposeMessageOverlay from './ComposeMessageOverlay';
 
@@ -31,6 +33,13 @@ const SHOW_VIEW_TOGGLE = false;
 type MessageStatus = 'Live' | 'Pending' | 'Draft';
 type MessageType = '' | 'Announcement' | 'Emergency';
 
+interface MessageFormData {
+  body?: string; reason?: string; displayFormat?: string; placement?: string; featurePath?: string;
+  messageColor?: string; frequency?: string; searchMode?: string; statesOrAgencies?: string[];
+  packages?: string[]; roles?: string[]; dismissible?: string; hasCta?: boolean;
+  ctaLabel?: string; ctaDestination?: string; pushNotification?: boolean;
+}
+
 interface BroadcastMessageRow {
   id: string;
   subject: string;
@@ -41,6 +50,7 @@ interface BroadcastMessageRow {
   startDate: string;
   endDate: string;
   recipients: number | null;
+  formData?: MessageFormData;
 }
 
 const STATUS_COLOR: Record<MessageStatus, string> = {
@@ -89,6 +99,39 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
   { id: '5', subject: 'Q3 Training Reminder', type: 'Announcement', audience: 'Field Staff — Region A', channel: 'Push', status: 'Draft', startDate: '—', endDate: '—', recipients: null },
   { id: '6', subject: 'Referral Program Launch', type: 'Announcement', audience: 'All Agencies', channel: 'Email', status: 'Draft', startDate: '—', endDate: '—', recipients: null },
 ];
+
+const STORAGE_KEY = 'bs-messages';
+
+function useSharedMessages() {
+  const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_MESSAGES));
+    return INITIAL_MESSAGES;
+  });
+
+  const setMessages = useCallback((updater: BroadcastMessageRow[] | ((prev: BroadcastMessageRow[]) => BroadcastMessageRow[])) => {
+    setMessagesRaw((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try { setMessagesRaw(JSON.parse(e.newValue)); } catch {}
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  return [messages, setMessages] as const;
+}
 
 const FILTERS: Array<'All' | MessageStatus> = ['All', 'Live', 'Pending', 'Draft'];
 
@@ -288,16 +331,19 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
   Draft: 'Edit',
 };
 
-function KanbanCard({ row, role, onAction, onApprove, onReject }: {
+function KanbanCard({ row, role, onEdit, onSendForApproval, onApprove, onReject }: {
   row: BroadcastMessageRow;
   role: UserRole;
-  onAction?: () => void;
+  onEdit?: () => void;
+  onSendForApproval?: () => void;
   onApprove?: () => void;
   onReject?: () => void;
 }) {
   const color = STATUS_COLOR[row.status];
   const dateRange = row.startDate === '—' ? '—' : `${row.startDate} – ${row.endDate}`;
-  const canApprove = role === 'extra-super-admin' && row.status === 'Pending';
+  const isSuperAdmin = role === 'super-admin';
+  const isDraft = row.status === 'Draft';
+  const isPending = row.status === 'Pending';
   return (
     <div className="bg-white rounded-[8px] border border-[#e5e5e5] overflow-hidden flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div className="w-[4px] shrink-0" style={{ backgroundColor: color }} />
@@ -314,34 +360,36 @@ function KanbanCard({ row, role, onAction, onApprove, onReject }: {
           <span className="font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px] bg-[#e8f3ff] text-[#2699fb] whitespace-nowrap self-start">{row.recipients.toLocaleString()} Agencies</span>
         )}
         <div className="flex items-center justify-end gap-[8px]">
-          {canApprove && (
-            <>
-              <button
-                type="button"
-                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] h-[32px] rounded-[6px] border transition-colors duration-100"
-                style={{ color: '#00AA00', borderColor: '#00AA00', backgroundColor: 'white' }}
-                onClick={onApprove}
-              >
-                Approve
-              </button>
-              <button
-                type="button"
-                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] h-[32px] rounded-[6px] border transition-colors duration-100"
-                style={{ color: '#DA4040', borderColor: '#DA4040', backgroundColor: 'white' }}
-                onClick={onReject}
-              >
-                Reject
-              </button>
-            </>
+          {isDraft && (
+            <button
+              type="button"
+              className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] h-[32px] rounded-[6px] border transition-colors duration-100"
+              style={{ color, borderColor: color, backgroundColor: 'white' }}
+              onClick={onEdit}
+            >
+              Edit
+            </button>
           )}
-          <button
-            type="button"
-            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] h-[32px] rounded-[6px] border transition-colors duration-100"
-            style={{ color, borderColor: color, backgroundColor: 'white' }}
-            onClick={onAction}
-          >
-            {ACTION_LABEL[row.status]}
-          </button>
+          {isPending && (
+            <button
+              type="button"
+              className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] h-[32px] rounded-[6px] border transition-colors duration-100"
+              style={{ color, borderColor: color, backgroundColor: 'white' }}
+              onClick={onEdit}
+            >
+              Review
+            </button>
+          )}
+          {row.status === 'Live' && (
+            <button
+              type="button"
+              className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] h-[32px] rounded-[6px] border transition-colors duration-100"
+              style={{ color, borderColor: color, backgroundColor: 'white' }}
+              onClick={onEdit}
+            >
+              View
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -354,10 +402,11 @@ const KANBAN_COLUMNS: Array<{ status: MessageStatus; label: string }> = [
   { status: 'Live', label: 'Live' },
 ];
 
-function KanbanBoard({ rows, role, onEdit, onApprove, onReject }: {
+function KanbanBoard({ rows, role, onEdit, onSendForApproval, onApprove, onReject }: {
   rows: BroadcastMessageRow[];
   role: UserRole;
   onEdit: (row: BroadcastMessageRow) => void;
+  onSendForApproval: (id: string) => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
 }) {
@@ -386,7 +435,8 @@ function KanbanBoard({ rows, role, onEdit, onApprove, onReject }: {
                     key={row.id}
                     row={row}
                     role={role}
-                    onAction={row.status === 'Draft' ? () => onEdit(row) : () => onEdit(row)}
+                    onEdit={() => onEdit(row)}
+                    onSendForApproval={() => onSendForApproval(row.id)}
                     onApprove={() => onApprove(row.id)}
                     onReject={() => onReject(row.id)}
                   />
@@ -400,6 +450,110 @@ function KanbanBoard({ rows, role, onEdit, onApprove, onReject }: {
   );
 }
 
+function LiveMessagePreview({ row, onClose }: { row: BroadcastMessageRow; onClose: () => void }) {
+  const isEmergency = row.type === 'Emergency';
+  const displayFormat = isEmergency ? 'Banner' : (row.formData?.displayFormat || 'Overlay');
+  const bannerColor = isEmergency ? '#DA4040' : (row.formData?.messageColor || '#27496D');
+  const body = row.formData?.body || row.subject;
+  const hasCta = row.formData?.hasCta ?? false;
+  const ctaLabel = row.formData?.ctaLabel || 'Learn more';
+  const ctaDestination = row.formData?.ctaDestination || '#';
+  const isDismissible = !isEmergency && row.formData?.dismissible !== 'Non-Dismissible';
+  const isFeatureSpecific = row.formData?.placement === 'Feature Specific';
+  const featurePath = row.formData?.featurePath || '';
+
+  const handleAction = () => {
+    if (isFeatureSpecific && featurePath) {
+      window.location.href = featurePath;
+    } else {
+      onClose();
+    }
+  };
+
+  if (displayFormat === 'Banner') {
+    return (
+      <div
+        className="fixed inset-x-0 bottom-0 z-50 flex items-center gap-[16px] px-[16px] py-[12px] w-full"
+        style={{ backgroundColor: bannerColor }}
+      >
+        {isDismissible && <div className="shrink-0" style={{ width: 18 }} />}
+        <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-white flex-1 text-center">
+          {body}
+          {hasCta && ctaLabel && (
+            <> <span onClick={handleAction} className="font-medium underline cursor-pointer">{ctaLabel}</span></>
+          )}
+        </p>
+        {isDismissible ? (
+          <button type="button" onClick={onClose} className="cursor-pointer flex items-center shrink-0">
+            <IoIosClose size={18} color="white" />
+          </button>
+        ) : (
+          <div className="shrink-0" style={{ width: 18 }} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div
+        className="absolute inset-0"
+        style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
+        onClick={isDismissible ? onClose : undefined}
+      />
+      <div className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col">
+        <div
+          className="flex items-center justify-between px-[16px] shrink-0"
+          style={{ borderBottom: '1px solid #E5E5E5', height: '56px' }}
+        >
+          <p className="font-['Montserrat',sans-serif] font-semibold text-[16px] text-black">{row.subject}</p>
+          {isDismissible && (
+            <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
+              <IoIosClose size={26} color="#000000" />
+            </button>
+          )}
+        </div>
+        <div className="flex-1 px-[16px] py-[24px] overflow-y-auto flex flex-col gap-[16px]">
+          <p className="font-['Montserrat',sans-serif] font-normal text-[14px] text-black leading-[1.5]">{body}</p>
+          {hasCta && (
+            <a
+              href={ctaDestination}
+              className="flex items-center gap-[6px] cursor-pointer font-['Montserrat',sans-serif] font-medium text-[13px] underline"
+              style={{ color: '#27496D' }}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <FiExternalLink size={14} className="shrink-0" />
+              {ctaLabel}
+            </a>
+          )}
+        </div>
+        <div
+          className="flex items-center justify-between px-[16px] shrink-0"
+          style={{ borderTop: '1px solid #E5E5E5', backgroundColor: '#f8f8f8', height: '60px' }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            className="font-['Montserrat',sans-serif] font-medium text-[14px] cursor-pointer"
+            style={{ color: '#27496D' }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleAction}
+            className="font-['Montserrat',sans-serif] font-semibold text-[13px] text-white px-[16px] h-[32px] rounded-[8px] cursor-pointer"
+            style={{ backgroundColor: '#2699FB' }}
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BroadcastStudioDashboard() {
   const role = useRole();
 
@@ -407,12 +561,18 @@ export default function BroadcastStudioDashboard() {
     document.title = role === 'extra-super-admin' ? 'BS - Extra Super Admin' : 'BS - Super Admin';
   }, [role]);
 
-  const [messages, setMessages] = useState<BroadcastMessageRow[]>(INITIAL_MESSAGES);
+  const [messages, setMessages] = useSharedMessages();
   const [selectedStatus, setSelectedStatus] = useState<MessageStatus>('Live');
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<BroadcastMessageRow | null>(null);
+  const [reviewingRow, setReviewingRow] = useState<BroadcastMessageRow | null>(null);
+  const [viewingRow, setViewingRow] = useState<BroadcastMessageRow | null>(null);
+
+  const handleSendForApproval = (id: string) => {
+    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Pending' } : m));
+  };
 
   const handleApprove = (id: string) => {
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Live' } : m));
@@ -422,34 +582,24 @@ export default function BroadcastStudioDashboard() {
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Draft' } : m));
   };
 
-  const handleMessageCreated = (data: {
-    title: string;
-    messageType: string;
-    statesOrAgencies: string[];
-    searchMode: string;
-    startDate: string;
-    endDate: string;
-  }) => {
-    const audience =
-      data.statesOrAgencies.length === 0
-        ? 'All'
-        : data.statesOrAgencies.length <= 2
-        ? data.statesOrAgencies.join(', ')
-        : `${data.statesOrAgencies.slice(0, 2).join(', ')} +${data.statesOrAgencies.length - 2}`;
-
+  const handleMessageCreated = (data: MessageFormData & { title?: string; messageType?: string; startDate?: string; endDate?: string; statesOrAgencies?: string[]; searchMode?: string }) => {
+    const agencies = data.statesOrAgencies ?? [];
+    const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;
+    const newStatus = role === 'extra-super-admin' ? 'Live' : 'Pending';
     const newMessage: BroadcastMessageRow = {
       id: Date.now().toString(),
-      subject: data.title,
-      type: data.messageType as MessageType,
+      subject: data.title ?? '',
+      type: (data.messageType as MessageType) ?? '',
       audience,
       channel: 'Email',
-      status: 'Pending',
-      startDate: formatDisplayDate(data.startDate),
+      status: newStatus,
+      startDate: data.startDate ? formatDisplayDate(data.startDate) : '—',
       endDate: data.endDate ? formatDisplayDate(data.endDate) : '—',
       recipients: null,
+      formData: data,
     };
     setMessages((prev) => [newMessage, ...prev]);
-    setSelectedStatus('Pending');
+    setSelectedStatus(newStatus);
   };
 
   const liveCount = messages.filter((m) => m.status === 'Live').length;
@@ -492,9 +642,15 @@ export default function BroadcastStudioDashboard() {
           rows={searchFiltered}
           role={role}
           onEdit={(row) => {
-            setMessages((prev) => prev.filter((m) => m.id !== row.id));
-            setEditingRow(row);
+            if (row.status === 'Live') {
+              setViewingRow(row);
+            } else if (row.status === 'Pending') {
+              setReviewingRow(row);
+            } else {
+              setEditingRow(row);
+            }
           }}
+          onSendForApproval={handleSendForApproval}
           onApprove={handleApprove}
           onReject={handleReject}
         />
@@ -503,18 +659,22 @@ export default function BroadcastStudioDashboard() {
       {editingRow && (
         <ComposeMessageOverlay
           onClose={() => setEditingRow(null)}
+          overlayTitle="Edit Message"
           initialData={{
             title: editingRow.subject,
             messageType: editingRow.type,
             startDate: parseDisplayDate(editingRow.startDate),
             endDate: parseDisplayDate(editingRow.endDate),
+            ...editingRow.formData,
           }}
-          onMessageCreated={(data) => { handleMessageCreated(data); setEditingRow(null); }}
+          onMessageCreated={(data) => {
+            setMessages((prev) => prev.filter((m) => m.id !== editingRow!.id));
+            handleMessageCreated(data);
+            setEditingRow(null);
+          }}
           onSaveAsDraft={(data) => {
-            const audience =
-              data.statesOrAgencies.length === 0 ? 'All'
-              : data.statesOrAgencies.length <= 2 ? data.statesOrAgencies.join(', ')
-              : `${data.statesOrAgencies.slice(0, 2).join(', ')} +${data.statesOrAgencies.length - 2}`;
+            const agencies = data.statesOrAgencies ?? [];
+            const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;
             setMessages((prev) => [{
               id: Date.now().toString(),
               subject: data.title || 'Untitled Draft',
@@ -525,11 +685,35 @@ export default function BroadcastStudioDashboard() {
               startDate: data.startDate ? formatDisplayDate(data.startDate) : '—',
               endDate: data.endDate ? formatDisplayDate(data.endDate) : '—',
               recipients: null,
-            }, ...prev]);
+              formData: data,
+            }, ...prev.filter((m) => m.id !== editingRow!.id)]);
             setSelectedStatus('Draft');
             setEditingRow(null);
           }}
         />
+      )}
+
+      {reviewingRow && (
+        <ComposeMessageOverlay
+          onClose={() => setReviewingRow(null)}
+          overlayTitle="Review Message"
+          readOnly
+          {...(role === 'extra-super-admin' ? {
+            onApprove: () => { handleApprove(reviewingRow.id); setReviewingRow(null); },
+            onReject: () => { handleReject(reviewingRow.id); setReviewingRow(null); },
+          } : {})}
+          initialData={{
+            title: reviewingRow.subject,
+            messageType: reviewingRow.type,
+            startDate: parseDisplayDate(reviewingRow.startDate),
+            endDate: parseDisplayDate(reviewingRow.endDate),
+            ...reviewingRow.formData,
+          }}
+        />
+      )}
+
+      {viewingRow && (
+        <LiveMessagePreview row={viewingRow} onClose={() => setViewingRow(null)} />
       )}
 
       <RoleBadge role={role} />
@@ -538,13 +722,10 @@ export default function BroadcastStudioDashboard() {
         <ComposeMessageOverlay
           onClose={() => setIsComposeOpen(false)}
           onMessageCreated={handleMessageCreated}
+          submitLabel={role === 'extra-super-admin' ? 'Publish' : 'Send for Approval'}
           onSaveAsDraft={(data) => {
-            const audience =
-              data.statesOrAgencies.length === 0
-                ? 'All'
-                : data.statesOrAgencies.length <= 2
-                ? data.statesOrAgencies.join(', ')
-                : `${data.statesOrAgencies.slice(0, 2).join(', ')} +${data.statesOrAgencies.length - 2}`;
+            const agencies = data.statesOrAgencies ?? [];
+            const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;
             setMessages((prev) => [
               {
                 id: Date.now().toString(),
@@ -556,6 +737,7 @@ export default function BroadcastStudioDashboard() {
                 startDate: data.startDate ? formatDisplayDate(data.startDate) : '—',
                 endDate: data.endDate ? formatDisplayDate(data.endDate) : '—',
                 recipients: null,
+                formData: data,
               },
               ...prev,
             ]);
