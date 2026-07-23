@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdClose, MdPreview, MdSend } from 'react-icons/md';
+import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone } from 'react-icons/md';
 import { FiExternalLink } from 'react-icons/fi';
 import { GrAnnounce } from 'react-icons/gr';
 
@@ -442,6 +442,8 @@ function OverlayPreview({
   hasCta,
   ctaLabel,
   rounded = true,
+  fullWidth = false,
+  roundedTop = false,
 }: {
   title: string;
   body: string;
@@ -449,10 +451,13 @@ function OverlayPreview({
   hasCta: boolean;
   ctaLabel: string;
   rounded?: boolean;
+  fullWidth?: boolean;
+  roundedTop?: boolean;
 }) {
+  const shapeClass = roundedTop ? 'rounded-t-[14px] shadow-lg' : rounded ? 'rounded-[8px] shadow-md' : 'border-t-0 border-r-0 border-b-0';
   return (
     <div
-      className={`bg-white border flex flex-col w-[320px] h-full ${rounded ? 'rounded-[8px] shadow-md' : 'border-t-0 border-r-0 border-b-0'}`}
+      className={`bg-white border flex flex-col ${fullWidth ? 'w-full' : 'w-[320px]'} h-full ${shapeClass}`}
       style={{ borderColor: BORDER }}
     >
       <div className="flex items-center justify-between px-[16px] py-[12px] border-b shrink-0" style={{ borderColor: BORDER }}>
@@ -652,6 +657,100 @@ function ScreenSkeleton({
   );
 }
 
+function PhoneCardSkeleton({ index }: { index: number }) {
+  return (
+    <div
+      className="rounded-[6px] border p-[8px] flex flex-col gap-[5px] shrink-0"
+      style={{ borderColor: BORDER, backgroundColor: index % 2 === 0 ? SKELETON.rowTint : '#ffffff' }}
+    >
+      <div className="flex items-center justify-between gap-[6px]">
+        <SkeletonBar width="55%" height={7} />
+        <SkeletonBar width="26%" height={9} color={SKELETON.badgeRed} />
+      </div>
+      <SkeletonBar width="75%" height={6} />
+    </div>
+  );
+}
+
+function PhoneSkeleton({
+  effectiveFormat,
+  title,
+  body,
+  color,
+  dismissible,
+  hasCta,
+  ctaLabel,
+}: {
+  effectiveFormat: DisplayFormat;
+  title: string;
+  body: string;
+  color: string;
+  dismissible: boolean;
+  hasCta: boolean;
+  ctaLabel: string;
+}) {
+  return (
+    <div className="w-full h-full flex items-center justify-center">
+      <div
+        className="relative bg-white rounded-[28px] overflow-hidden flex flex-col shadow-lg shrink-0"
+        style={{ width: 220, height: '100%', maxHeight: 480, border: '6px solid #2b2b2b', borderColor: '#2b2b2b' }}
+      >
+        {/* Status bar */}
+        <div className="h-[18px] flex items-center justify-between px-[12px] shrink-0 bg-white">
+          <SkeletonBar width="24px" height={6} />
+          <div className="w-[10px] h-[6px] rounded-[1px]" style={{ backgroundColor: SKELETON.grey }} />
+        </div>
+        {/* App header */}
+        <div className="h-[34px] border-b flex items-center gap-[8px] px-[12px] shrink-0" style={{ borderColor: BORDER }}>
+          <div className="w-[12px] h-[12px] rounded-[3px] shrink-0" style={{ backgroundColor: SKELETON.grey }} />
+          <SkeletonBar width="50%" height={8} color={SKELETON.greyLight} />
+          <div className="ml-auto w-[16px] h-[16px] rounded-full shrink-0" style={{ backgroundColor: SKELETON.avatar }} />
+        </div>
+        {/* Content: stacked stat cards + list cards, mobile's substitute for the sidebar/datagrid */}
+        <div className="flex-1 min-h-0 overflow-hidden p-[10px] flex flex-col gap-[8px]">
+          <div className="flex gap-[6px]">
+            <StatCardSkeleton color={SKELETON.statBlue} borderColor={SKELETON.statBlueBorder} />
+            <StatCardSkeleton color={SKELETON.statRed} borderColor={SKELETON.statRedBorder} />
+          </div>
+          <div className="flex flex-col gap-[6px]">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <PhoneCardSkeleton key={i} index={i} />
+            ))}
+          </div>
+        </div>
+        {/* Bottom tab bar — mobile's substitute for the left sidebar nav */}
+        <div className="h-[38px] border-t flex items-center justify-around shrink-0" style={{ borderColor: BORDER, backgroundColor: '#fafafa' }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="w-[14px] h-[14px] rounded-[3px]" style={{ backgroundColor: i === 0 ? SKELETON.avatar : SKELETON.greyLight }} />
+          ))}
+        </div>
+
+        {effectiveFormat === 'Overlay' && (
+          <div className="absolute inset-0 flex items-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
+            <div style={{ width: '100%', height: '55%' }}>
+              <OverlayPreview
+                title={title}
+                body={body}
+                dismissible={dismissible}
+                hasCta={hasCta}
+                ctaLabel={ctaLabel}
+                fullWidth
+                roundedTop
+              />
+            </div>
+          </div>
+        )}
+
+        {effectiveFormat === 'Banner' && (
+          <div className="absolute left-0 right-0" style={{ bottom: 38 }}>
+            <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData }: {
   onClose: () => void;
   onMessageCreated?: (data: { title: string; messageType: string; statesOrAgencies: string[]; searchMode: string; startDate: string; endDate: string; }) => void;
@@ -680,7 +779,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [frequency, setFrequency] = useState('');
   const [dismissible, setDismissible] = useState<Dismissible>('Dismissible');
   const [pushNotification, setPushNotification] = useState(false);
-  const [hideScreenPreview, setHideScreenPreview] = useState(false);
+  const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
 
   const isAnnouncement = messageType === 'Announcement';
   const isEmergency = messageType === 'Emergency';
@@ -822,17 +921,31 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           <div className="bg-white rounded-[8px] border flex flex-col flex-1 overflow-hidden" style={{ borderColor: BORDER }}>
             <div className="px-[16px] py-[12px] border-b flex items-center justify-between gap-[12px] shrink-0" style={{ borderColor: BORDER }}>
               <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] text-black">Message Preview</p>
-              <div className="flex items-center gap-[8px] shrink-0">
-                <span className="font-['Montserrat',sans-serif] font-medium text-[12px] whitespace-nowrap" style={{ color: LABEL_GREY }}>
-                  Do not show screen
-                </span>
-                <ToggleSwitch checked={hideScreenPreview} onChange={setHideScreenPreview} />
+              <div className="flex items-center rounded-[6px] border border-[#e5e5e5] bg-white overflow-hidden shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setDeviceView('desktop')}
+                  className="flex items-center justify-center w-[32px] h-[32px] transition-colors duration-150"
+                  style={{ backgroundColor: deviceView === 'desktop' ? '#27496d' : 'white' }}
+                  title="Desktop view"
+                >
+                  <MdDesktopWindows size={16} color={deviceView === 'desktop' ? 'white' : '#8a8a8a'} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeviceView('phone')}
+                  className="flex items-center justify-center w-[32px] h-[32px] transition-colors duration-150"
+                  style={{ backgroundColor: deviceView === 'phone' ? '#27496d' : 'white' }}
+                  title="Phone view"
+                >
+                  <MdPhoneIphone size={16} color={deviceView === 'phone' ? 'white' : '#8a8a8a'} />
+                </button>
               </div>
             </div>
             <div className="flex-1 min-h-0 flex flex-col p-[16px] gap-[12px]">
-              {!hideScreenPreview ? (
-                hasPreview ? (
-                  <div className="flex-1 min-h-0">
+              {hasPreview ? (
+                <div className="flex-1 min-h-0">
+                  {deviceView === 'desktop' ? (
                     <ScreenSkeleton
                       effectiveFormat={effectiveFormat}
                       title={title}
@@ -842,50 +955,18 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                       hasCta={hasCta}
                       ctaLabel={ctaLabel}
                     />
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center gap-[10px] py-[40px]">
-                    <MdPreview size={40} color="#d1d3d4" />
-                    <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8] text-center max-w-[220px]">
-                      {messageType === ''
-                        ? 'Preview will appear here once you select a message type.'
-                        : 'Preview will appear here once you select a display format.'}
-                    </p>
-                  </div>
-                )
-              ) : hasPreview ? (
-                <>
-                  <div
-                    className="flex-1 min-h-0 flex justify-center"
-                    style={{ alignItems: effectiveFormat === 'Overlay' ? 'stretch' : 'center' }}
-                  >
-                    {effectiveFormat === 'Banner' && (
-                      <div className="w-full self-center">
-                        <BannerPreview
-                          body={body}
-                          color={effectiveBannerColor}
-                          dismissible={effectiveDismissible}
-                          hasCta={hasCta}
-                          ctaLabel={ctaLabel}
-                        />
-                      </div>
-                    )}
-                    {effectiveFormat === 'Overlay' && (
-                      <OverlayPreview
-                        title={title}
-                        body={body}
-                        dismissible={effectiveDismissible}
-                        hasCta={hasCta}
-                        ctaLabel={ctaLabel}
-                      />
-                    )}
-                  </div>
-                  {/* Meta */}
-                  <div className="flex flex-wrap gap-[8px] shrink-0">
-                    {startDate && <span className="text-[11px] font-['Montserrat',sans-serif] text-[#8b8b8b]">Starts {startDate}</span>}
-                    {audienceCount > 0 && <span className="text-[11px] font-['Montserrat',sans-serif] text-[#8b8b8b]">• {audienceCount} {audienceCount === 1 ? 'agency' : 'agencies'}</span>}
-                  </div>
-                </>
+                  ) : (
+                    <PhoneSkeleton
+                      effectiveFormat={effectiveFormat}
+                      title={title}
+                      body={body}
+                      color={effectiveBannerColor}
+                      dismissible={effectiveDismissible}
+                      hasCta={hasCta}
+                      ctaLabel={ctaLabel}
+                    />
+                  )}
+                </div>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center gap-[10px] py-[40px]">
                   <MdPreview size={40} color="#d1d3d4" />
