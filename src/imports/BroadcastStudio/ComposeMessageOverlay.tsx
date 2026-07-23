@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdClose, MdPreview, MdSend } from 'react-icons/md';
+import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone } from 'react-icons/md';
 import { FiExternalLink } from 'react-icons/fi';
 import { GrAnnounce } from 'react-icons/gr';
 
@@ -442,6 +442,8 @@ function OverlayPreview({
   hasCta,
   ctaLabel,
   rounded = true,
+  widthClass = 'w-[320px]',
+  compact = false,
 }: {
   title: string;
   body: string;
@@ -449,38 +451,40 @@ function OverlayPreview({
   hasCta: boolean;
   ctaLabel: string;
   rounded?: boolean;
+  widthClass?: string;
+  compact?: boolean;
 }) {
   return (
     <div
-      className={`bg-white border flex flex-col w-[320px] h-full ${rounded ? 'rounded-[8px] shadow-md' : 'border-t-0 border-r-0 border-b-0'}`}
+      className={`bg-white border flex flex-col ${widthClass} h-full ${rounded ? 'rounded-[8px] shadow-md' : 'border-t-0 border-r-0 border-b-0'}`}
       style={{ borderColor: BORDER }}
     >
-      <div className="flex items-center justify-between px-[16px] py-[12px] border-b shrink-0" style={{ borderColor: BORDER }}>
-        <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">{title || 'Message Title'}</p>
-        {dismissible && <MdClose size={18} color="#000000" className="cursor-pointer shrink-0" />}
+      <div className={`flex items-center justify-between gap-[8px] ${compact ? 'px-[12px] py-[10px]' : 'px-[16px] py-[12px]'} border-b shrink-0`} style={{ borderColor: BORDER }}>
+        <p className={`font-['Montserrat',sans-serif] font-semibold ${compact ? 'text-[13px]' : 'text-[14px]'} text-black truncate`}>{title || 'Message Title'}</p>
+        {dismissible && <MdClose size={compact ? 16 : 18} color="#000000" className="cursor-pointer shrink-0" />}
       </div>
-      <div className="px-[16px] py-[14px] flex flex-col gap-[10px] flex-1 min-w-0 overflow-y-auto">
-        <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-[#383838] whitespace-pre-wrap break-words">
+      <div className={`${compact ? 'px-[12px] py-[10px]' : 'px-[16px] py-[14px]'} flex flex-col gap-[10px] flex-1 min-w-0 overflow-y-auto`}>
+        <p className={`font-['Montserrat',sans-serif] font-normal ${compact ? 'text-[12px]' : 'text-[13px]'} text-[#383838] whitespace-pre-wrap break-words`}>
           {body || 'Your message body will appear here.'}
         </p>
         {hasCta && ctaLabel && (
           <div className="flex items-start gap-[6px] min-w-0 cursor-pointer" style={{ color: '#27496D' }}>
-            <FiExternalLink size={14} className="shrink-0 mt-[2px]" />
             <p className="font-['Montserrat',sans-serif] font-medium text-[13px] underline break-words min-w-0">{ctaLabel}</p>
+            <FiExternalLink size={14} className="shrink-0 mt-[2px]" />
           </div>
         )}
       </div>
       {dismissible && (
-        <div className="flex items-center justify-between px-[16px] py-[10px] border-t shrink-0" style={{ borderColor: BORDER, backgroundColor: '#fafafa' }}>
-          <span className="font-['Montserrat',sans-serif] font-medium text-[11px] uppercase tracking-wide cursor-pointer" style={{ color: NAVY }}>
+        <div className={`flex items-center justify-between gap-[8px] ${compact ? 'px-[12px] py-[8px]' : 'px-[16px] py-[10px]'} border-t shrink-0`} style={{ borderColor: BORDER, backgroundColor: '#fafafa' }}>
+          <span className={`font-['Montserrat',sans-serif] font-medium ${compact ? 'text-[8px] tracking-normal' : 'text-[11px] tracking-wide'} uppercase whitespace-nowrap cursor-pointer`} style={{ color: NAVY }}>
             Don't show again
           </span>
           <button
             type="button"
-            className="rounded-[6px] px-[12px] py-[6px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white flex items-center gap-[4px] cursor-pointer"
+            className={`rounded-[6px] shrink-0 ${compact ? 'px-[8px] py-[4px] text-[10px]' : 'px-[12px] py-[6px] text-[12px]'} font-['Montserrat',sans-serif] font-medium text-white flex items-center gap-[4px] cursor-pointer`}
             style={{ backgroundColor: PRIMARY }}
           >
-            <MdCheck size={14} /> Dismiss
+            <MdCheck size={compact ? 10 : 14} /> Dismiss
           </button>
         </div>
       )}
@@ -652,6 +656,137 @@ function ScreenSkeleton({
   );
 }
 
+function PhoneDataCard() {
+  const rows: Array<{ label: string; kind: 'checkbox' | 'badge' | 'icon' | 'text' | 'two-line' | 'empty'; value?: string }> = [
+    { label: '20%', kind: 'checkbox' },
+    { label: '22%', kind: 'text', value: '45%' },
+    { label: '38%', kind: 'badge' },
+    { label: '28%', kind: 'text', value: '40%' },
+    { label: '18%', kind: 'icon' },
+    { label: '42%', kind: 'two-line' },
+    { label: '32%', kind: 'empty' },
+  ];
+  return (
+    <div className="rounded-[8px] border overflow-hidden shrink-0" style={{ borderColor: BORDER }}>
+      {rows.map((row, i) => (
+        <div
+          key={i}
+          className="flex items-center justify-between gap-[8px] px-[10px] py-[8px]"
+          style={{
+            backgroundColor: i % 2 === 0 ? SKELETON.rowTint : '#ffffff',
+            borderBottom: i < rows.length - 1 ? `1px solid ${BORDER}` : 'none',
+          }}
+        >
+          <SkeletonBar width={row.label} height={7} />
+          {row.kind === 'checkbox' && <CheckboxSkeleton />}
+          {row.kind === 'badge' && <SkeletonBar width="34%" height={9} color={SKELETON.badgeRed} />}
+          {row.kind === 'icon' && <div className="w-[9px] h-[9px] rounded-[2px] border shrink-0" style={{ borderColor: SKELETON.grey }} />}
+          {row.kind === 'text' && <SkeletonBar width={row.value ?? '30%'} height={7} />}
+          {row.kind === 'two-line' && (
+            <div className="flex flex-col gap-[3px] items-end">
+              <SkeletonBar width="80px" height={7} />
+              <SkeletonBar width="40px" height={6} />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PhoneSkeleton({
+  effectiveFormat,
+  title,
+  body,
+  color,
+  dismissible,
+  hasCta,
+  ctaLabel,
+}: {
+  effectiveFormat: DisplayFormat;
+  title: string;
+  body: string;
+  color: string;
+  dismissible: boolean;
+  hasCta: boolean;
+  ctaLabel: string;
+}) {
+  return (
+    <div className="w-full h-full flex items-center justify-center">
+      <div
+        className="relative bg-white rounded-[28px] overflow-hidden flex flex-col shadow-lg shrink-0"
+        style={{ width: 260, height: '100%', maxHeight: 520, border: '6px solid #2b2b2b', borderColor: '#2b2b2b' }}
+      >
+        {/* Topbar: hamburger, logo, search, notifications w/ badge, avatar */}
+        <div className="h-[34px] border-b flex items-center gap-[10px] px-[10px] shrink-0" style={{ borderColor: BORDER }}>
+          <div className="w-[12px] h-[12px] rounded-[2px] shrink-0" style={{ backgroundColor: SKELETON.grey }} />
+          <SkeletonBar width="28%" height={9} color={SKELETON.greyLight} />
+          <div className="ml-auto flex items-center gap-[8px] shrink-0">
+            <div className="w-[10px] h-[10px] rounded-full" style={{ backgroundColor: SKELETON.grey }} />
+            <div className="relative w-[10px] h-[10px] rounded-[2px]" style={{ backgroundColor: SKELETON.grey }}>
+              <div className="absolute -top-[2px] -right-[2px] w-[6px] h-[6px] rounded-full" style={{ backgroundColor: SKELETON.badgeRed }} />
+            </div>
+            <div className="w-[16px] h-[16px] rounded-full" style={{ backgroundColor: SKELETON.avatar }} />
+          </div>
+        </div>
+        {/* Breadcrumb */}
+        <div className="h-[28px] border-b flex items-center gap-[8px] px-[10px] shrink-0" style={{ borderColor: BORDER }}>
+          <div className="w-[8px] h-[8px]" style={{ borderLeft: `1.5px solid ${SKELETON.avatar}`, borderBottom: `1.5px solid ${SKELETON.avatar}`, transform: 'rotate(45deg)' }} />
+          <SkeletonBar width="40%" height={8} color="#c7c7c7" />
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-[10px] flex flex-col gap-[8px]">
+          {/* Stat cards: 2-column grid, same plain skeleton boxes as desktop */}
+          <div className="grid grid-cols-2 gap-[6px]">
+            <StatCardSkeleton color={SKELETON.statBlue} borderColor={SKELETON.statBlueBorder} />
+            <StatCardSkeleton color={SKELETON.statRed} borderColor={SKELETON.statRedBorder} />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </div>
+          {/* Search */}
+          <div className="h-[26px] rounded-[4px] border flex items-center px-[8px] shrink-0" style={{ borderColor: BORDER }}>
+            <SkeletonBar width="40%" height={7} />
+          </div>
+          {/* Toolbar */}
+          <div className="flex items-center gap-[8px] shrink-0">
+            <SkeletonBar width="54px" height={12} color={SKELETON.greyLight} />
+            <SkeletonBar width="54px" height={12} color={SKELETON.greyLight} />
+          </div>
+          {/* Select All + record cards, mobile's substitute for the datagrid */}
+          <div className="rounded-[8px] border flex items-center justify-between px-[10px] py-[8px] shrink-0" style={{ borderColor: BORDER }}>
+            <SkeletonBar width="30%" height={8} color="#c7c7c7" />
+            <CheckboxSkeleton />
+          </div>
+          <PhoneDataCard />
+          <PhoneDataCard />
+        </div>
+
+        {effectiveFormat === 'Overlay' && (
+          <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
+            <OverlayPreview
+              title={title}
+              body={body}
+              dismissible={dismissible}
+              hasCta={hasCta}
+              ctaLabel={ctaLabel}
+              rounded={false}
+              widthClass="w-[80%]"
+              compact
+            />
+          </div>
+        )}
+
+        {effectiveFormat === 'Banner' && (
+          <div className="absolute left-0 right-0 bottom-0">
+            <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData }: {
   onClose: () => void;
   onMessageCreated?: (data: { title: string; messageType: string; statesOrAgencies: string[]; searchMode: string; startDate: string; endDate: string; }) => void;
@@ -680,7 +815,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [frequency, setFrequency] = useState('');
   const [dismissible, setDismissible] = useState<Dismissible>('Dismissible');
   const [pushNotification, setPushNotification] = useState(false);
-  const [hideScreenPreview, setHideScreenPreview] = useState(false);
+  const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
 
   const isAnnouncement = messageType === 'Announcement';
   const isEmergency = messageType === 'Emergency';
@@ -822,17 +957,31 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           <div className="bg-white rounded-[8px] border flex flex-col flex-1 overflow-hidden" style={{ borderColor: BORDER }}>
             <div className="px-[16px] py-[12px] border-b flex items-center justify-between gap-[12px] shrink-0" style={{ borderColor: BORDER }}>
               <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] text-black">Message Preview</p>
-              <div className="flex items-center gap-[8px] shrink-0">
-                <span className="font-['Montserrat',sans-serif] font-medium text-[12px] whitespace-nowrap" style={{ color: LABEL_GREY }}>
-                  Do not show screen
-                </span>
-                <ToggleSwitch checked={hideScreenPreview} onChange={setHideScreenPreview} />
+              <div className="flex items-center rounded-[6px] border border-[#e5e5e5] bg-white overflow-hidden shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setDeviceView('desktop')}
+                  className="flex items-center justify-center w-[32px] h-[32px] transition-colors duration-150"
+                  style={{ backgroundColor: deviceView === 'desktop' ? '#27496d' : 'white' }}
+                  title="Desktop view"
+                >
+                  <MdDesktopWindows size={16} color={deviceView === 'desktop' ? 'white' : '#8a8a8a'} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeviceView('phone')}
+                  className="flex items-center justify-center w-[32px] h-[32px] transition-colors duration-150"
+                  style={{ backgroundColor: deviceView === 'phone' ? '#27496d' : 'white' }}
+                  title="Phone view"
+                >
+                  <MdPhoneIphone size={16} color={deviceView === 'phone' ? 'white' : '#8a8a8a'} />
+                </button>
               </div>
             </div>
             <div className="flex-1 min-h-0 flex flex-col p-[16px] gap-[12px]">
-              {!hideScreenPreview ? (
-                hasPreview ? (
-                  <div className="flex-1 min-h-0">
+              {hasPreview ? (
+                <div className="flex-1 min-h-0">
+                  {deviceView === 'desktop' ? (
                     <ScreenSkeleton
                       effectiveFormat={effectiveFormat}
                       title={title}
@@ -842,50 +991,18 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                       hasCta={hasCta}
                       ctaLabel={ctaLabel}
                     />
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center gap-[10px] py-[40px]">
-                    <MdPreview size={40} color="#d1d3d4" />
-                    <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8] text-center max-w-[220px]">
-                      {messageType === ''
-                        ? 'Preview will appear here once you select a message type.'
-                        : 'Preview will appear here once you select a display format.'}
-                    </p>
-                  </div>
-                )
-              ) : hasPreview ? (
-                <>
-                  <div
-                    className="flex-1 min-h-0 flex justify-center"
-                    style={{ alignItems: effectiveFormat === 'Overlay' ? 'stretch' : 'center' }}
-                  >
-                    {effectiveFormat === 'Banner' && (
-                      <div className="w-full self-center">
-                        <BannerPreview
-                          body={body}
-                          color={effectiveBannerColor}
-                          dismissible={effectiveDismissible}
-                          hasCta={hasCta}
-                          ctaLabel={ctaLabel}
-                        />
-                      </div>
-                    )}
-                    {effectiveFormat === 'Overlay' && (
-                      <OverlayPreview
-                        title={title}
-                        body={body}
-                        dismissible={effectiveDismissible}
-                        hasCta={hasCta}
-                        ctaLabel={ctaLabel}
-                      />
-                    )}
-                  </div>
-                  {/* Meta */}
-                  <div className="flex flex-wrap gap-[8px] shrink-0">
-                    {startDate && <span className="text-[11px] font-['Montserrat',sans-serif] text-[#8b8b8b]">Starts {startDate}</span>}
-                    {audienceCount > 0 && <span className="text-[11px] font-['Montserrat',sans-serif] text-[#8b8b8b]">• {audienceCount} {audienceCount === 1 ? 'agency' : 'agencies'}</span>}
-                  </div>
-                </>
+                  ) : (
+                    <PhoneSkeleton
+                      effectiveFormat={effectiveFormat}
+                      title={title}
+                      body={body}
+                      color={effectiveBannerColor}
+                      dismissible={effectiveDismissible}
+                      hasCta={hasCta}
+                      ctaLabel={ctaLabel}
+                    />
+                  )}
+                </div>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center gap-[10px] py-[40px]">
                   <MdPreview size={40} color="#d1d3d4" />
