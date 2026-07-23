@@ -442,8 +442,7 @@ function OverlayPreview({
   hasCta,
   ctaLabel,
   rounded = true,
-  fullWidth = false,
-  roundedTop = false,
+  widthClass = 'w-[320px]',
 }: {
   title: string;
   body: string;
@@ -451,17 +450,15 @@ function OverlayPreview({
   hasCta: boolean;
   ctaLabel: string;
   rounded?: boolean;
-  fullWidth?: boolean;
-  roundedTop?: boolean;
+  widthClass?: string;
 }) {
-  const shapeClass = roundedTop ? 'rounded-t-[14px] shadow-lg' : rounded ? 'rounded-[8px] shadow-md' : 'border-t-0 border-r-0 border-b-0';
   return (
     <div
-      className={`bg-white border flex flex-col ${fullWidth ? 'w-full' : 'w-[320px]'} h-full ${shapeClass}`}
+      className={`bg-white border flex flex-col ${widthClass} h-full ${rounded ? 'rounded-[8px] shadow-md' : 'border-t-0 border-r-0 border-b-0'}`}
       style={{ borderColor: BORDER }}
     >
-      <div className="flex items-center justify-between px-[16px] py-[12px] border-b shrink-0" style={{ borderColor: BORDER }}>
-        <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">{title || 'Message Title'}</p>
+      <div className="flex items-center justify-between gap-[8px] px-[16px] py-[12px] border-b shrink-0" style={{ borderColor: BORDER }}>
+        <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black truncate">{title || 'Message Title'}</p>
         {dismissible && <MdClose size={18} color="#000000" className="cursor-pointer shrink-0" />}
       </div>
       <div className="px-[16px] py-[14px] flex flex-col gap-[10px] flex-1 min-w-0 overflow-y-auto">
@@ -470,8 +467,8 @@ function OverlayPreview({
         </p>
         {hasCta && ctaLabel && (
           <div className="flex items-start gap-[6px] min-w-0 cursor-pointer" style={{ color: '#27496D' }}>
-            <FiExternalLink size={14} className="shrink-0 mt-[2px]" />
             <p className="font-['Montserrat',sans-serif] font-medium text-[13px] underline break-words min-w-0">{ctaLabel}</p>
+            <FiExternalLink size={14} className="shrink-0 mt-[2px]" />
           </div>
         )}
       </div>
@@ -657,17 +654,52 @@ function ScreenSkeleton({
   );
 }
 
-function PhoneCardSkeleton({ index }: { index: number }) {
+function PhoneStatCardSkeleton({ color, borderColor }: { color?: string; borderColor?: string }) {
   return (
     <div
-      className="rounded-[6px] border p-[8px] flex flex-col gap-[5px] shrink-0"
-      style={{ borderColor: BORDER, backgroundColor: index % 2 === 0 ? SKELETON.rowTint : '#ffffff' }}
+      className="rounded-[4px] border flex items-start justify-between p-[8px]"
+      style={{ height: 44, backgroundColor: color ?? '#ffffff', borderColor: borderColor ?? BORDER }}
     >
-      <div className="flex items-center justify-between gap-[6px]">
-        <SkeletonBar width="55%" height={7} />
-        <SkeletonBar width="26%" height={9} color={SKELETON.badgeRed} />
-      </div>
-      <SkeletonBar width="75%" height={6} />
+      <SkeletonBar width="55%" height={9} color="#c7c7c7" />
+      <div className="w-[9px] h-[9px] rounded-full border shrink-0" style={{ borderColor: '#b3b3b3' }} />
+    </div>
+  );
+}
+
+function PhoneDataCard() {
+  const rows: Array<{ label: string; kind: 'checkbox' | 'badge' | 'icon' | 'text' | 'two-line' | 'empty'; value?: string }> = [
+    { label: '20%', kind: 'checkbox' },
+    { label: '22%', kind: 'text', value: '45%' },
+    { label: '38%', kind: 'badge' },
+    { label: '28%', kind: 'text', value: '40%' },
+    { label: '18%', kind: 'icon' },
+    { label: '42%', kind: 'two-line' },
+    { label: '32%', kind: 'empty' },
+  ];
+  return (
+    <div className="rounded-[8px] border overflow-hidden shrink-0" style={{ borderColor: BORDER }}>
+      {rows.map((row, i) => (
+        <div
+          key={i}
+          className="flex items-center justify-between gap-[8px] px-[10px] py-[8px]"
+          style={{
+            backgroundColor: i % 2 === 0 ? SKELETON.rowTint : '#ffffff',
+            borderBottom: i < rows.length - 1 ? `1px solid ${BORDER}` : 'none',
+          }}
+        >
+          <SkeletonBar width={row.label} height={7} />
+          {row.kind === 'checkbox' && <CheckboxSkeleton />}
+          {row.kind === 'badge' && <SkeletonBar width="34%" height={9} color={SKELETON.badgeRed} />}
+          {row.kind === 'icon' && <div className="w-[9px] h-[9px] rounded-[2px] border shrink-0" style={{ borderColor: SKELETON.grey }} />}
+          {row.kind === 'text' && <SkeletonBar width={row.value ?? '30%'} height={7} />}
+          {row.kind === 'two-line' && (
+            <div className="flex flex-col gap-[3px] items-end">
+              <SkeletonBar width="80px" height={7} />
+              <SkeletonBar width="40px" height={6} />
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -693,56 +725,76 @@ function PhoneSkeleton({
     <div className="w-full h-full flex items-center justify-center">
       <div
         className="relative bg-white rounded-[28px] overflow-hidden flex flex-col shadow-lg shrink-0"
-        style={{ width: 220, height: '100%', maxHeight: 480, border: '6px solid #2b2b2b', borderColor: '#2b2b2b' }}
+        style={{ width: 260, height: '100%', maxHeight: 520, border: '6px solid #2b2b2b', borderColor: '#2b2b2b' }}
       >
-        {/* Status bar */}
-        <div className="h-[18px] flex items-center justify-between px-[12px] shrink-0 bg-white">
-          <SkeletonBar width="24px" height={6} />
-          <div className="w-[10px] h-[6px] rounded-[1px]" style={{ backgroundColor: SKELETON.grey }} />
-        </div>
-        {/* App header */}
-        <div className="h-[34px] border-b flex items-center gap-[8px] px-[12px] shrink-0" style={{ borderColor: BORDER }}>
-          <div className="w-[12px] h-[12px] rounded-[3px] shrink-0" style={{ backgroundColor: SKELETON.grey }} />
-          <SkeletonBar width="50%" height={8} color={SKELETON.greyLight} />
-          <div className="ml-auto w-[16px] h-[16px] rounded-full shrink-0" style={{ backgroundColor: SKELETON.avatar }} />
-        </div>
-        {/* Content: stacked stat cards + list cards, mobile's substitute for the sidebar/datagrid */}
-        <div className="flex-1 min-h-0 overflow-hidden p-[10px] flex flex-col gap-[8px]">
-          <div className="flex gap-[6px]">
-            <StatCardSkeleton color={SKELETON.statBlue} borderColor={SKELETON.statBlueBorder} />
-            <StatCardSkeleton color={SKELETON.statRed} borderColor={SKELETON.statRedBorder} />
-          </div>
-          <div className="flex flex-col gap-[6px]">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <PhoneCardSkeleton key={i} index={i} />
-            ))}
+        {/* Topbar: hamburger, logo, search, notifications w/ badge, avatar */}
+        <div className="h-[34px] border-b flex items-center gap-[10px] px-[10px] shrink-0" style={{ borderColor: BORDER }}>
+          <div className="w-[12px] h-[12px] rounded-[2px] shrink-0" style={{ backgroundColor: SKELETON.grey }} />
+          <SkeletonBar width="28%" height={9} color={SKELETON.greyLight} />
+          <div className="ml-auto flex items-center gap-[8px] shrink-0">
+            <div className="w-[10px] h-[10px] rounded-full" style={{ backgroundColor: SKELETON.grey }} />
+            <div className="relative w-[10px] h-[10px] rounded-[2px]" style={{ backgroundColor: SKELETON.grey }}>
+              <div className="absolute -top-[2px] -right-[2px] w-[6px] h-[6px] rounded-full" style={{ backgroundColor: SKELETON.badgeRed }} />
+            </div>
+            <div className="w-[16px] h-[16px] rounded-full" style={{ backgroundColor: SKELETON.avatar }} />
           </div>
         </div>
-        {/* Bottom tab bar — mobile's substitute for the left sidebar nav */}
-        <div className="h-[38px] border-t flex items-center justify-around shrink-0" style={{ borderColor: BORDER, backgroundColor: '#fafafa' }}>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="w-[14px] h-[14px] rounded-[3px]" style={{ backgroundColor: i === 0 ? SKELETON.avatar : SKELETON.greyLight }} />
-          ))}
+        {/* Breadcrumb */}
+        <div className="h-[28px] border-b flex items-center gap-[8px] px-[10px] shrink-0" style={{ borderColor: BORDER }}>
+          <div className="w-[8px] h-[8px]" style={{ borderLeft: `1.5px solid ${SKELETON.avatar}`, borderBottom: `1.5px solid ${SKELETON.avatar}`, transform: 'rotate(45deg)' }} />
+          <SkeletonBar width="40%" height={8} color="#c7c7c7" />
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-[10px] flex flex-col gap-[8px]">
+          {/* Stat cards: 2-column grid */}
+          <div className="grid grid-cols-2 gap-[6px]">
+            <PhoneStatCardSkeleton color={SKELETON.statBlue} borderColor={SKELETON.statBlueBorder} />
+            <PhoneStatCardSkeleton color={SKELETON.statRed} borderColor={SKELETON.statRedBorder} />
+            <PhoneStatCardSkeleton />
+            <PhoneStatCardSkeleton />
+            <PhoneStatCardSkeleton />
+            <PhoneStatCardSkeleton />
+          </div>
+          {/* Search */}
+          <div className="h-[26px] rounded-[4px] border flex items-center px-[8px] shrink-0" style={{ borderColor: BORDER }}>
+            <SkeletonBar width="40%" height={7} />
+          </div>
+          {/* Toolbar */}
+          <div className="flex items-center gap-[12px] shrink-0">
+            <div className="flex items-center gap-[4px]">
+              <div className="w-[9px] h-[9px] rounded-full border" style={{ borderColor: '#b3b3b3' }} />
+              <SkeletonBar width="34px" height={7} />
+            </div>
+            <div className="flex items-center gap-[4px]">
+              <div className="w-[9px] h-[9px] rounded-[2px] border" style={{ borderColor: '#b3b3b3' }} />
+              <SkeletonBar width="40px" height={7} />
+            </div>
+            <div className="ml-auto w-[10px] h-[10px] rounded-full border" style={{ borderColor: '#b3b3b3' }} />
+          </div>
+          {/* Select All + record cards, mobile's substitute for the datagrid */}
+          <div className="rounded-[8px] border flex items-center justify-between px-[10px] py-[8px] shrink-0" style={{ borderColor: BORDER }}>
+            <SkeletonBar width="30%" height={8} color="#c7c7c7" />
+            <CheckboxSkeleton />
+          </div>
+          <PhoneDataCard />
+          <PhoneDataCard />
         </div>
 
         {effectiveFormat === 'Overlay' && (
-          <div className="absolute inset-0 flex items-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
-            <div style={{ width: '100%', height: '55%' }}>
-              <OverlayPreview
-                title={title}
-                body={body}
-                dismissible={dismissible}
-                hasCta={hasCta}
-                ctaLabel={ctaLabel}
-                fullWidth
-                roundedTop
-              />
-            </div>
+          <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
+            <OverlayPreview
+              title={title}
+              body={body}
+              dismissible={dismissible}
+              hasCta={hasCta}
+              ctaLabel={ctaLabel}
+              rounded={false}
+              widthClass="w-[80%]"
+            />
           </div>
         )}
 
         {effectiveFormat === 'Banner' && (
-          <div className="absolute left-0 right-0" style={{ bottom: 38 }}>
+          <div className="absolute left-0 right-0 bottom-0">
             <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
           </div>
         )}
