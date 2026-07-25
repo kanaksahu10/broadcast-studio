@@ -6,3 +6,98 @@ html, body, #root {
   overflow: hidden;
   font-size: 14px;
 }
+
+/* ---- Collapsed sidebar: icon-over-label rail (matches GEOH collapsed nav) ---- */
+/* every top-level nav row spans the full rail and centers its content
+   (fixes rows whose generated markup lacks w-full, e.g. Billing) */
+.sidebar-collapsed > div > button,
+.sidebar-collapsed > div > div {
+  width: 100% !important;
+  align-items: center !important;
+}
+.sidebar-collapsed [data-name="Sidebar States"]:has(p),
+.sidebar-collapsed [data-name="Sidebar States"]:has(p) > div,
+.sidebar-collapsed [data-name="Sidebar States"]:has(p) > div > div,
+.sidebar-collapsed [data-name="Super Administrator"]:has(p) > button > div > div {
+  justify-content: center !important;
+  column-gap: 0 !important;
+}
+/* strip Figma side padding from inner wrappers only — the row keeps its own
+   padding so content stays clear of the left indicator bar */
+.sidebar-collapsed [data-name="Sidebar States"]:has(p) > div,
+.sidebar-collapsed [data-name="Sidebar States"]:has(p) > div > div,
+.sidebar-collapsed [data-name="Super Administrator"]:has(p) > button > div > div {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+/* hide the "add" (+) quick-action next to Employees in the rail */
+.sidebar-collapsed [data-name="react-icons/bs/BsPlus"] {
+  display: none !important;
+}
+/* Each nav row: taller, vertical padding, relative for the pinned bar */
+.sidebar-collapsed [data-name="Sidebar States"] {
+  position: relative !important;
+  height: auto !important;
+  min-height: 58px !important;
+  padding-top: 9px !important;
+  padding-bottom: 9px !important;
+  /* keep icon/label clear of the left indicator bar, balanced on the right */
+  padding-left: 8px !important;
+  padding-right: 6px !important;
+}
+/* icon + label wrapper -> stack vertically, centered */
+.sidebar-collapsed div:has(> p) {
+  flex-direction: column !important;
+  align-items: center !important;
+  row-gap: 5px !important;
+  column-gap: 0 !important;
+}
+/* labels: show, shrink, center, truncate to fit the rail */
+.sidebar-collapsed p {
+  display: block !important;
+  font-family: 'Montserrat', sans-serif !important;
+  font-size: 8px !important;
+  line-height: 11px !important;
+  font-weight: 400 !important;
+  text-align: center !important;
+  max-width: 55px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+/* neutralize inner positioned wrappers so the indicator bar's containing
+   block is the full row (not the shorter icon+label group).
+   the :has() selector also catches the deeper Super Administrator header
+   wrapper, and never matches icon containers (they hold no bar). */
+.sidebar-collapsed [data-name="Sidebar States"] > div,
+.sidebar-collapsed [data-name="Sidebar States"] > div > div,
+.sidebar-collapsed [data-name="Sidebar States"] div:has(> .w-\[4px\]) {
+  position: static !important;
+}
+/* active indicator bar -> flush to left edge, full row height (like expanded) */
+.sidebar-collapsed [data-name="Sidebar States"] .w-\[4px\] {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  height: auto !important;
+  width: 4px !important;
+}
+/* every icon in the collapsed rail renders at 17x17 (both react-icon <svg>s
+   and the Figma <div> icon containers) */
+.sidebar-collapsed div:has(> p) > svg,
+.sidebar-collapsed div:has(> p) > [data-name] {
+  width: 17px !important;
+  height: 17px !important;
+  min-width: 17px !important;
+  min-height: 17px !important;
+}
+/* the Super Administrator section header also gets the blue indicator bar */
+.sidebar-collapsed [data-name="Super Administrator"] > button .w-\[4px\] {
+  background-color: #0078d4 !important;
+}
+/* bold labels for the section header (Super Admin) and the active item (Broadcast Studio) */
+.sidebar-collapsed [data-name="Super Administrator"] > button p,
+.sidebar-collapsed .bg-\[\#cfcfcf\] p {
+  font-weight: 700 !important;
+}

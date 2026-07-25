@@ -9,6 +9,7 @@ import { MdInsights, MdArrowBack } from 'react-icons/md';
 import { TbZoomCode } from 'react-icons/tb';
 import { AiOutlineForm } from 'react-icons/ai';
 import { PiPlugs } from 'react-icons/pi';
+import { LuReceipt } from 'react-icons/lu';
 import TopbarSearch from '../TopbarSearch/TopbarSearch';
 import NotificationPanel from '../NotificationPanel-1/NotificationPanel-29-20200';
 import { useState, useRef, useEffect } from 'react';
@@ -138,7 +139,7 @@ function TopBar({ onHamburgerClick, sidebarCollapsed }: { onHamburgerClick: () =
   return (
     <div className="absolute inset-x-0 top-0 h-[59px] bg-white border-b border-[#dfdfdf] z-10 flex items-center" data-name="Top Bar">
       {/* Logo + Hamburger — same width as sidebar */}
-      <div className={`flex items-center px-[16px] shrink-0 transition-[width] duration-200 ${sidebarCollapsed ? 'w-[72px] justify-center' : 'w-[329px] justify-between'}`}>
+      <div className={`flex items-center px-[16px] shrink-0 transition-[width] duration-200 ${sidebarCollapsed ? 'w-[69px] justify-center' : 'w-[329px] justify-between'}`}>
         {!sidebarCollapsed && <Logo />}
         <button onClick={onHamburgerClick} className="p-0 bg-transparent border-0 cursor-pointer flex items-center justify-center">
           <svg fill="none" viewBox="0 0 14.2642 10.5" className="w-[14px] h-[11px]">
@@ -318,7 +319,7 @@ function Frame7() {
 function Frame8() {
   return (
     <div className="content-stretch flex gap-[8px] items-center relative shrink-0">
-      <div className="relative shrink-0 size-[23px]" data-name="react-icons/ri/RiDashboardFill">
+      <div className="relative shrink-0 size-[17.25px]" data-name="react-icons/ri/RiDashboardFill">
         <svg className="absolute block inset-0 size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 17.25 17.25">
           <g id="Group">
             <path d={svgPaths.p359abb00} fill="var(--fill-0, #27496D)" id="Vector" />
@@ -378,15 +379,7 @@ function Frame11() {
 function Frame12() {
   return (
     <div className="content-stretch flex gap-[8px] items-center relative shrink-0">
-      <div className="overflow-clip relative shrink-0 size-[23px]" data-name="receipt-2">
-        <div className="absolute inset-[12.5%_20.83%]" data-name="Vector">
-          <div className="absolute inset-[-5.8%_-7.45%]">
-            <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 15.4167 19.25">
-              <path d={svgPaths.p2a156580} id="Vector" stroke="var(--stroke-0, #334C6D)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-            </svg>
-          </div>
-        </div>
-      </div>
+      <LuReceipt className="shrink-0 text-[#334c6d]" size={23} />
       <p className="font-['Montserrat',sans-serif] font-normal leading-[20px] not-italic relative shrink-0 text-[#334c6d] text-[14px] text-left whitespace-nowrap">Billing</p>
     </div>
   );
@@ -1399,6 +1392,20 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
   const [expandedSection, setExpandedSection] = useState<'clients' | 'agency' | 'superAdmin' | null>('superAdmin');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  // Collapsed rail shows only the first word of each nav label (e.g. "Super
+  // Administrator" -> "Super"); expanded restores the full label.
+  useEffect(() => {
+    const menu = document.querySelector('[data-name="Sidebar Menu"]');
+    if (!menu) return;
+    menu.querySelectorAll('p').forEach((p) => {
+      const el = p as HTMLElement;
+      if (el.closest('[data-name="Collapsed Org"]')) return; // org name truncates by ellipsis, not first-word
+      if (!el.dataset.fullLabel) el.dataset.fullLabel = el.textContent ?? '';
+      const full = el.dataset.fullLabel;
+      el.textContent = sidebarCollapsed ? full.split(' ')[0] : full;
+    });
+  }, [sidebarCollapsed, expandedSection]);
+
   const handleClientsClick = () => {
     setExpandedSection('clients');
   };
@@ -1421,7 +1428,7 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
       <div className="absolute right-0 top-[59px] bottom-0 w-[60px] border-l border-[#e5e5e5] z-50">
         <NotificationPanel />
       </div>
-      <div className={`absolute bg-[#eaeaea] bottom-0 left-0 top-[59px] overflow-hidden transition-[width] duration-200 ${sidebarCollapsed ? 'w-[72px] [&_p]:hidden' : 'w-[329px]'}`} data-name="Sidebar Menu">
+      <div className={`absolute bg-[#eaeaea] bottom-0 left-0 top-[59px] overflow-hidden transition-[width] duration-200 ${sidebarCollapsed ? 'sidebar-collapsed w-[69px]' : 'w-[329px]'}`} data-name="Sidebar Menu">
         <div className="content-stretch flex flex-col items-start overflow-y-auto relative rounded-[inherit] size-full">
           {!sidebarCollapsed && (
             <>
@@ -1440,6 +1447,26 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
                   <div aria-hidden="true" className="absolute border-[#dfdfdf] border-b border-solid inset-0 pointer-events-none" />
                 </div>
                 <Frame4 />
+              </div>
+            </>
+          )}
+          {sidebarCollapsed && (
+            <>
+              <div
+                data-name="Collapsed Org"
+                className="w-full flex items-center justify-center shrink-0"
+                style={{ height: 45, backgroundColor: '#efefef', borderBottom: '1px solid #dfdfdf' }}
+              >
+                <div className="bg-[#3eb361] rounded-[8px] flex items-center justify-center shrink-0" style={{ width: 30, height: 30 }}>
+                  <span className="font-['Montserrat',sans-serif] font-medium text-white" style={{ fontSize: 12, lineHeight: '15px' }}>JD</span>
+                </div>
+              </div>
+              <div
+                data-name="Collapsed Org"
+                className="w-full flex items-center justify-center shrink-0 px-[6px]"
+                style={{ height: 45, backgroundColor: '#efefef', borderBottom: '1px solid #dfdfdf' }}
+              >
+                <p className="font-['Montserrat',sans-serif] font-normal text-center" style={{ color: '#334c6d' }}>GEOH Demonstration</p>
               </div>
             </>
           )}
@@ -1820,13 +1847,13 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
       </div>
       {/* Main content area: fixed breadcrumb toolbar + its own independent scroll region,
           so content taller than the viewport scrolls instead of being clipped. */}
-      <div className={`absolute bg-[#f8f8f8] flex gap-[14px] h-[48px] items-center right-[60px] p-[16px] top-[59px] z-10 transition-[left] duration-200 ${sidebarCollapsed ? 'left-[72px]' : 'left-[329px]'}`} data-name="Toolbar">
+      <div className={`absolute bg-[#f8f8f8] flex gap-[14px] h-[48px] items-center right-[60px] p-[16px] top-[59px] z-10 transition-[left] duration-200 ${sidebarCollapsed ? 'left-[69px]' : 'left-[329px]'}`} data-name="Toolbar">
         <MdArrowBack size={21} color="#27496D" />
         <span className="font-['Montserrat',sans-serif] font-medium text-[15px] text-black leading-[15px]">
           {expandedSection === 'agency' ? 'View Goals' : 'Broadcast Studio'}
         </span>
       </div>
-      <div className={`absolute right-[60px] top-[107px] bottom-0 overflow-y-auto transition-[left] duration-200 ${sidebarCollapsed ? 'left-[72px]' : 'left-[329px]'}`}>
+      <div className={`absolute right-[60px] top-[107px] bottom-0 overflow-y-auto transition-[left] duration-200 ${sidebarCollapsed ? 'left-[69px]' : 'left-[329px]'}`}>
         <div className="p-[16px]">
           {expandedSection === 'agency' ? (
             <Container goalTemplates={goalTemplates} />

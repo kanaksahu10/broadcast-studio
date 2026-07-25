@@ -1,26 +1,26 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BsSearch } from 'react-icons/bs';
-import { FiExternalLink } from 'react-icons/fi';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BiBuildings } from 'react-icons/bi';
+import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose } from 'react-icons/io';
-import { MdAdd, MdTableRows, MdViewKanban } from 'react-icons/md';
-import ComposeMessageOverlay from './ComposeMessageOverlay';
+import { MdAdd, MdApps, MdBusiness, MdDeleteOutline, MdDesktopWindows, MdMoreVert, MdOutlineGroup, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
+import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton } from './ComposeMessageOverlay';
 
-type UserRole = 'super-admin' | 'extra-super-admin';
+type UserRole = 'super-admin' | 'executive-approver';
 
 function useRole(): UserRole {
   const param = new URLSearchParams(window.location.search).get('role');
-  return param === 'extra-super-admin' ? 'extra-super-admin' : 'super-admin';
+  return param === 'executive-approver' ? 'executive-approver' : 'super-admin';
 }
 
 function RoleBadge({ role }: { role: UserRole }) {
   if (import.meta.env.PROD) return null;
-  const isExtra = role === 'extra-super-admin';
+  const isExtra = role === 'executive-approver';
   return (
     <div
       className="fixed bottom-[16px] left-[16px] z-[9999] px-[10px] py-[5px] rounded-[6px] font-['Montserrat',sans-serif] font-medium text-[11px] pointer-events-none"
       style={{ backgroundColor: isExtra ? '#27496D' : '#2699fb', color: 'white', opacity: 0.9 }}
     >
-      {isExtra ? 'Extra Super Admin' : 'Super Admin'}
+      {isExtra ? 'Executive Approver' : 'Super Admin'}
     </div>
   );
 }
@@ -92,15 +92,183 @@ function parseDisplayDate(str: string): string {
 }
 
 const INITIAL_MESSAGES: BroadcastMessageRow[] = [
-  { id: '1', subject: 'Summer Schedule Update', type: 'Announcement', audience: 'All Field Staff', channel: 'Email', status: 'Live', startDate: 'Jul 10, 2026', endDate: 'Jul 17, 2026', recipients: 1204 },
-  { id: '2', subject: 'New Overtime Policy', type: 'Emergency', audience: 'Payroll Admins', channel: 'Email', status: 'Live', startDate: 'Jul 8, 2026', endDate: 'Jul 15, 2026', recipients: 42 },
-  { id: '3', subject: 'Holiday Closure Notice', type: 'Announcement', audience: 'All Employees', channel: 'SMS', status: 'Pending', startDate: 'Jul 20, 2026', endDate: 'Jul 27, 2026', recipients: 3150 },
-  { id: '4', subject: 'Client Portal Maintenance', type: 'Emergency', audience: 'All Clients', channel: 'Email', status: 'Pending', startDate: 'Jul 18, 2026', endDate: 'Jul 19, 2026', recipients: 892 },
-  { id: '5', subject: 'Q3 Training Reminder', type: 'Announcement', audience: 'Field Staff — Region A', channel: 'Push', status: 'Draft', startDate: '—', endDate: '—', recipients: null },
-  { id: '6', subject: 'Referral Program Launch', type: 'Announcement', audience: 'All Agencies', channel: 'Email', status: 'Draft', startDate: '—', endDate: '—', recipients: null },
+  // ---- DRAFTS ----
+  {
+    id: 'seed-d1',
+    subject: 'Q3 Training Reminder',
+    type: 'Announcement',
+    audience: 'Sunrise Home Care +2',
+    channel: 'Email',
+    status: 'Draft',
+    startDate: 'Aug 1, 2026',
+    endDate: 'Aug 8, 2026',
+    recipients: null,
+    formData: {
+      body: 'Q3 compliance training is now available. Please complete all assigned modules before the end of the quarter to stay certified.',
+      reason: 'Quarterly compliance',
+      displayFormat: 'Overlay',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: true,
+      ctaLabel: 'Start training',
+      ctaDestination: '#',
+      statesOrAgencies: ['Sunrise Home Care', 'Golden Gate Health Partners', 'Lone Star Caregivers'],
+      packages: [],
+      roles: [],
+    },
+  },
+  {
+    id: 'seed-d2',
+    subject: 'Referral Program Launch',
+    type: 'Announcement',
+    audience: 'All',
+    channel: 'Email',
+    status: 'Draft',
+    startDate: '—',
+    endDate: '—',
+    recipients: null,
+    formData: {
+      body: 'Introducing our new employee referral program — earn bonuses for every successful hire you refer.',
+      displayFormat: 'Banner',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: false,
+      statesOrAgencies: ['Austin Family Support'],
+      packages: [],
+      roles: [],
+    },
+  },
+
+  // ---- PENDING APPROVAL ----
+  {
+    id: 'seed-p1',
+    subject: 'Holiday Closure Notice',
+    type: 'Announcement',
+    audience: 'Sunrise Home Care +3',
+    channel: 'Email',
+    status: 'Pending',
+    startDate: 'Jul 20, 2026',
+    endDate: 'Jul 27, 2026',
+    recipients: 3150,
+    formData: {
+      body: 'Our offices will be closed for the upcoming holiday. Emergency on-call support remains available throughout the closure.',
+      reason: 'Holiday schedule',
+      displayFormat: 'Overlay',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: true,
+      ctaLabel: 'View schedule',
+      ctaDestination: '#',
+      statesOrAgencies: ['Sunrise Home Care', 'Golden Gate Health Partners', 'Lone Star Caregivers', 'Empire Homecare Group'],
+      packages: ['Premium Support'],
+      roles: [],
+    },
+  },
+  {
+    id: 'seed-p2',
+    subject: 'Client Portal Maintenance',
+    type: 'Emergency',
+    audience: 'All',
+    channel: 'Push',
+    status: 'Pending',
+    startDate: 'Jul 18, 2026',
+    endDate: 'Jul 19, 2026',
+    recipients: 892,
+    formData: {
+      body: 'The client portal will undergo emergency maintenance tonight from 11 PM to 2 AM. Access will be intermittent during this window.',
+      reason: 'Emergency maintenance',
+      displayFormat: 'Banner',
+      placement: 'Global',
+      messageColor: '#DA4040',
+      dismissible: 'Non-Dismissible',
+      hasCta: false,
+      pushNotification: true,
+      statesOrAgencies: ['Austin Family Support', 'Empire Homecare Group'],
+      packages: [],
+      roles: ['Administrator'],
+    },
+  },
+
+  // ---- APPROVED ----
+  {
+    id: 'seed-a1',
+    subject: 'Summer Schedule Update',
+    type: 'Announcement',
+    audience: 'Sunrise Home Care +2',
+    channel: 'Email',
+    status: 'Live',
+    startDate: 'Jul 20, 2026',
+    endDate: 'Jul 27, 2026',
+    recipients: 1204,
+    formData: {
+      body: 'Summer hours are now in effect. Review the updated shift schedule to see how your availability windows have changed.',
+      displayFormat: 'Banner',
+      placement: 'Feature Specific',
+      featurePath: 'Scheduling',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: true,
+      ctaLabel: 'View schedule',
+      ctaDestination: '#',
+      statesOrAgencies: ['Sunrise Home Care', 'Golden Gate Health Partners', 'Lone Star Caregivers'],
+      packages: [],
+      roles: [],
+    },
+  },
+  {
+    id: 'seed-a2',
+    subject: 'New Overtime Policy',
+    type: 'Emergency',
+    audience: 'All',
+    channel: 'Push',
+    status: 'Live',
+    startDate: 'Jul 22, 2026',
+    endDate: 'Jul 28, 2026',
+    recipients: 42,
+    formData: {
+      body: 'Effective immediately: overtime must be pre-approved by a supervisor. Unapproved overtime will not be compensated.',
+      reason: 'Policy change',
+      displayFormat: 'Banner',
+      placement: 'Global',
+      messageColor: '#DA4040',
+      dismissible: 'Non-Dismissible',
+      hasCta: false,
+      pushNotification: true,
+      statesOrAgencies: ['Empire Homecare Group'],
+      packages: [],
+      roles: ['Caregiver', 'Administrator'],
+    },
+  },
+  {
+    id: 'seed-a3',
+    subject: 'Open Enrollment Opens',
+    type: 'Announcement',
+    audience: 'Sunrise Home Care +1',
+    channel: 'Email',
+    status: 'Live',
+    startDate: 'Aug 1, 2026',
+    endDate: 'Aug 15, 2026',
+    recipients: 560,
+    formData: {
+      body: 'Benefits open enrollment begins August 1st. Take a few minutes to review your options and make any changes for the coming year.',
+      displayFormat: 'Overlay',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: true,
+      ctaLabel: 'Review benefits',
+      ctaDestination: '#',
+      statesOrAgencies: ['Sunrise Home Care', 'Austin Family Support'],
+      packages: [],
+      roles: [],
+    },
+  },
 ];
 
-const STORAGE_KEY = 'bs-messages';
+const STORAGE_KEY = 'bs-messages-v4';
 
 function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
@@ -161,11 +329,11 @@ function NewMessageButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="bg-[#2699fb] content-stretch flex gap-[6px] h-[32px] items-center px-[14px] rounded-[8px] shrink-0 cursor-pointer"
+      className="bg-[#2699fb] content-stretch flex gap-[6px] items-center px-[12px] py-[8px] rounded-[8px] shrink-0 cursor-pointer"
       data-name="New Message Button"
     >
       <MdAdd className="shrink-0" size={17} color="white" />
-      <span className="font-['Montserrat',sans-serif] font-medium text-[13px] text-white whitespace-nowrap">New Message</span>
+      <span className="font-['Montserrat',sans-serif] font-medium text-[13px] text-white whitespace-nowrap">NEW MESSAGE</span>
     </button>
   );
 }
@@ -331,10 +499,125 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
   Draft: 'Edit',
 };
 
-function KanbanCard({ row, role, onEdit, onSendForApproval, onApprove, onReject }: {
+function AudienceChip({ label, variant }: { label: string; variant: 'agency' | 'package' | 'role' }) {
+  const iconMap = {
+    agency: <BiBuildings size={12} color="white" />,
+    package: <MdApps size={11} color="white" />,
+    role: <BsPersonBadgeFill size={11} color="white" />,
+  };
+  const bgMap = { agency: '#2699FB', package: '#2699FB', role: '#2ECC71' };
+  return (
+    <span className="flex items-center gap-[8px] pl-[4px] pr-[8px] h-[29px] rounded-full border shrink-0" style={{ backgroundColor: '#F2F2F2', borderColor: '#E5E5E5' }}>
+      <span className="rounded-full size-[20px] flex items-center justify-center shrink-0" style={{ backgroundColor: bgMap[variant] }}>
+        {iconMap[variant]}
+      </span>
+      <span className="font-['Montserrat',sans-serif] font-medium text-[12px] text-black leading-[17px] whitespace-nowrap">{label}</span>
+    </span>
+  );
+}
+
+function AudienceSection({ label, items, variant }: { label: string; items: string[]; variant: 'agency' | 'package' | 'role' }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="bg-white border rounded-[4px] flex flex-col gap-[8px] px-[8px] py-[12px]" style={{ borderColor: '#E5E5E5' }}>
+      <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: '#585858' }}>{label}</p>
+      <div className="flex flex-col items-start gap-[4px]">
+        {items.map(item => <AudienceChip key={item} label={item} variant={variant} />)}
+      </div>
+    </div>
+  );
+}
+
+function AudienceOverlay({ formData, onClose }: { formData: NonNullable<BroadcastMessageRow['formData']>; onClose: () => void }) {
+  const agencies = formData.statesOrAgencies ?? [];
+  const packages = formData.packages ?? [];
+  const roles = formData.roles ?? [];
+  return (
+    <div className="fixed inset-0 z-50">
+      <div
+        className="absolute inset-0"
+        style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
+        onClick={onClose}
+      />
+      <div className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
+          <p className="font-['Montserrat',sans-serif] font-medium text-[15px] leading-[21px] text-black">Audience</p>
+          <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
+            <IoIosClose size={26} color="#27496D" />
+          </button>
+        </div>
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-[16px] py-[16px] flex flex-col gap-[12px]">
+          <AudienceSection label="Agencies" items={agencies} variant="agency" />
+          <AudienceSection label="Packages" items={packages} variant="package" />
+          <AudienceSection label="Roles" items={roles} variant="role" />
+        </div>
+        {/* Footer */}
+        <div className="flex items-center px-[16px] shrink-0" style={{ borderTop: '1px solid #CFCFCF', backgroundColor: '#f8f8f8', height: '60px' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px]"
+            style={{ color: '#27496D' }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeleteConfirmOverlay({ subject, onConfirm, onClose }: { subject: string; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50">
+      <div
+        className="absolute inset-0"
+        style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
+        onClick={onClose}
+      />
+      <div className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col">
+        <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
+          <p className="font-['Montserrat',sans-serif] font-medium text-[15px] leading-[21px] text-black">Delete Message</p>
+          <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
+            <IoIosClose size={26} color="#27496D" />
+          </button>
+        </div>
+        <div className="flex-1 px-[16px] pt-[16px] pb-[24px]">
+          <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px]" style={{ color: '#343434' }}>
+            You are about to delete the <span className="font-semibold">"{subject}"</span> message which is live right now. This will remove the announcement from all the recipients immediately.
+          </p>
+        </div>
+        <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderTop: '1px solid #CFCFCF', backgroundColor: '#f8f8f8', height: '60px' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px]"
+            style={{ color: '#27496D' }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px] rounded-[8px] border flex items-center gap-[6px]"
+            style={{ color: '#DA4040', borderColor: '#DA4040', backgroundColor: '#fdeaea' }}
+          >
+            <MdDeleteOutline size={15} color="#DA4040" />
+            DELETE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KanbanCard({ row, role, onEdit, onDelete, onSendForApproval, onApprove, onReject }: {
   row: BroadcastMessageRow;
   role: UserRole;
   onEdit?: () => void;
+  onDelete?: () => void;
   onSendForApproval?: () => void;
   onApprove?: () => void;
   onReject?: () => void;
@@ -344,27 +627,130 @@ function KanbanCard({ row, role, onEdit, onSendForApproval, onApprove, onReject 
   const isSuperAdmin = role === 'super-admin';
   const isDraft = row.status === 'Draft';
   const isPending = row.status === 'Pending';
+  const [showAudience, setShowAudience] = useState(false);
+  const [showKebab, setShowKebab] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isButtonHovered, setIsButtonHovered] = useState(false);
+  const kebabRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showKebab) return;
+    const handler = (e: MouseEvent) => {
+      if (kebabRef.current && !kebabRef.current.contains(e.target as Node)) {
+        setShowKebab(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showKebab]);
+
   return (
+    <>
+    {showAudience && row.formData && (
+      <AudienceOverlay formData={row.formData} onClose={() => setShowAudience(false)} />
+    )}
+    {showDeleteConfirm && (
+      <DeleteConfirmOverlay
+        subject={row.subject}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={() => { setShowDeleteConfirm(false); onDelete?.(); }}
+      />
+    )}
     <div className="bg-white rounded-[8px] border border-[#e5e5e5] overflow-hidden flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-      <div className="w-[4px] shrink-0" style={{ backgroundColor: color }} />
       <div className="flex flex-col gap-[10px] p-[14px] flex-1 min-w-0">
-        <div>
-          <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px] text-[#000000]">{row.subject}</p>
-          {(row.type || dateRange !== '—') && (
-            <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
-              {row.type}{row.type && dateRange !== '—' && <span> • </span>}{dateRange !== '—' && dateRange}
-            </p>
+        <div className="flex items-start justify-between gap-[6px]">
+          <div className="flex flex-col flex-1 min-w-0">
+            <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px] text-[#000000]">{row.subject}</p>
+            {(row.type || dateRange !== '—') && (
+              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
+                {row.type}{row.type && dateRange !== '—' && <span> • </span>}{dateRange !== '—' && dateRange}
+              </p>
+            )}
+          </div>
+          {(isDraft || row.status === 'Live') && (
+            <div className="relative shrink-0" ref={kebabRef}>
+              <button
+                type="button"
+                className="flex items-center justify-center w-[24px] h-[24px] rounded-[4px] cursor-pointer hover:bg-[#f2f2f2]"
+                onClick={() => setShowKebab(v => !v)}
+              >
+                <BsThreeDotsVertical size={16} color="#27496D" />
+              </button>
+              {showKebab && (
+                <div
+                  className="absolute top-full right-0 mt-[2px] bg-white rounded-[6px] border z-20 overflow-hidden"
+                  style={{ borderColor: '#E5E5E5', boxShadow: '0 4px 12px rgba(0,0,0,0.10)', minWidth: '120px' }}
+                >
+                  <button
+                    type="button"
+                    className="flex items-center gap-[8px] w-full px-[12px] h-[36px] cursor-pointer hover:bg-[#EFEFEF]"
+                    onClick={() => {
+                      setShowKebab(false);
+                      if (row.status === 'Live' && row.startDate !== '—') {
+                        const today = new Date(); today.setHours(0, 0, 0, 0);
+                        const start = new Date(row.startDate);
+                        const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
+                        if (today >= start && today <= end) { setShowDeleteConfirm(true); return; }
+                      }
+                      onDelete?.();
+                    }}
+                  >
+                    <MdDeleteOutline size={15} color="#DA4040" />
+                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px]" style={{ color: '#DA4040' }}>Delete</span>
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
-        {row.recipients !== null && (
-          <span className="font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px] bg-[#e8f3ff] text-[#2699fb] whitespace-nowrap self-start">{row.recipients.toLocaleString()} Agencies</span>
-        )}
-        <div className="flex items-center justify-end gap-[8px]">
+        {row.status === 'Live' && row.startDate !== '—' && (() => {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const start = new Date(row.startDate);
+          const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
+          const isLive = today >= start && today <= end;
+          const isScheduled = today < start;
+          if (isLive) return (
+            <span className="flex items-center gap-[5px] self-start font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]" style={{ backgroundColor: '#EEFFEE', color: '#00AA00' }}>
+              <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: '#00AA00' }} />
+              Live
+            </span>
+          );
+          if (isScheduled) return (
+            <span className="flex items-center gap-[5px] self-start font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]" style={{ backgroundColor: '#E8F4FF', color: '#2699FB' }}>
+              <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: '#2699FB' }} />
+              Scheduled
+            </span>
+          );
+          return null;
+        })()}
+        <div className="flex items-center justify-between gap-[8px]">
+          {(() => {
+            const agencies = row.formData?.statesOrAgencies ?? [];
+            const packages = row.formData?.packages ?? [];
+            const roles = row.formData?.roles ?? [];
+            const count = agencies.length + packages.length + roles.length || (row.recipients ?? 0);
+            if (count === 0) return <span />;
+            const hasDetail = agencies.length > 0 || packages.length > 0 || roles.length > 0;
+            return (
+              <button
+                type="button"
+                className="flex items-center gap-[5px]"
+                style={{ cursor: hasDetail ? 'pointer' : 'default' }}
+                onClick={() => hasDetail && setShowAudience(true)}
+              >
+                <MdOutlineGroup size={15} color="#27496D" />
+                <span className="font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px]" style={{ color: '#27496D' }}>{count} {count === 1 ? 'Recipient' : 'Recipients'}</span>
+              </button>
+            );
+          })()}
           {isDraft && (
             <button
               type="button"
-              className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] h-[32px] rounded-[6px] border transition-colors duration-100"
-              style={{ color, borderColor: color, backgroundColor: 'white' }}
+              className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
+              style={{ color: isButtonHovered ? 'white' : color, borderColor: color, backgroundColor: isButtonHovered ? color : 'white' }}
+              onMouseEnter={() => setIsButtonHovered(true)}
+              onMouseLeave={() => setIsButtonHovered(false)}
               onClick={onEdit}
             >
               Edit
@@ -373,8 +759,10 @@ function KanbanCard({ row, role, onEdit, onSendForApproval, onApprove, onReject 
           {isPending && (
             <button
               type="button"
-              className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] h-[32px] rounded-[6px] border transition-colors duration-100"
-              style={{ color, borderColor: color, backgroundColor: 'white' }}
+              className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
+              style={{ color: isButtonHovered ? 'white' : color, borderColor: color, backgroundColor: isButtonHovered ? color : 'white' }}
+              onMouseEnter={() => setIsButtonHovered(true)}
+              onMouseLeave={() => setIsButtonHovered(false)}
               onClick={onEdit}
             >
               Review
@@ -383,8 +771,10 @@ function KanbanCard({ row, role, onEdit, onSendForApproval, onApprove, onReject 
           {row.status === 'Live' && (
             <button
               type="button"
-              className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] h-[32px] rounded-[6px] border transition-colors duration-100"
-              style={{ color, borderColor: color, backgroundColor: 'white' }}
+              className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
+              style={{ color: isButtonHovered ? 'white' : color, borderColor: color, backgroundColor: isButtonHovered ? color : 'white' }}
+              onMouseEnter={() => setIsButtonHovered(true)}
+              onMouseLeave={() => setIsButtonHovered(false)}
               onClick={onEdit}
             >
               View
@@ -393,19 +783,21 @@ function KanbanCard({ row, role, onEdit, onSendForApproval, onApprove, onReject 
         </div>
       </div>
     </div>
+    </>
   );
 }
 
 const KANBAN_COLUMNS: Array<{ status: MessageStatus; label: string }> = [
   { status: 'Draft', label: 'Drafts' },
   { status: 'Pending', label: 'Pending Approval' },
-  { status: 'Live', label: 'Live' },
+  { status: 'Live', label: 'Approved' },
 ];
 
-function KanbanBoard({ rows, role, onEdit, onSendForApproval, onApprove, onReject }: {
+function KanbanBoard({ rows, role, onEdit, onDelete, onSendForApproval, onApprove, onReject }: {
   rows: BroadcastMessageRow[];
   role: UserRole;
   onEdit: (row: BroadcastMessageRow) => void;
+  onDelete: (id: string) => void;
   onSendForApproval: (id: string) => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
@@ -419,7 +811,6 @@ function KanbanBoard({ rows, role, onEdit, onSendForApproval, onApprove, onRejec
           <div key={status} className="flex flex-col gap-[10px] flex-1 min-w-0 bg-[#fcfcfc] rounded-[10px] p-[12px]">
             <div className="flex items-center justify-between px-[2px]">
               <div className="flex items-center gap-[7px]">
-                <div className="rounded-full size-[8px] shrink-0" style={{ backgroundColor: color }} />
                 <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{label}</span>
               </div>
               <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
@@ -436,6 +827,7 @@ function KanbanBoard({ rows, role, onEdit, onSendForApproval, onApprove, onRejec
                     row={row}
                     role={role}
                     onEdit={() => onEdit(row)}
+                    onDelete={() => onDelete(row.id)}
                     onSendForApproval={() => onSendForApproval(row.id)}
                     onApprove={() => onApprove(row.id)}
                     onReject={() => onReject(row.id)}
@@ -450,105 +842,96 @@ function KanbanBoard({ rows, role, onEdit, onSendForApproval, onApprove, onRejec
   );
 }
 
-function LiveMessagePreview({ row, onClose }: { row: BroadcastMessageRow; onClose: () => void }) {
+function MessagePreviewModal({ row, onClose }: { row: BroadcastMessageRow; onClose: () => void }) {
+  const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
+
   const isEmergency = row.type === 'Emergency';
-  const displayFormat = isEmergency ? 'Banner' : (row.formData?.displayFormat || 'Overlay');
-  const bannerColor = isEmergency ? '#DA4040' : (row.formData?.messageColor || '#27496D');
+  const effectiveFormat: 'Overlay' | 'Banner' = isEmergency ? 'Banner' : ((row.formData?.displayFormat as 'Overlay' | 'Banner') || 'Overlay');
+  const color = isEmergency ? '#DA4040' : (row.formData?.messageColor || '#27496D');
   const body = row.formData?.body || row.subject;
   const hasCta = row.formData?.hasCta ?? false;
   const ctaLabel = row.formData?.ctaLabel || 'Learn more';
-  const ctaDestination = row.formData?.ctaDestination || '#';
-  const isDismissible = !isEmergency && row.formData?.dismissible !== 'Non-Dismissible';
+  const dismissible = !isEmergency && row.formData?.dismissible !== 'Non-Dismissible';
   const isFeatureSpecific = row.formData?.placement === 'Feature Specific';
   const featurePath = row.formData?.featurePath || '';
 
-  const handleAction = () => {
-    if (isFeatureSpecific && featurePath) {
-      window.location.href = featurePath;
-    } else {
-      onClose();
-    }
-  };
-
-  if (displayFormat === 'Banner') {
-    return (
-      <div
-        className="fixed inset-x-0 bottom-0 z-50 flex items-center gap-[16px] px-[16px] py-[12px] w-full"
-        style={{ backgroundColor: bannerColor }}
-      >
-        {isDismissible && <div className="shrink-0" style={{ width: 18 }} />}
-        <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-white flex-1 text-center">
-          {body}
-          {hasCta && ctaLabel && (
-            <> <span onClick={handleAction} className="font-medium underline cursor-pointer">{ctaLabel}</span></>
-          )}
-        </p>
-        {isDismissible ? (
-          <button type="button" onClick={onClose} className="cursor-pointer flex items-center shrink-0">
-            <IoIosClose size={18} color="white" />
-          </button>
-        ) : (
-          <div className="shrink-0" style={{ width: 18 }} />
-        )}
-      </div>
-    );
+  // Determine live vs scheduled for the status chip.
+  let previewStatus: 'Live' | 'Scheduled' | null = null;
+  if (row.startDate !== '—') {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const start = new Date(row.startDate);
+    const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
+    if (today < start) previewStatus = 'Scheduled';
+    else if (today >= start && today <= end) previewStatus = 'Live';
   }
+  const chipBg = previewStatus === 'Live' ? '#EEFFEE' : previewStatus === 'Scheduled' ? '#E8F4FF' : '#F2F2F2';
+  const chipColor = previewStatus === 'Live' ? '#00AA00' : previewStatus === 'Scheduled' ? '#2699FB' : '#585858';
+  const scheduleRange = row.endDate !== '—' ? `${row.startDate} – ${row.endDate}` : row.startDate;
+  const statusChipText = previewStatus ? `${previewStatus}: ${scheduleRange}` : null;
+  const placementChips = isFeatureSpecific ? ['Feature Specific', ...(featurePath ? [featurePath] : [])] : ['App-wide'];
 
   return (
     <div className="fixed inset-0 z-50">
-      <div
-        className="absolute inset-0"
-        style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
-        onClick={isDismissible ? onClose : undefined}
-      />
-      <div className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col">
-        <div
-          className="flex items-center justify-between px-[16px] shrink-0"
-          style={{ borderBottom: '1px solid #E5E5E5', height: '56px' }}
-        >
-          <p className="font-['Montserrat',sans-serif] font-semibold text-[16px] text-black">{row.subject}</p>
-          {isDismissible && (
+      <div className="absolute inset-0 bg-white flex flex-col overflow-hidden">
+          {/* Header — the modal's own close is always the exit */}
+          <div className="flex items-center justify-between px-[20px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', height: '56px' }}>
+            <div className="flex flex-col gap-[4px]">
+              <p className="font-['Montserrat',sans-serif] font-semibold text-[15px] leading-[20px] text-black">Message Preview</p>
+              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[16px]" style={{ color: '#8b8b8b' }}>{row.subject}</p>
+            </div>
             <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
-              <IoIosClose size={26} color="#000000" />
+              <IoIosClose size={26} color="#27496D" />
             </button>
-          )}
-        </div>
-        <div className="flex-1 px-[16px] py-[24px] overflow-y-auto flex flex-col gap-[16px]">
-          <p className="font-['Montserrat',sans-serif] font-normal text-[14px] text-black leading-[1.5]">{body}</p>
-          {hasCta && (
-            <a
-              href={ctaDestination}
-              className="flex items-center gap-[6px] cursor-pointer font-['Montserrat',sans-serif] font-medium text-[13px] underline"
-              style={{ color: '#27496D' }}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <FiExternalLink size={14} className="shrink-0" />
-              {ctaLabel}
-            </a>
-          )}
-        </div>
-        <div
-          className="flex items-center justify-between px-[16px] shrink-0"
-          style={{ borderTop: '1px solid #E5E5E5', backgroundColor: '#f8f8f8', height: '60px' }}
-        >
-          <button
-            type="button"
-            onClick={onClose}
-            className="font-['Montserrat',sans-serif] font-medium text-[14px] cursor-pointer"
-            style={{ color: '#27496D' }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleAction}
-            className="font-['Montserrat',sans-serif] font-semibold text-[13px] text-white px-[16px] h-[32px] rounded-[8px] cursor-pointer"
-            style={{ backgroundColor: '#2699FB' }}
-          >
-            Got it
-          </button>
-        </div>
+          </div>
+
+          {/* Context bar — device toggle + "what recipients see" + push indicator */}
+          <div className="flex items-center justify-between gap-[12px] px-[20px] py-[10px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', backgroundColor: '#ffffff' }}>
+            <div className="flex items-center gap-[6px] min-w-0 flex-wrap">
+              {statusChipText && (
+                <span
+                  className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
+                  style={{ backgroundColor: chipBg, color: chipColor }}
+                >
+                  <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: chipColor }} />
+                  {statusChipText}
+                </span>
+              )}
+              {row.type && (
+                <span
+                  className="flex items-center font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
+                  style={{ backgroundColor: chipBg, color: chipColor }}
+                >
+                  {row.type}
+                </span>
+              )}
+              {placementChips.map((chip) => (
+                <span
+                  key={chip}
+                  className="flex items-center font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
+                  style={{ backgroundColor: chipBg, color: chipColor }}
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+            <div className="flex items-center rounded-[6px] border border-[#e5e5e5] bg-white overflow-hidden shrink-0">
+              <button type="button" onClick={() => setDeviceView('desktop')} className="flex items-center justify-center w-[32px] h-[32px] transition-colors duration-150" style={{ backgroundColor: deviceView === 'desktop' ? '#27496d' : 'white' }} title="Desktop view">
+                <MdDesktopWindows size={16} color={deviceView === 'desktop' ? 'white' : '#8a8a8a'} />
+              </button>
+              <button type="button" onClick={() => setDeviceView('phone')} className="flex items-center justify-center w-[32px] h-[32px] transition-colors duration-150" style={{ backgroundColor: deviceView === 'phone' ? '#27496d' : 'white' }} title="Phone view">
+                <MdPhoneIphone size={16} color={deviceView === 'phone' ? 'white' : '#8a8a8a'} />
+              </button>
+            </div>
+          </div>
+
+          {/* Stage — faithful in-context render, always contained */}
+          <div className="flex-1 min-h-0 p-[20px]" style={{ backgroundColor: '#f5f6f7' }}>
+            {deviceView === 'desktop' ? (
+              <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+            ) : (
+              <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+            )}
+          </div>
       </div>
     </div>
   );
@@ -558,7 +941,7 @@ export default function BroadcastStudioDashboard() {
   const role = useRole();
 
   useEffect(() => {
-    document.title = role === 'extra-super-admin' ? 'BS - Extra Super Admin' : 'BS - Super Admin';
+    document.title = role === 'executive-approver' ? 'BS - Executive Approver' : 'BS - Super Admin';
   }, [role]);
 
   const [messages, setMessages] = useSharedMessages();
@@ -569,6 +952,10 @@ export default function BroadcastStudioDashboard() {
   const [editingRow, setEditingRow] = useState<BroadcastMessageRow | null>(null);
   const [reviewingRow, setReviewingRow] = useState<BroadcastMessageRow | null>(null);
   const [viewingRow, setViewingRow] = useState<BroadcastMessageRow | null>(null);
+
+  const handleDelete = (id: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+  };
 
   const handleSendForApproval = (id: string) => {
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Pending' } : m));
@@ -585,7 +972,7 @@ export default function BroadcastStudioDashboard() {
   const handleMessageCreated = (data: MessageFormData & { title?: string; messageType?: string; startDate?: string; endDate?: string; statesOrAgencies?: string[]; searchMode?: string }) => {
     const agencies = data.statesOrAgencies ?? [];
     const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;
-    const newStatus = role === 'extra-super-admin' ? 'Live' : 'Pending';
+    const newStatus = role === 'executive-approver' ? 'Live' : 'Pending';
     const newMessage: BroadcastMessageRow = {
       id: Date.now().toString(),
       subject: data.title ?? '',
@@ -626,7 +1013,7 @@ export default function BroadcastStudioDashboard() {
         </div>
       )}
 
-      {viewMode === 'kanban' && <AudienceMetrics rows={messages} />}
+      {/* {viewMode === 'kanban' && <AudienceMetrics rows={messages} />} */}
 
       <div className="flex items-center gap-[12px] w-full">
         <SearchInput value={search} onChange={setSearch} />
@@ -641,6 +1028,7 @@ export default function BroadcastStudioDashboard() {
         <KanbanBoard
           rows={searchFiltered}
           role={role}
+          onDelete={handleDelete}
           onEdit={(row) => {
             if (row.status === 'Live') {
               setViewingRow(row);
@@ -697,8 +1085,8 @@ export default function BroadcastStudioDashboard() {
         <ComposeMessageOverlay
           onClose={() => setReviewingRow(null)}
           overlayTitle="Review Message"
-          readOnly
-          {...(role === 'extra-super-admin' ? {
+          readOnly={role !== 'executive-approver'}
+          {...(role === 'executive-approver' ? {
             onApprove: () => { handleApprove(reviewingRow.id); setReviewingRow(null); },
             onReject: () => { handleReject(reviewingRow.id); setReviewingRow(null); },
           } : {})}
@@ -713,7 +1101,7 @@ export default function BroadcastStudioDashboard() {
       )}
 
       {viewingRow && (
-        <LiveMessagePreview row={viewingRow} onClose={() => setViewingRow(null)} />
+        <MessagePreviewModal row={viewingRow} onClose={() => setViewingRow(null)} />
       )}
 
       <RoleBadge role={role} />
@@ -722,7 +1110,7 @@ export default function BroadcastStudioDashboard() {
         <ComposeMessageOverlay
           onClose={() => setIsComposeOpen(false)}
           onMessageCreated={handleMessageCreated}
-          submitLabel={role === 'extra-super-admin' ? 'Publish' : 'Send for Approval'}
+          submitLabel={role === 'executive-approver' ? 'Publish' : 'Send for Approval'}
           onSaveAsDraft={(data) => {
             const agencies = data.statesOrAgencies ?? [];
             const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone } from 'react-icons/md';
+import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps } from 'react-icons/md';
+import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle } from 'react-icons/fa';
 import { GrAnnounce } from 'react-icons/gr';
@@ -37,6 +38,34 @@ const AGENCIES: Agency[] = [
 const STATES = Array.from(new Set(AGENCIES.map((a) => a.state)));
 const PACKAGES = Array.from(new Set(AGENCIES.map((a) => a.package)));
 const ROLES = Array.from(new Set(AGENCIES.map((a) => a.role)));
+const STATE_ABBR: Record<string, string> = {
+  'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
+  'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
+  'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
+  'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
+  'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+  'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
+  'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
+  'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
+  'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
+  'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+  'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
+  'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
+  'Wisconsin': 'WI', 'Wyoming': 'WY',
+};
+const STATE_BG_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FF8C42', '#A78BFA', '#34D399', '#F59E0B', '#EF4444', '#3B82F6', '#10B981', '#8B5CF6'];
+function stateColor(name: string) {
+  let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return STATE_BG_COLORS[Math.abs(h) % STATE_BG_COLORS.length];
+}
+
+const ROLE_SUBTEXT: Record<string, string> = {
+  'Owner': 'Full access to all agency features',
+  'Admin': 'Manage agency settings and staff',
+  'Care Coordinator': 'Schedule and coordinate care',
+  'Field Staff': 'Caregiver and field worker',
+};
+
 const FEATURE_PATHS = ['Dashboard', 'Scheduling', 'Billing', 'Clients', 'Employees', 'Broadcast Studio'];
 const FREQUENCY_OPTIONS = ['Once', 'Every Login', 'Daily', 'Weekly'];
 const MESSAGE_COLOR_OPTIONS = ['#DA4040', '#27496D'];
@@ -52,11 +81,11 @@ function SectionHeader({ children }: { children: string }) {
   return <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px] text-black w-full">{children}</p>;
 }
 
-function FieldShell({ label, height, disabled, children }: { label: string; height?: number; disabled?: boolean; children: React.ReactNode }) {
+function FieldShell({ label, height, disabled, open, children }: { label: string; height?: number; disabled?: boolean; open?: boolean; children: React.ReactNode }) {
   return (
     <div
-      className="border rounded-[4px] px-[12px] py-[8px] flex flex-col gap-[8px] justify-center w-full"
-      style={{ borderColor: BORDER, borderWidth: '1px', minHeight: height ?? 70, backgroundColor: disabled ? '#f2f2f2' : 'white' }}
+      className={`border px-[12px] py-[8px] flex flex-col gap-[8px] justify-center w-full ${open ? 'rounded-t-[4px]' : 'rounded-[4px]'}`}
+      style={{ borderColor: BORDER, borderWidth: '1px', borderBottomWidth: open ? 0 : 1, minHeight: height ?? 70, backgroundColor: disabled ? '#f2f2f2' : 'white' }}
     >
       <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: disabled ? '#585858' : LABEL_GREY }}>
         {label}
@@ -189,33 +218,63 @@ function SelectField({
 }
 
 function DateField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (v: string) => void; disabled?: boolean }) {
-  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const today = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+
+  const displayValue = value
+    ? (() => { const [yyyy, mm, dd] = value.split('-'); return `${mm} / ${dd} / ${yyyy}`; })()
+    : null;
+
   return (
     <FieldShell label={label} disabled={disabled}>
       <div className="flex items-center justify-between w-full relative">
         <div className="relative flex-1 pr-[24px]">
-          <input
-            type="date"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            className="date-input-no-native-icon font-['Montserrat',sans-serif] font-normal text-[13px] outline-none bg-transparent w-full"
-            style={{ color: value ? '#000000' : focused ? '#B8B8B8' : 'transparent' }}
-          />
-          {!value && !focused && (
-            <span
-              className="absolute inset-0 font-['Montserrat',sans-serif] font-normal text-[13px] pointer-events-none flex items-center"
-              style={{ color: '#B8B8B8' }}
-            >
-              00 / 00 / 0000
-            </span>
+          <span
+            className="font-['Montserrat',sans-serif] font-normal text-[13px] pointer-events-none select-none"
+            style={{ color: value ? '#000000' : '#B8B8B8' }}
+          >
+            {displayValue ?? '00 / 00 / 0000'}
+          </span>
+          {!disabled && (
+            <input
+              ref={inputRef}
+              type="date"
+              value={value}
+              min={today}
+              onChange={(e) => onChange(e.target.value)}
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+            />
           )}
         </div>
-        {!disabled && <BiCalendarEvent className="absolute right-0 pointer-events-none" size={18} color="#27496D" />}
+        {!disabled && (
+          <BiCalendarEvent
+            className="absolute right-0 cursor-pointer"
+            size={18}
+            color="#27496D"
+            onClick={() => (inputRef.current as any)?.showPicker?.()}
+          />
+        )}
       </div>
     </FieldShell>
   );
+}
+
+type MultiSelectVariant = 'agency' | 'state' | 'package' | 'role' | 'default';
+
+function OptionIcon({ variant, name }: { variant: MultiSelectVariant; name: string }) {
+  const base = 'size-[20px] rounded-full flex items-center justify-center shrink-0';
+  if (variant === 'agency') return <span className={base} style={{ backgroundColor: '#2699FB' }}><MdBusiness size={11} color="white" /></span>;
+  if (variant === 'role') return <span className={base} style={{ backgroundColor: '#2ECC71' }}><BsPersonBadgeFill size={11} color="white" /></span>;
+  if (variant === 'package') return <span className={base} style={{ backgroundColor: '#2699FB' }}><MdApps size={11} color="white" /></span>;
+  if (variant === 'state') {
+    const abbr = (STATE_ABBR[name] ?? name.slice(0, 2)).toUpperCase();
+    return <span className={`${base} font-['Montserrat',sans-serif] font-bold text-[8px] text-white`} style={{ backgroundColor: stateColor(name) }}>{abbr}</span>;
+  }
+  return null;
 }
 
 function MultiSelectField({
@@ -226,6 +285,7 @@ function MultiSelectField({
   options,
   caption,
   disabled,
+  variant = 'default',
 }: {
   label: string;
   values: string[];
@@ -234,6 +294,7 @@ function MultiSelectField({
   options: string[];
   caption?: string;
   disabled?: boolean;
+  variant?: MultiSelectVariant;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -250,29 +311,39 @@ function MultiSelectField({
     onChange(values.includes(opt) ? values.filter((v) => v !== opt) : [...values, opt]);
   };
 
+  const hasIcon = variant !== 'default';
+
   return (
     <div className="relative w-full" ref={ref}>
-      <button type="button" onClick={() => !disabled && setOpen((o) => !o)} className="w-full text-left cursor-pointer">
-        <FieldShell label={label} height={values.length > 0 ? undefined : 70} disabled={disabled}>
-          <div className="flex items-center justify-between w-full gap-[8px]">
-            <div className="flex flex-wrap gap-[6px] flex-1 min-w-0">
-              {values.length === 0 ? (
-                <span className="font-['Montserrat',sans-serif] font-normal text-[13px]" style={{ color: PLACEHOLDER }}>
-                  {placeholder}
-                </span>
-              ) : (
-                values.map((v) => (
+      <button type="button" onClick={() => !disabled && setOpen((o) => !o)} className="w-full text-left" disabled={disabled}>
+        <FieldShell label={label} disabled={disabled} open={open}>
+          <div className="flex flex-col gap-[6px]">
+            {values.length > 0 && (
+              <div className="flex flex-col gap-[6px] items-start">
+                {values.map((v) => (
                   <span
                     key={v}
-                    className="bg-[#eaf4fe] font-medium text-[12px] rounded-[4px] px-[8px] py-[2px] flex items-center gap-[4px]"
-                    style={{ color: PRIMARY }}
+                    className="border rounded-full pl-[5px] pr-[8px] h-[29px] flex items-center gap-[5px]"
+                    style={{ borderColor: '#E5E5E5', backgroundColor: '#F2F2F2' }}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    {v}
+                    {hasIcon && <OptionIcon variant={variant} name={v} />}
+                    <span className="font-['Montserrat',sans-serif] font-medium text-[12px] text-black">{v}</span>
+                    {!disabled && (
+                      <span role="button" onClick={(e) => { e.stopPropagation(); toggle(v); }} className="cursor-pointer flex items-center">
+                        <IoIosClose size={16} color="#27496D" />
+                      </span>
+                    )}
                   </span>
-                ))
-              )}
+                ))}
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <span className="font-['Montserrat',sans-serif] font-normal text-[13px]" style={{ color: PLACEHOLDER }}>
+                {placeholder}
+              </span>
+              {!disabled && <IoMdArrowDropdown className="shrink-0" size={20} color="#27496D" />}
             </div>
-            {!disabled && <IoMdArrowDropdown className="shrink-0" size={20} color="#27496D" />}
           </div>
         </FieldShell>
       </button>
@@ -282,26 +353,38 @@ function MultiSelectField({
         </p>
       )}
       {open && (
-        <div className="absolute z-10 top-full left-0 mt-[4px] w-full bg-white border rounded-[4px] shadow-lg max-h-[220px] overflow-y-auto" style={{ borderColor: BORDER }}>
-          {options.map((opt) => {
-            const checked = values.includes(opt);
-            return (
+        <div className="absolute z-10 top-full left-0 w-full bg-white border rounded-b-[4px] shadow-lg" style={{ borderColor: BORDER }}>
+          <div className="max-h-[220px] overflow-y-auto">
+            {options.filter((opt) => !values.includes(opt)).map((opt) => (
               <button
                 type="button"
                 key={opt}
-                onClick={() => toggle(opt)}
-                className="w-full flex items-center gap-[8px] px-[12px] py-[10px] text-left hover:bg-[#f7fbff] cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); toggle(opt); setOpen(false); }}
+                className={`w-full flex items-center gap-[10px] px-[12px] ${variant === 'role' ? 'h-[44px]' : 'h-[40px]'} text-left cursor-pointer`}
+                style={{ backgroundColor: 'white' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#EFEFEF'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'white'; }}
               >
-                <span
-                  className="size-[16px] rounded-[3px] border flex items-center justify-center shrink-0"
-                  style={{ borderColor: checked ? PRIMARY : BORDER, backgroundColor: checked ? PRIMARY : 'white' }}
-                >
-                  {checked && <MdCheck size={12} color="white" />}
-                </span>
-                <span className="font-['Montserrat',sans-serif] text-[13px] text-black">{opt}</span>
+                {hasIcon && <OptionIcon variant={variant} name={opt} />}
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="font-['Montserrat',sans-serif] font-medium text-[12px] text-black leading-[17px]">{opt}</span>
+                  {variant === 'role' && ROLE_SUBTEXT[opt] && (
+                    <span className="font-['Montserrat',sans-serif] text-[12px] mt-[2px] leading-[17px]" style={{ color: PLACEHOLDER }}>{ROLE_SUBTEXT[opt]}</span>
+                  )}
+                </div>
               </button>
-            );
-          })}
+            ))}
+          </div>
+          <div className="border-t flex justify-end px-[12px] py-[8px]" style={{ borderColor: BORDER }}>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onChange([...options]); setOpen(false); }}
+              className="font-['Montserrat',sans-serif] font-medium text-[13px] cursor-pointer"
+              style={{ color: '#27496D' }}
+            >
+              SELECT ALL
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -472,7 +555,7 @@ function OverlayPreview({
     >
       <div className={`flex items-center justify-between gap-[8px] ${compact ? 'px-[12px] py-[10px]' : 'px-[16px] py-[12px]'} border-b shrink-0`} style={{ borderColor: BORDER }}>
         <p className={`font-['Montserrat',sans-serif] font-semibold ${compact ? 'text-[13px]' : 'text-[14px]'} text-black truncate`}>{title || 'Message Title'}</p>
-        {dismissible && <MdClose size={compact ? 16 : 18} color="#000000" className="cursor-pointer shrink-0" />}
+        {dismissible && <MdClose size={compact ? 16 : 18} color="#27496D" className="cursor-pointer shrink-0" />}
       </div>
       <div className={`${compact ? 'px-[12px] py-[10px]' : 'px-[16px] py-[14px]'} flex flex-col gap-[10px] flex-1 min-w-0 overflow-y-auto`}>
         <p className={`font-['Montserrat',sans-serif] font-normal ${compact ? 'text-[12px]' : 'text-[13px]'} text-[#383838] whitespace-pre-wrap break-words`}>
@@ -550,7 +633,7 @@ function TableRowSkeleton({ index }: { index: number }) {
   );
 }
 
-function ScreenSkeleton({
+export function ScreenSkeleton({
   effectiveFormat,
   title,
   body,
@@ -705,7 +788,7 @@ function PhoneDataCard() {
   );
 }
 
-function PhoneSkeleton({
+export function PhoneSkeleton({
   effectiveFormat,
   title,
   body,
@@ -911,7 +994,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
       <div className="flex items-center justify-between h-[56px] px-[24px] border-b shrink-0" style={{ borderColor: BORDER }}>
         <h2 className="font-['Montserrat',sans-serif] font-semibold text-[16px] text-black">{overlayTitle ?? 'New Message'}</h2>
         <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
-          <IoIosClose size={26} color="#000000" />
+          <IoIosClose size={26} color="#27496D" />
         </button>
       </div>
 
@@ -927,7 +1010,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Message Details</p>
             <SelectField label="Message Type *" value={messageType} onChange={(v) => setMessageType(v as MessageType)} placeholder="Select message type..." options={['Announcement', 'Emergency']} disabled={readOnly} />
             {isEmergency && (
-              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#717182]">
+              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] mt-[-12px]" style={{ color: '#B8B8B8' }}>
                 Emergency messages are always sent as a non-dismissible, app-wide red banner.
               </p>
             )}
@@ -961,7 +1044,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             <div className="flex flex-wrap items-center justify-between gap-x-[8px] gap-y-[2px]">
               <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Audience</p>
               <span className="font-['Montserrat',sans-serif] font-medium text-[12px] shrink-0" style={{ color: NAVY }}>
-                {audienceCount} {audienceCount === 1 ? 'agency' : 'agencies'} will see this message
+                {audienceCount} {audienceCount === 1 ? 'recipient' : 'recipients'} will see this message
               </span>
             </div>
             <RadioField label="Search By *" value={searchMode} onChange={handleSearchModeChange} options={['Agency', 'State']} disabled={readOnly} />
@@ -972,9 +1055,10 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               placeholder={searchMode === 'State' ? 'Select states...' : 'Select agencies...'}
               options={searchMode === 'Agency' ? AGENCIES.map((a) => a.name) : STATES}
               disabled={readOnly}
+              variant={searchMode === 'Agency' ? 'agency' : 'state'}
             />
-            <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} disabled={readOnly} />
-            <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} disabled={readOnly} />
+            <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} disabled={readOnly} variant="package" />
+            <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} disabled={readOnly} variant="role" />
           </div>
 
           {/* Display Settings card */}
@@ -1071,8 +1155,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             >
               Cancel
             </button>
-            {readOnly ? (
-              onApprove && onReject ? (
+            {onApprove && onReject ? (
                 <div className="flex items-center gap-[8px]">
                   <button
                     type="button"
@@ -1096,8 +1179,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                     </span>
                   </button>
                 </div>
-              ) : null
-            ) : (
+            ) : !readOnly ? (
               <div className="flex items-center gap-[8px]">
                 <button
                   type="button"
@@ -1109,26 +1191,38 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                     Save as Draft
                   </span>
                 </button>
-                <button
-                  type="button"
-                  onClick={isFormValid ? handleSubmit : undefined}
-                  disabled={!isFormValid}
-                  className="rounded-[8px] px-[16px] h-[32px] flex items-center gap-[8px]"
-                  style={{
-                    backgroundColor: isFormValid ? PRIMARY : '#e1e3e4',
-                    cursor: isFormValid ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  <MdSend size={17} color={isFormValid ? 'white' : '#a1a3a4'} />
-                  <span
-                    className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase"
-                    style={{ color: isFormValid ? 'white' : '#a1a3a4' }}
+                <div className="relative group">
+                  <button
+                    type="button"
+                    onClick={isFormValid ? handleSubmit : undefined}
+                    disabled={!isFormValid}
+                    className="rounded-[8px] px-[16px] h-[32px] flex items-center gap-[8px]"
+                    style={{
+                      backgroundColor: isFormValid ? PRIMARY : '#e1e3e4',
+                      cursor: isFormValid ? 'pointer' : 'not-allowed',
+                    }}
                   >
-                    {submitLabel ?? 'Send for Approval'}
-                  </span>
-                </button>
+                    <MdSend size={17} color={isFormValid ? 'white' : '#a1a3a4'} />
+                    <span
+                      className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase"
+                      style={{ color: isFormValid ? 'white' : '#a1a3a4' }}
+                    >
+                      {submitLabel ?? 'Send for Approval'}
+                    </span>
+                  </button>
+                  {!isFormValid && (
+                    <div
+                      className="absolute bottom-full left-1/2 -translate-x-1/2 mb-[8px] w-max max-w-[220px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 rounded-[4px] px-[8px] py-[10px] z-50"
+                      style={{ backgroundColor: '#3b5c79' }}
+                    >
+                      <p className="font-['Montserrat',sans-serif] font-medium text-[12px] text-white leading-[17px]">
+                        Please fill in all required fields to proceed
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
