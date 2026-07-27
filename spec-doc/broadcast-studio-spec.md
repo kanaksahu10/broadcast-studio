@@ -12,7 +12,7 @@ This is the **UX / interaction spec and dev-handoff** layer beneath the [PRD](ht
 - `super-admin` — GEOH Message Author: composes messages, sends for approval, manages drafts/live.
 - `executive-approver` — Extra-Super Admin / Executive Approver: reviews pending messages and approves/rejects.
 
-Role is switched in the prototype via URL param: `?role=super-admin` or `?role=executive-approver`.
+Role is switched via an **in-app toggle** — a "Viewing as" segmented control fixed to the bottom-left of the screen (Super Admin | Executive Approver). Clicking the inactive option updates the `?role=` URL param and reloads, so the whole app re-renders under that role. This replaces the old "share two separate URLs" workflow: reviewers self-serve both perspectives from a single link. The toggle is visible in the deployed build (not dev-only) so PM/QA can use it directly. The URL param (`?role=super-admin` / `?role=executive-approver`) still works on its own if a direct link is needed.
 
 ### Relationship to the PRD & terminology mapping
 
@@ -36,7 +36,7 @@ The prototype realizes the PRD's P0/P1 flows. A few naming differences to reconc
 |---|---|
 | **Live prototype** | _<deploy URL — TBD>_ |
 | **Source repo (reference only, not for merge)** | _<Azure DevOps / GitHub URL — TBD>_ |
-| **Role switch** | append `?role=executive-approver` to the URL |
+| **Role switch** | click the "Viewing as" toggle, bottom-left of the screen — or append `?role=executive-approver` to the URL |
 
 > Devs reimplement in their own codebase; the prototype source is a **reference**, not something to merge. Exact px/hex/timing values live in the code and in §3.
 
@@ -139,6 +139,15 @@ Full-screen **contained** preview. Renders the real banner/overlay in an in-app 
 - **AC3** The org avatar and group name appear as two stacked 45px boxes at the top (30px avatar; group name ellipsis-truncated).
 - **AC4** Expanding restores full labels and the full org switcher; the expanded layout is unchanged.
 
+### 4.9 Role toggle
+A "Viewing as" control fixed to the bottom-left of the screen: the label sits above a two-option segmented control (**Super Admin** | **Executive Approver**). Prototype-only affordance — stands in for real authentication/role assignment, which the shipped product will have.
+
+- **AC1** The label reads "VIEWING AS" (small, uppercase, muted grey) directly above the toggle.
+- **AC2** The active role's pill is filled in its role color (Super Admin = Primary `#2699FB`; Executive Approver = Secondary navy `#27496D`) with white text; the inactive pill is white with grey text.
+- **AC3** Clicking the inactive pill switches roles: it updates the `?role=` URL param and reloads, so the entire app (board, message actions, Review/Approve flow, submit-button labels, browser tab title) re-renders under the new role.
+- **AC4** Clicking the already-active pill is a no-op.
+- **AC5** The toggle is visible in the deployed build, not just local dev — PM/QA can switch roles themselves without two separate links.
+
 ---
 
 ## 5. Key decisions & rationale
@@ -146,6 +155,7 @@ Full-screen **contained** preview. Renders the real banner/overlay in an in-app 
 - **Preview is contained, not "actually live."** Clicking View *inspects* a message; it does not inject the live banner into the reviewer's session. Reason: an uncontained non-dismissable emergency banner would trap the reviewer, and a contained render is visually identical while always giving a safe exit. See §4.5.
 - **The exit belongs to the preview harness, never the message.** The banner keeps its true (non-dismissable) behavior; the modal provides the escape.
 - **Wording: "Live" not "Active."** Matches the broadcast domain and the rest of the app's status language.
+- **Role switching is a single in-app toggle, not two shared links.** A prototype-only control (§4.9) — real role assignment in the shipped product comes from auth, not a URL param.
 
 ---
 
