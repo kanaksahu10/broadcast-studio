@@ -12,15 +12,47 @@ function useRole(): UserRole {
   return param === 'executive-approver' ? 'executive-approver' : 'super-admin';
 }
 
-function RoleBadge({ role }: { role: UserRole }) {
-  if (import.meta.env.PROD) return null;
-  const isExtra = role === 'executive-approver';
+// Prototype affordance: switch the viewer's role in one click (no URL editing).
+// Visible in the deployed build too, so PM/QA can self-serve both perspectives.
+function RoleToggle({ role }: { role: UserRole }) {
+  const switchRole = (next: UserRole) => {
+    if (next === role) return;
+    const url = new URL(window.location.href);
+    if (next === 'super-admin') url.searchParams.delete('role');
+    else url.searchParams.set('role', next);
+    window.location.href = url.toString();
+  };
+  const options: Array<{ key: UserRole; label: string; activeBg: string }> = [
+    { key: 'super-admin', label: 'Super Admin', activeBg: '#2699fb' },
+    { key: 'executive-approver', label: 'Executive Approver', activeBg: '#27496D' },
+  ];
   return (
-    <div
-      className="fixed bottom-[16px] left-[16px] z-[9999] px-[10px] py-[5px] rounded-[6px] font-['Montserrat',sans-serif] font-medium text-[11px] pointer-events-none"
-      style={{ backgroundColor: isExtra ? '#27496D' : '#2699fb', color: 'white', opacity: 0.9 }}
-    >
-      {isExtra ? 'Executive Approver' : 'Super Admin'}
+    <div className="fixed bottom-[16px] left-[16px] z-[9999] flex flex-col items-start gap-[4px]">
+      <span
+        className="font-['Montserrat',sans-serif] font-semibold text-[9px] uppercase tracking-[0.08em] pl-[2px]"
+        style={{ color: '#8b8b8b' }}
+      >
+        Viewing as
+      </span>
+      <div
+        className="flex items-center rounded-[8px] overflow-hidden border"
+        style={{ borderColor: '#E5E5E5', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.10)' }}
+      >
+        {options.map((o) => {
+          const active = role === o.key;
+          return (
+            <button
+              key={o.key}
+              type="button"
+              onClick={() => switchRole(o.key)}
+              className="font-['Montserrat',sans-serif] font-medium text-[11px] px-[10px] py-[5px] transition-colors duration-100 cursor-pointer whitespace-nowrap"
+              style={{ backgroundColor: active ? o.activeBg : 'white', color: active ? 'white' : '#585858' }}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1104,7 +1136,7 @@ export default function BroadcastStudioDashboard() {
         <MessagePreviewModal row={viewingRow} onClose={() => setViewingRow(null)} />
       )}
 
-      <RoleBadge role={role} />
+      <RoleToggle role={role} />
 
       {isComposeOpen && (
         <ComposeMessageOverlay
