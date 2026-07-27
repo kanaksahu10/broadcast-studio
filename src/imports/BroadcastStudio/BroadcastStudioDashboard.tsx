@@ -987,7 +987,7 @@ function MessagePreviewModal({ row, onClose }: { row: BroadcastMessageRow; onClo
           {/* Stage — faithful in-context render, always contained */}
           <div className="flex-1 min-h-0 p-[20px]" style={{ backgroundColor: '#f5f6f7' }}>
             {deviceView === 'desktop' ? (
-              <div className="w-full h-full flex justify-center rounded-[6px]" style={{ backgroundColor: '#eaeaea' }}>
+              <div className="w-full h-full flex justify-center">
                 <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
                   <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
                 </div>
