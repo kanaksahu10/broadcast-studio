@@ -535,7 +535,7 @@ function Tooltip({ label, children }: { label: string; children: React.ReactNode
   return (
     <div className="relative inline-flex group">
       {children}
-      <div className="pointer-events-none absolute right-0 bottom-full mb-[8px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20 whitespace-nowrap">
+      <div className="pointer-events-none absolute right-0 top-full mt-[8px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20 whitespace-nowrap">
         <div className="rounded-[6px] p-[12px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: '#27486d' }}>
           {label}
         </div>
@@ -710,7 +710,7 @@ function KanbanCard({ row, role, onEdit, onDelete, onSendForApproval, onApprove,
         onConfirm={() => { setShowDeleteConfirm(false); onDelete?.(); }}
       />
     )}
-    <div className="bg-white rounded-[8px] border border-[#e5e5e5] overflow-hidden flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+    <div className="bg-white rounded-[8px] border border-[#e5e5e5] flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div className="flex flex-col gap-[10px] p-[14px] flex-1 min-w-0">
         <div className="flex items-start justify-between gap-[6px]">
           <div className="flex flex-col flex-1 min-w-0">
@@ -987,7 +987,11 @@ function MessagePreviewModal({ row, onClose }: { row: BroadcastMessageRow; onClo
           {/* Stage — faithful in-context render, always contained */}
           <div className="flex-1 min-h-0 p-[20px]" style={{ backgroundColor: '#f5f6f7' }}>
             {deviceView === 'desktop' ? (
-              <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+              <div className="w-full h-full flex justify-center rounded-[6px]" style={{ backgroundColor: '#eaeaea' }}>
+                <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
+                  <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+                </div>
+              </div>
             ) : (
               <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
             )}
