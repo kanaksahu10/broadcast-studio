@@ -327,9 +327,32 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       roles: [],
     },
   },
+  {
+    id: 'seed-r2',
+    subject: 'Placeholder Rejected Message',
+    type: 'Announcement',
+    audience: 'All',
+    channel: 'Email',
+    status: 'Rejected',
+    startDate: '—',
+    endDate: '—',
+    recipients: null,
+    formData: {
+      body: 'This is a placeholder message for prototyping purposes.',
+      reason: 'Placeholder reason',
+      displayFormat: 'Banner',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: false,
+      statesOrAgencies: [],
+      packages: [],
+      roles: [],
+    },
+  },
 ];
 
-const STORAGE_KEY = 'bs-messages-v4';
+const STORAGE_KEY = 'bs-messages-v5';
 
 function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
