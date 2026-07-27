@@ -372,23 +372,21 @@ function NewMessageButton({ onClick }: { onClick: () => void }) {
 
 function ShowRejectedToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <Tooltip label="Show Rejected">
-      <button
-        type="button"
-        onClick={() => onChange(!checked)}
-        className="group flex items-center gap-[8px] cursor-pointer shrink-0"
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="group flex items-center gap-[8px] cursor-pointer shrink-0"
+    >
+      <span
+        className="w-[32px] h-[18px] rounded-full flex items-center px-[2px] transition-colors shrink-0"
+        style={{ backgroundColor: checked ? '#2699fb' : '#d0d0d0', justifyContent: checked ? 'flex-end' : 'flex-start' }}
       >
-        <span
-          className="w-[32px] h-[18px] rounded-full flex items-center px-[2px] transition-colors shrink-0"
-          style={{ backgroundColor: checked ? '#2699fb' : '#27486d', justifyContent: checked ? 'flex-end' : 'flex-start' }}
-        >
-          <span className="size-[14px] rounded-full bg-white shadow shrink-0" />
-        </span>
-        <span className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors text-[#27486d] group-hover:text-[#2699fb] group-hover:underline">
-          Show Rejected
-        </span>
-      </button>
-    </Tooltip>
+        <span className="size-[14px] rounded-full bg-white shadow shrink-0" />
+      </span>
+      <span className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors text-[#27486d] group-hover:text-[#2699fb] group-hover:underline">
+        Show Rejected
+      </span>
+    </button>
   );
 }
 
