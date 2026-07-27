@@ -302,6 +302,31 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       roles: [],
     },
   },
+
+  // ---- REJECTED ----
+  {
+    id: 'seed-r1',
+    subject: 'Weekend Overtime Bonus',
+    type: 'Announcement',
+    audience: 'All',
+    channel: 'Email',
+    status: 'Rejected',
+    startDate: 'Jul 25, 2026',
+    endDate: 'Aug 1, 2026',
+    recipients: null,
+    formData: {
+      body: 'Placeholder rejected message for prototyping the Rejected bucket.',
+      reason: 'Needs budget sign-off',
+      displayFormat: 'Overlay',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: false,
+      statesOrAgencies: [],
+      packages: [],
+      roles: [],
+    },
+  },
 ];
 
 const STORAGE_KEY = 'bs-messages-v4';
@@ -937,6 +962,9 @@ function RejectedBoard({ rows, onMoveToDrafts, onPreview }: {
           )}
         </div>
       </div>
+      {/* Invisible spacers so the single Rejected column keeps the same width as one column of the 3-column board */}
+      <div className="flex-1 min-w-0" aria-hidden="true" />
+      <div className="flex-1 min-w-0" aria-hidden="true" />
     </div>
   );
 }
