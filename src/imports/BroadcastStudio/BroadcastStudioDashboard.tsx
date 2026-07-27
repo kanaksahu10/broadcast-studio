@@ -62,7 +62,7 @@ type ViewMode = 'datagrid' | 'kanban';
 // FEATURE FLAG: set to true to restore the datagrid/kanban toggle button
 const SHOW_VIEW_TOGGLE = false;
 
-type MessageStatus = 'Live' | 'Pending' | 'Draft';
+type MessageStatus = 'Live' | 'Pending' | 'Draft' | 'Rejected';
 type MessageType = '' | 'Announcement' | 'Emergency';
 
 interface MessageFormData {
@@ -89,24 +89,28 @@ const STATUS_COLOR: Record<MessageStatus, string> = {
   Live: '#00aa00',
   Pending: '#ff8800',
   Draft: '#8a8a8a',
+  Rejected: '#DA4040',
 };
 
 const STATUS_BG: Record<MessageStatus, string> = {
   Live: '#eeffee',
   Pending: '#fefad1',
   Draft: '#f0f0f0',
+  Rejected: '#fdeaea',
 };
 
 const STATUS_HOVER_BORDER: Record<MessageStatus, string> = {
   Live: '#008800',
   Pending: '#ff8800',
   Draft: '#6a6a6a',
+  Rejected: '#b83333',
 };
 
 const STATUS_HOVER_SHADOW: Record<MessageStatus, string> = {
   Live: '0px 0px 8px #c6e2c1',
   Pending: '0px 0px 8px #e0c7b4',
   Draft: '0px 0px 8px #c8c8c8',
+  Rejected: '0px 0px 8px #f0c7c7',
 };
 
 function formatDisplayDate(dateStr: string): string {
@@ -549,6 +553,7 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
   Live: 'View',
   Pending: 'Review',
   Draft: 'Edit',
+  Rejected: 'Preview',
 };
 
 function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
@@ -852,6 +857,90 @@ function KanbanCard({ row, role, onEdit, onDelete, onSendForApproval, onApprove,
   );
 }
 
+function RejectedCard({ row, onMoveToDrafts, onPreview }: {
+  row: BroadcastMessageRow;
+  onMoveToDrafts: () => void;
+  onPreview: () => void;
+}) {
+  const dateRange = row.startDate === '—' ? '—' : `${row.startDate} – ${row.endDate}`;
+  const draftColor = STATUS_COLOR.Draft;
+  const rejectedColor = STATUS_COLOR.Rejected;
+  const [moveHovered, setMoveHovered] = useState(false);
+  const [previewHovered, setPreviewHovered] = useState(false);
+  return (
+    <div className="bg-white rounded-[8px] border border-[#e5e5e5] overflow-hidden flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div className="flex flex-col gap-[10px] p-[14px] flex-1 min-w-0">
+        <div className="flex flex-col flex-1 min-w-0">
+          <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px] text-[#000000]">{row.subject}</p>
+          {(row.type || dateRange !== '—') && (
+            <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
+              {row.type}{row.type && dateRange !== '—' && <span> • </span>}{dateRange !== '—' && dateRange}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-[8px]">
+          <button
+            type="button"
+            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
+            style={{ color: moveHovered ? 'white' : draftColor, borderColor: draftColor, backgroundColor: moveHovered ? draftColor : 'white' }}
+            onMouseEnter={() => setMoveHovered(true)}
+            onMouseLeave={() => setMoveHovered(false)}
+            onClick={onMoveToDrafts}
+          >
+            Move to Drafts
+          </button>
+          <button
+            type="button"
+            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
+            style={{ color: previewHovered ? 'white' : rejectedColor, borderColor: rejectedColor, backgroundColor: previewHovered ? rejectedColor : 'white' }}
+            onMouseEnter={() => setPreviewHovered(true)}
+            onMouseLeave={() => setPreviewHovered(false)}
+            onClick={onPreview}
+          >
+            Preview
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RejectedBoard({ rows, onMoveToDrafts, onPreview }: {
+  rows: BroadcastMessageRow[];
+  onMoveToDrafts: (id: string) => void;
+  onPreview: (row: BroadcastMessageRow) => void;
+}) {
+  const color = STATUS_COLOR.Rejected;
+  return (
+    <div className="flex gap-[16px] w-full items-start">
+      <div className="flex flex-col gap-[10px] flex-1 min-w-0 bg-[#fcfcfc] rounded-[10px] p-[12px]">
+        <div className="flex items-center justify-between px-[2px]">
+          <div className="flex items-center gap-[7px]">
+            <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>Rejected</span>
+          </div>
+          <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{rows.length}</span>
+        </div>
+        <div className="flex flex-col gap-[8px]">
+          {rows.length === 0 ? (
+            <div className="border border-dashed border-[#e5e5e5] rounded-[8px] py-[28px] flex items-center justify-center bg-white">
+              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8]">No messages</p>
+            </div>
+          ) : (
+            rows.map((row) => (
+              <RejectedCard
+                key={row.id}
+                row={row}
+                onMoveToDrafts={() => onMoveToDrafts(row.id)}
+                onPreview={() => onPreview(row)}
+              />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const KANBAN_COLUMNS: Array<{ status: MessageStatus; label: string }> = [
   { status: 'Draft', label: 'Drafts' },
   { status: 'Pending', label: 'Pending Approval' },
@@ -1032,6 +1121,10 @@ export default function BroadcastStudioDashboard() {
   };
 
   const handleReject = (id: string) => {
+    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Rejected' } : m));
+  };
+
+  const handleMoveToDrafts = (id: string) => {
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Draft' } : m));
   };
 
@@ -1071,7 +1164,7 @@ export default function BroadcastStudioDashboard() {
 
   return (
     <div className="flex flex-col gap-[20px] items-start w-full pb-[8px]" data-name="Broadcast Studio Dashboard">
-      {viewMode === 'datagrid' && (
+      {viewMode === 'datagrid' && !showRejected && (
         <div className="flex items-center gap-[16px] w-full">
           <StatusCard label="Live" count={liveCount} color={STATUS_COLOR.Live} bg={STATUS_BG.Live} hoverBorder={STATUS_HOVER_BORDER.Live} hoverShadow={STATUS_HOVER_SHADOW.Live} active={selectedStatus === 'Live'} onClick={() => setSelectedStatus('Live')} />
           <StatusCard label="Pending Approval" count={pendingCount} color={STATUS_COLOR.Pending} bg={STATUS_BG.Pending} hoverBorder={STATUS_HOVER_BORDER.Pending} hoverShadow={STATUS_HOVER_SHADOW.Pending} active={selectedStatus === 'Pending'} onClick={() => setSelectedStatus('Pending')} />
@@ -1089,7 +1182,13 @@ export default function BroadcastStudioDashboard() {
         {SHOW_VIEW_TOGGLE && <ViewToggle view={viewMode} onChange={setViewMode} />}
       </div>
 
-      {viewMode === 'datagrid' ? (
+      {showRejected ? (
+        <RejectedBoard
+          rows={searchFiltered.filter((row) => row.status === 'Rejected')}
+          onMoveToDrafts={handleMoveToDrafts}
+          onPreview={(row) => setViewingRow(row)}
+        />
+      ) : viewMode === 'datagrid' ? (
         <MessageTable rows={filteredRows} />
       ) : (
         <KanbanBoard
