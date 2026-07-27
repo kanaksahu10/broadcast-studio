@@ -531,6 +531,28 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
   Draft: 'Edit',
 };
 
+function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="relative inline-flex group">
+      {children}
+      <div className="pointer-events-none absolute right-0 bottom-full mb-[8px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20 whitespace-nowrap">
+        <div className="rounded-[6px] p-[12px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: '#27486d' }}>
+          {label}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function getActionTooltip(status: MessageStatus, role: UserRole): string {
+  const isSuperAdmin = role === 'super-admin';
+  if (status === 'Draft') return 'Edit this draft message';
+  if (status === 'Pending') {
+    return isSuperAdmin ? 'Review only, no editing' : 'Approve or reject this message';
+  }
+  return 'Preview this live message';
+}
+
 function AudienceChip({ label, variant }: { label: string; variant: 'agency' | 'package' | 'role' }) {
   const iconMap = {
     agency: <BiBuildings size={12} color="white" />,
@@ -777,40 +799,46 @@ function KanbanCard({ row, role, onEdit, onDelete, onSendForApproval, onApprove,
             );
           })()}
           {isDraft && (
-            <button
-              type="button"
-              className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
-              style={{ color: isButtonHovered ? 'white' : color, borderColor: color, backgroundColor: isButtonHovered ? color : 'white' }}
-              onMouseEnter={() => setIsButtonHovered(true)}
-              onMouseLeave={() => setIsButtonHovered(false)}
-              onClick={onEdit}
-            >
-              Edit
-            </button>
+            <Tooltip label={getActionTooltip('Draft', role)}>
+              <button
+                type="button"
+                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
+                style={{ color: isButtonHovered ? 'white' : color, borderColor: color, backgroundColor: isButtonHovered ? color : 'white' }}
+                onMouseEnter={() => setIsButtonHovered(true)}
+                onMouseLeave={() => setIsButtonHovered(false)}
+                onClick={onEdit}
+              >
+                Edit
+              </button>
+            </Tooltip>
           )}
           {isPending && (
-            <button
-              type="button"
-              className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
-              style={{ color: isButtonHovered ? 'white' : color, borderColor: color, backgroundColor: isButtonHovered ? color : 'white' }}
-              onMouseEnter={() => setIsButtonHovered(true)}
-              onMouseLeave={() => setIsButtonHovered(false)}
-              onClick={onEdit}
-            >
-              Review
-            </button>
+            <Tooltip label={getActionTooltip('Pending', role)}>
+              <button
+                type="button"
+                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
+                style={{ color: isButtonHovered ? 'white' : color, borderColor: color, backgroundColor: isButtonHovered ? color : 'white' }}
+                onMouseEnter={() => setIsButtonHovered(true)}
+                onMouseLeave={() => setIsButtonHovered(false)}
+                onClick={onEdit}
+              >
+                Review
+              </button>
+            </Tooltip>
           )}
           {row.status === 'Live' && (
-            <button
-              type="button"
-              className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
-              style={{ color: isButtonHovered ? 'white' : color, borderColor: color, backgroundColor: isButtonHovered ? color : 'white' }}
-              onMouseEnter={() => setIsButtonHovered(true)}
-              onMouseLeave={() => setIsButtonHovered(false)}
-              onClick={onEdit}
-            >
-              View
-            </button>
+            <Tooltip label={getActionTooltip('Live', role)}>
+              <button
+                type="button"
+                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
+                style={{ color: isButtonHovered ? 'white' : color, borderColor: color, backgroundColor: isButtonHovered ? color : 'white' }}
+                onMouseEnter={() => setIsButtonHovered(true)}
+                onMouseLeave={() => setIsButtonHovered(false)}
+                onClick={onEdit}
+              >
+                View
+              </button>
+            </Tooltip>
           )}
         </div>
       </div>

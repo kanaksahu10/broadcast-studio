@@ -1111,15 +1111,19 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               {hasPreview ? (
                 <div className="flex-1 min-h-0">
                   {deviceView === 'desktop' ? (
-                    <ScreenSkeleton
-                      effectiveFormat={effectiveFormat}
-                      title={title}
-                      body={body}
-                      color={effectiveBannerColor}
-                      dismissible={effectiveDismissible}
-                      hasCta={hasCta}
-                      ctaLabel={ctaLabel}
-                    />
+                    <div className="w-full h-full flex justify-center rounded-[6px]" style={{ backgroundColor: '#f0f0f0' }}>
+                      <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
+                        <ScreenSkeleton
+                          effectiveFormat={effectiveFormat}
+                          title={title}
+                          body={body}
+                          color={effectiveBannerColor}
+                          dismissible={effectiveDismissible}
+                          hasCta={hasCta}
+                          ctaLabel={ctaLabel}
+                        />
+                      </div>
+                    </div>
                   ) : (
                     <PhoneSkeleton
                       effectiveFormat={effectiveFormat}
