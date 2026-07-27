@@ -370,6 +370,28 @@ function NewMessageButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+function ShowRejectedToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <Tooltip label="Show Rejected">
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className="group flex items-center gap-[8px] cursor-pointer shrink-0"
+      >
+        <span
+          className="w-[32px] h-[18px] rounded-full flex items-center px-[2px] transition-colors shrink-0"
+          style={{ backgroundColor: checked ? '#2699fb' : '#d0d0d0', justifyContent: checked ? 'flex-end' : 'flex-start' }}
+        >
+          <span className="size-[14px] rounded-full bg-white shadow shrink-0" />
+        </span>
+        <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] uppercase tracking-wide whitespace-nowrap transition-colors text-[#27486d] group-hover:text-[#2699fb] group-hover:underline">
+          Show Rejected
+        </span>
+      </button>
+    </Tooltip>
+  );
+}
+
 function FilterTab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
@@ -530,6 +552,19 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
   Pending: 'Review',
   Draft: 'Edit',
 };
+
+function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="relative inline-flex group">
+      {children}
+      <div className="pointer-events-none absolute right-0 top-full mt-[8px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20 whitespace-nowrap">
+        <div className="rounded-[6px] p-[12px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: '#27486d' }}>
+          {label}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function AudienceChip({ label, variant }: { label: string; variant: 'agency' | 'package' | 'role' }) {
   const iconMap = {
@@ -981,6 +1016,7 @@ export default function BroadcastStudioDashboard() {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [showRejected, setShowRejected] = useState(false);
   const [editingRow, setEditingRow] = useState<BroadcastMessageRow | null>(null);
   const [reviewingRow, setReviewingRow] = useState<BroadcastMessageRow | null>(null);
   const [viewingRow, setViewingRow] = useState<BroadcastMessageRow | null>(null);
@@ -1050,6 +1086,7 @@ export default function BroadcastStudioDashboard() {
       <div className="flex items-center gap-[12px] w-full">
         <SearchInput value={search} onChange={setSearch} />
         <NewMessageButton onClick={() => setIsComposeOpen(true)} />
+        <ShowRejectedToggle checked={showRejected} onChange={setShowRejected} />
         <div className="flex-1" />
         {SHOW_VIEW_TOGGLE && <ViewToggle view={viewMode} onChange={setViewMode} />}
       </div>
