@@ -380,11 +380,11 @@ function ShowRejectedToggle({ checked, onChange }: { checked: boolean; onChange:
       >
         <span
           className="w-[32px] h-[18px] rounded-full flex items-center px-[2px] transition-colors shrink-0"
-          style={{ backgroundColor: checked ? '#2699fb' : '#d0d0d0', justifyContent: checked ? 'flex-end' : 'flex-start' }}
+          style={{ backgroundColor: checked ? '#2699fb' : '#27486d', justifyContent: checked ? 'flex-end' : 'flex-start' }}
         >
           <span className="size-[14px] rounded-full bg-white shadow shrink-0" />
         </span>
-        <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] uppercase tracking-wide whitespace-nowrap transition-colors text-[#27486d] group-hover:text-[#2699fb] group-hover:underline">
+        <span className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors text-[#27486d] group-hover:text-[#2699fb] group-hover:underline">
           Show Rejected
         </span>
       </button>
