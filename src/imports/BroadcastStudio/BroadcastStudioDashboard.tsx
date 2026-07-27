@@ -911,9 +911,7 @@ function RejectedCard({ row, onMoveToDrafts, onPreview }: {
   onPreview: () => void;
 }) {
   const dateRange = row.startDate === '—' ? '—' : `${row.startDate} – ${row.endDate}`;
-  const draftColor = STATUS_COLOR.Draft;
   const rejectedColor = STATUS_COLOR.Rejected;
-  const [moveHovered, setMoveHovered] = useState(false);
   const [previewHovered, setPreviewHovered] = useState(false);
   return (
     <div className="bg-white rounded-[8px] border border-[#e5e5e5] overflow-hidden flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
@@ -926,13 +924,10 @@ function RejectedCard({ row, onMoveToDrafts, onPreview }: {
             </p>
           )}
         </div>
-        <div className="flex items-center justify-between gap-[8px]">
+        <div className="flex items-center justify-end gap-[8px]">
           <button
             type="button"
-            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
-            style={{ color: moveHovered ? 'white' : draftColor, borderColor: draftColor, backgroundColor: moveHovered ? draftColor : 'white' }}
-            onMouseEnter={() => setMoveHovered(true)}
-            onMouseLeave={() => setMoveHovered(false)}
+            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors text-[#27486d] hover:text-[#2699fb] hover:underline cursor-pointer"
             onClick={onMoveToDrafts}
           >
             Move to Drafts
