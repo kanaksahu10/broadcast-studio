@@ -1150,15 +1150,17 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           </div>
 
           {/* Action buttons below preview */}
-          <div className="flex items-center justify-between shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="font-['Montserrat',sans-serif] font-medium text-[13px] capitalize cursor-pointer"
-              style={{ color: NAVY }}
-            >
-              Cancel
-            </button>
+          <div className="flex items-center justify-end shrink-0">
+            {!overlayTitle && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="font-['Montserrat',sans-serif] font-medium text-[13px] capitalize cursor-pointer mr-auto"
+                style={{ color: NAVY }}
+              >
+                Cancel
+              </button>
+            )}
             {onApprove && onReject ? (
                 <div className="flex items-center gap-[8px]">
                   <button

@@ -610,7 +610,7 @@ function Tooltip({ label, children }: { label: string; children: React.ReactNode
     <div className="relative inline-flex group">
       {children}
       <div className="pointer-events-none absolute right-0 top-full mt-[8px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20 whitespace-nowrap">
-        <div className="rounded-[6px] p-[12px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: '#27486d' }}>
+        <div className="rounded-[6px] p-[12px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: '#3B5C79' }}>
           {label}
         </div>
       </div>
