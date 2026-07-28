@@ -3,6 +3,7 @@ import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose } from 'react-icons/io';
 import { MdAdd, MdApps, MdBusiness, MdDeleteOutline, MdDesktopWindows, MdMoreVert, MdOutlineGroup, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
+import { RiDeleteBinLine } from 'react-icons/ri';
 import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton } from './ComposeMessageOverlay';
 
 type UserRole = 'super-admin' | 'executive-approver';
@@ -1032,7 +1033,12 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onSendForApproval, onApprov
   );
 }
 
-function MessagePreviewModal({ row, onClose }: { row: BroadcastMessageRow; onClose: () => void }) {
+function MessagePreviewModal({ row, onClose, onMoveToDrafts, onDelete }: {
+  row: BroadcastMessageRow;
+  onClose: () => void;
+  onMoveToDrafts?: () => void;
+  onDelete?: () => void;
+}) {
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
 
   const isEmergency = row.type === 'Emergency';
@@ -1126,6 +1132,32 @@ function MessagePreviewModal({ row, onClose }: { row: BroadcastMessageRow; onClo
               <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
             )}
           </div>
+
+          {(onMoveToDrafts || onDelete) && (
+            <div className="flex items-center justify-end gap-[16px] px-[20px] shrink-0" style={{ borderTop: '1px solid #E5E5E5', backgroundColor: '#f8f8f8', height: '60px' }}>
+              {onDelete && (
+                <button
+                  type="button"
+                  className="flex items-center gap-[6px] font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+                  style={{ color: '#DA4040' }}
+                  onClick={onDelete}
+                >
+                  <RiDeleteBinLine size={17} color="#DA4040" />
+                  Delete
+                </button>
+              )}
+              {onMoveToDrafts && (
+                <button
+                  type="button"
+                  className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
+                  style={{ color: STATUS_COLOR.Draft, borderColor: STATUS_COLOR.Draft, backgroundColor: 'white' }}
+                  onClick={onMoveToDrafts}
+                >
+                  Move to Drafts
+                </button>
+              )}
+            </div>
+          )}
       </div>
     </div>
   );
@@ -1162,6 +1194,10 @@ export default function BroadcastStudioDashboard() {
 
   const handleReject = (id: string) => {
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Rejected' } : m));
+  };
+
+  const handleMoveToDrafts = (id: string) => {
+    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Draft' } : m));
   };
 
   const handleMessageCreated = (data: MessageFormData & { title?: string; messageType?: string; startDate?: string; endDate?: string; statesOrAgencies?: string[]; searchMode?: string }) => {
@@ -1302,7 +1338,12 @@ export default function BroadcastStudioDashboard() {
       )}
 
       {viewingRow && (
-        <MessagePreviewModal row={viewingRow} onClose={() => setViewingRow(null)} />
+        <MessagePreviewModal
+          row={viewingRow}
+          onClose={() => setViewingRow(null)}
+          onMoveToDrafts={viewingRow.status === 'Rejected' ? () => { handleMoveToDrafts(viewingRow.id); setViewingRow(null); } : undefined}
+          onDelete={viewingRow.status === 'Rejected' ? () => { handleDelete(viewingRow.id); setViewingRow(null); } : undefined}
+        />
       )}
 
       <RoleToggle role={role} />
