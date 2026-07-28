@@ -1343,7 +1343,7 @@ export default function BroadcastStudioDashboard() {
         <MessagePreviewModal
           row={viewingRow}
           onClose={() => setViewingRow(null)}
-          onMoveToDrafts={viewingRow.status === 'Rejected' ? () => { handleMoveToDrafts(viewingRow.id); setViewingRow(null); } : undefined}
+          onMoveToDrafts={viewingRow.status === 'Rejected' && role === 'super-admin' ? () => { handleMoveToDrafts(viewingRow.id); setViewingRow(null); } : undefined}
           onDelete={viewingRow.status === 'Rejected' ? () => { handleDelete(viewingRow.id); setViewingRow(null); } : undefined}
         />
       )}
