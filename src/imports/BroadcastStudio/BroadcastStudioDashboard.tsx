@@ -1149,11 +1149,13 @@ function MessagePreviewModal({ row, onClose, onMoveToDrafts, onDelete }: {
               {onMoveToDrafts && (
                 <button
                   type="button"
-                  className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
-                  style={{ color: STATUS_COLOR.Draft, borderColor: STATUS_COLOR.Draft, backgroundColor: 'white' }}
+                  className="rounded-[8px] px-[16px] h-[32px] flex items-center cursor-pointer"
+                  style={{ backgroundColor: '#2699fb' }}
                   onClick={onMoveToDrafts}
                 >
-                  Move to Drafts
+                  <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase text-white">
+                    Move to Drafts
+                  </span>
                 </button>
               )}
             </div>
