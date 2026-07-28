@@ -601,7 +601,7 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
   Live: 'View',
   Pending: 'Review',
   Draft: 'Edit',
-  Rejected: 'Preview',
+  Rejected: 'View',
 };
 
 function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
@@ -905,14 +905,13 @@ function KanbanCard({ row, role, onEdit, onDelete, onSendForApproval, onApprove,
   );
 }
 
-function RejectedCard({ row, onMoveToDrafts, onPreview }: {
+function RejectedCard({ row, onView }: {
   row: BroadcastMessageRow;
-  onMoveToDrafts: () => void;
-  onPreview: () => void;
+  onView: () => void;
 }) {
   const dateRange = row.startDate === '—' ? '—' : `${row.startDate} – ${row.endDate}`;
   const rejectedColor = STATUS_COLOR.Rejected;
-  const [previewHovered, setPreviewHovered] = useState(false);
+  const [viewHovered, setViewHovered] = useState(false);
   return (
     <div className="bg-white rounded-[8px] border border-[#e5e5e5] overflow-hidden flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div className="flex flex-col gap-[10px] p-[14px] flex-1 min-w-0">
@@ -927,20 +926,13 @@ function RejectedCard({ row, onMoveToDrafts, onPreview }: {
         <div className="flex items-center justify-end gap-[8px]">
           <button
             type="button"
-            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors text-[#27486d] hover:text-[#2699fb] hover:underline cursor-pointer"
-            onClick={onMoveToDrafts}
-          >
-            Move to Drafts
-          </button>
-          <button
-            type="button"
             className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
-            style={{ color: previewHovered ? 'white' : rejectedColor, borderColor: rejectedColor, backgroundColor: previewHovered ? rejectedColor : 'white' }}
-            onMouseEnter={() => setPreviewHovered(true)}
-            onMouseLeave={() => setPreviewHovered(false)}
-            onClick={onPreview}
+            style={{ color: viewHovered ? 'white' : rejectedColor, borderColor: rejectedColor, backgroundColor: viewHovered ? rejectedColor : 'white' }}
+            onMouseEnter={() => setViewHovered(true)}
+            onMouseLeave={() => setViewHovered(false)}
+            onClick={onView}
           >
-            Preview
+            View
           </button>
         </div>
       </div>
@@ -948,10 +940,9 @@ function RejectedCard({ row, onMoveToDrafts, onPreview }: {
   );
 }
 
-function RejectedBoard({ rows, onMoveToDrafts, onPreview }: {
+function RejectedBoard({ rows, onView }: {
   rows: BroadcastMessageRow[];
-  onMoveToDrafts: (id: string) => void;
-  onPreview: (row: BroadcastMessageRow) => void;
+  onView: (row: BroadcastMessageRow) => void;
 }) {
   const color = STATUS_COLOR.Rejected;
   return (
@@ -973,8 +964,7 @@ function RejectedBoard({ rows, onMoveToDrafts, onPreview }: {
               <RejectedCard
                 key={row.id}
                 row={row}
-                onMoveToDrafts={() => onMoveToDrafts(row.id)}
-                onPreview={() => onPreview(row)}
+                onView={() => onView(row)}
               />
             ))
           )}
@@ -1170,10 +1160,6 @@ export default function BroadcastStudioDashboard() {
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Rejected' } : m));
   };
 
-  const handleMoveToDrafts = (id: string) => {
-    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Draft' } : m));
-  };
-
   const handleMessageCreated = (data: MessageFormData & { title?: string; messageType?: string; startDate?: string; endDate?: string; statesOrAgencies?: string[]; searchMode?: string }) => {
     const agencies = data.statesOrAgencies ?? [];
     const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;
@@ -1231,8 +1217,7 @@ export default function BroadcastStudioDashboard() {
       {showRejected ? (
         <RejectedBoard
           rows={searchFiltered.filter((row) => row.status === 'Rejected')}
-          onMoveToDrafts={handleMoveToDrafts}
-          onPreview={(row) => setViewingRow(row)}
+          onView={(row) => setViewingRow(row)}
         />
       ) : viewMode === 'datagrid' ? (
         <MessageTable rows={filteredRows} />
