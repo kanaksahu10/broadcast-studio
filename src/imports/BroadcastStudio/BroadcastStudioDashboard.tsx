@@ -415,7 +415,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
   },
 ];
 
-const STORAGE_KEY = 'bs-messages-v6';
+const STORAGE_KEY = 'bs-messages-v7';
 
 function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
@@ -723,18 +723,31 @@ function AudienceOverlay({ formData, onClose }: { formData: NonNullable<Broadcas
   const agencies = formData.statesOrAgencies ?? [];
   const packages = formData.packages ?? [];
   const roles = formData.roles ?? [];
+  const [mounted, setMounted] = useState(false);
+  const [closing, setClosing] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const handleClose = () => {
+    setClosing(true);
+    setTimeout(onClose, 300);
+  };
   return (
     <div className="fixed inset-0 z-50">
       <div
         className="absolute inset-0"
         style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
-        onClick={onClose}
+        onClick={handleClose}
       />
-      <div className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col">
+      <div
+        className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
+        style={{ transform: mounted && !closing ? 'translateX(0)' : 'translateX(100%)' }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
           <p className="font-['Montserrat',sans-serif] font-medium text-[15px] leading-[21px] text-black">Audience</p>
-          <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
+          <button type="button" onClick={handleClose} className="cursor-pointer flex items-center">
             <IoIosClose size={26} color="#27496D" />
           </button>
         </div>
@@ -748,7 +761,7 @@ function AudienceOverlay({ formData, onClose }: { formData: NonNullable<Broadcas
         <div className="flex items-center px-[16px] shrink-0" style={{ borderTop: '1px solid #CFCFCF', backgroundColor: '#f8f8f8', height: '60px' }}>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px]"
             style={{ color: '#27496D' }}
           >
