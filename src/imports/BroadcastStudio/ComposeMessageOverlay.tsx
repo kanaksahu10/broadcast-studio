@@ -7,6 +7,7 @@ import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle } from 'react-icons/fa';
 import { GrAnnounce } from 'react-icons/gr';
+import { RiDeleteBinLine } from 'react-icons/ri';
 
 type MessageType = '' | 'Announcement' | 'Emergency';
 type DisplayFormat = '' | 'Overlay' | 'Banner';
@@ -904,7 +905,7 @@ type FormData = {
   pushNotification?: boolean;
 };
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -914,6 +915,8 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   readOnly?: boolean;
   onApprove?: () => void;
   onReject?: () => void;
+  onDeleteRow?: () => void;
+  onCopyToDrafts?: () => void;
 }) {
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [body, setBody] = useState(initialData?.body ?? '');
@@ -1161,7 +1164,33 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 Cancel
               </button>
             )}
-            {onApprove && onReject ? (
+            {onDeleteRow || onCopyToDrafts ? (
+              <div className="flex items-center gap-[16px]">
+                {onDeleteRow && (
+                  <button
+                    type="button"
+                    className="flex items-center gap-[6px] font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+                    style={{ color: '#DA4040' }}
+                    onClick={onDeleteRow}
+                  >
+                    <RiDeleteBinLine size={17} color="#DA4040" />
+                    Delete
+                  </button>
+                )}
+                {onCopyToDrafts && (
+                  <button
+                    type="button"
+                    className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[4px] border cursor-pointer"
+                    style={{ backgroundColor: '#e8f4ff', borderColor: '#2699fb', borderWidth: '1px' }}
+                    onClick={onCopyToDrafts}
+                  >
+                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: '#2699fb' }}>
+                      Copy to Drafts
+                    </span>
+                  </button>
+                )}
+              </div>
+            ) : onApprove && onReject ? (
                 <div className="flex items-center gap-[8px]">
                   <button
                     type="button"

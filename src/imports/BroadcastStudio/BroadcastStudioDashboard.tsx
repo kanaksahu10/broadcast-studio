@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose } from 'react-icons/io';
-import { MdAdd, MdApps, MdBusiness, MdDeleteOutline, MdDesktopWindows, MdMoreVert, MdOutlineGroup, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
-import { RiDeleteBinLine } from 'react-icons/ri';
+import { MdAdd, MdApps, MdBlock, MdBusiness, MdDeleteOutline, MdDesktopWindows, MdMoreVert, MdOutlineGroup, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
 import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton } from './ComposeMessageOverlay';
 
 type UserRole = 'super-admin' | 'executive-approver';
@@ -63,7 +62,7 @@ type ViewMode = 'datagrid' | 'kanban';
 // FEATURE FLAG: set to true to restore the datagrid/kanban toggle button
 const SHOW_VIEW_TOGGLE = false;
 
-type MessageStatus = 'Live' | 'Pending' | 'Draft' | 'Rejected';
+type MessageStatus = 'Live' | 'Pending' | 'Draft' | 'Rejected' | 'Discontinued';
 type MessageType = '' | 'Announcement' | 'Emergency';
 
 interface MessageFormData {
@@ -84,6 +83,7 @@ interface BroadcastMessageRow {
   endDate: string;
   recipients: number | null;
   formData?: MessageFormData;
+  statusChangedAt?: string;
 }
 
 const STATUS_COLOR: Record<MessageStatus, string> = {
@@ -91,6 +91,7 @@ const STATUS_COLOR: Record<MessageStatus, string> = {
   Pending: '#ff8800',
   Draft: '#8a8a8a',
   Rejected: '#DA4040',
+  Discontinued: '#FC7F15',
 };
 
 const STATUS_BG: Record<MessageStatus, string> = {
@@ -98,6 +99,7 @@ const STATUS_BG: Record<MessageStatus, string> = {
   Pending: '#fefad1',
   Draft: '#f0f0f0',
   Rejected: '#fdeaea',
+  Discontinued: '#fef1e4',
 };
 
 const STATUS_HOVER_BORDER: Record<MessageStatus, string> = {
@@ -105,6 +107,7 @@ const STATUS_HOVER_BORDER: Record<MessageStatus, string> = {
   Pending: '#ff8800',
   Draft: '#6a6a6a',
   Rejected: '#b83333',
+  Discontinued: '#d9690f',
 };
 
 const STATUS_HOVER_SHADOW: Record<MessageStatus, string> = {
@@ -112,7 +115,38 @@ const STATUS_HOVER_SHADOW: Record<MessageStatus, string> = {
   Pending: '0px 0px 8px #e0c7b4',
   Draft: '0px 0px 8px #c8c8c8',
   Rejected: '0px 0px 8px #f0c7c7',
+  Discontinued: '0px 0px 8px #f7dcb8',
 };
+
+type DiscardedBucket = 'Rejected' | 'Expired' | 'Discontinued';
+
+const BUCKET_COLOR: Record<DiscardedBucket, string> = {
+  Rejected: STATUS_COLOR.Rejected,
+  Expired: '#27496D',
+  Discontinued: STATUS_COLOR.Discontinued,
+};
+
+const RETENTION_DAYS = 30;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function getDiscardedBucket(row: BroadcastMessageRow): DiscardedBucket | null {
+  if (row.status === 'Rejected') return 'Rejected';
+  if (row.status === 'Discontinued') return 'Discontinued';
+  if (row.status === 'Live' && row.endDate !== '—') {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const end = new Date(row.endDate);
+    if (today > end) return 'Expired';
+  }
+  return null;
+}
+
+function getRetentionDaysLeft(row: BroadcastMessageRow, bucket: DiscardedBucket): number {
+  const enteredAt = bucket === 'Expired'
+    ? new Date(row.endDate)
+    : (row.statusChangedAt ? new Date(row.statusChangedAt) : new Date());
+  const elapsedDays = Math.floor((Date.now() - enteredAt.getTime()) / MS_PER_DAY);
+  return Math.max(0, RETENTION_DAYS - elapsedDays);
+}
 
 function formatDisplayDate(dateStr: string): string {
   if (!dateStr) return '—';
@@ -315,6 +349,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     startDate: 'Jul 25, 2026',
     endDate: 'Aug 1, 2026',
     recipients: null,
+    statusChangedAt: '2026-07-20T00:00:00.000Z',
     formData: {
       body: 'Placeholder rejected message for prototyping the Rejected bucket.',
       reason: 'Needs budget sign-off',
@@ -338,6 +373,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     startDate: '—',
     endDate: '—',
     recipients: null,
+    statusChangedAt: '2026-07-22T00:00:00.000Z',
     formData: {
       body: 'This is a placeholder message for prototyping purposes.',
       reason: 'Placeholder reason',
@@ -351,9 +387,35 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       roles: [],
     },
   },
+
+  // ---- DISCONTINUED ----
+  {
+    id: 'seed-x1',
+    subject: 'Legacy Portal Sunset Notice',
+    type: 'Announcement',
+    audience: 'Sunrise Home Care +1',
+    channel: 'Email',
+    status: 'Discontinued',
+    startDate: 'Jul 10, 2026',
+    endDate: 'Jul 24, 2026',
+    recipients: 640,
+    statusChangedAt: '2026-07-24T00:00:00.000Z',
+    formData: {
+      body: 'The legacy client portal has been discontinued. Please use the new portal for all requests going forward.',
+      reason: 'Superseded by new portal',
+      displayFormat: 'Overlay',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: false,
+      statesOrAgencies: ['Sunrise Home Care', 'Golden Gate Health Partners'],
+      packages: [],
+      roles: [],
+    },
+  },
 ];
 
-const STORAGE_KEY = 'bs-messages-v5';
+const STORAGE_KEY = 'bs-messages-v6';
 
 function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
@@ -423,7 +485,7 @@ function NewMessageButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function ShowRejectedToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function ShowDiscardedToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
       type="button"
@@ -437,7 +499,7 @@ function ShowRejectedToggle({ checked, onChange }: { checked: boolean; onChange:
         <span className="size-[14px] rounded-full bg-white shadow shrink-0" />
       </span>
       <span className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors text-[#27486d] group-hover:text-[#2699fb] group-hover:underline">
-        Show Rejected
+        Show Discarded
       </span>
     </button>
   );
@@ -603,6 +665,7 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
   Pending: 'Review',
   Draft: 'Edit',
   Rejected: 'View',
+  Discontinued: 'View',
 };
 
 function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
@@ -697,7 +760,12 @@ function AudienceOverlay({ formData, onClose }: { formData: NonNullable<Broadcas
   );
 }
 
-function DeleteConfirmOverlay({ subject, onConfirm, onClose }: { subject: string; onConfirm: () => void; onClose: () => void }) {
+function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete' }: { subject: string; onConfirm: () => void; onClose: () => void; mode?: 'delete' | 'discontinue' }) {
+  const isDiscontinue = mode === 'discontinue';
+  const verb = isDiscontinue ? 'discontinue' : 'delete';
+  const actionLabel = isDiscontinue ? 'DISCONTINUE' : 'DELETE';
+  const title = isDiscontinue ? 'Discontinue Message' : 'Delete Message';
+  const Icon = isDiscontinue ? MdBlock : MdDeleteOutline;
   return (
     <div className="fixed inset-0 z-50">
       <div
@@ -707,14 +775,14 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose }: { subject: string
       />
       <div className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col">
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
-          <p className="font-['Montserrat',sans-serif] font-medium text-[15px] leading-[21px] text-black">Delete Message</p>
+          <p className="font-['Montserrat',sans-serif] font-medium text-[15px] leading-[21px] text-black">{title}</p>
           <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
             <IoIosClose size={26} color="#27496D" />
           </button>
         </div>
         <div className="flex-1 px-[16px] pt-[16px] pb-[24px]">
           <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px]" style={{ color: '#343434' }}>
-            You are about to delete the <span className="font-semibold">"{subject}"</span> message which is live right now. This will remove the announcement from all the recipients immediately.
+            You are about to {verb} the <span className="font-semibold">"{subject}"</span> message which is live right now. This will remove the announcement from all the recipients immediately.
           </p>
         </div>
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderTop: '1px solid #CFCFCF', backgroundColor: '#f8f8f8', height: '60px' }}>
@@ -732,8 +800,8 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose }: { subject: string
             className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px] rounded-[8px] border flex items-center gap-[6px]"
             style={{ color: '#DA4040', borderColor: '#DA4040', backgroundColor: '#fdeaea' }}
           >
-            <MdDeleteOutline size={15} color="#DA4040" />
-            DELETE
+            <Icon size={15} color="#DA4040" />
+            {actionLabel}
           </button>
         </div>
       </div>
@@ -741,11 +809,12 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose }: { subject: string
   );
 }
 
-function KanbanCard({ row, role, onEdit, onDelete, onSendForApproval, onApprove, onReject }: {
+function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForApproval, onApprove, onReject }: {
   row: BroadcastMessageRow;
   role: UserRole;
   onEdit?: () => void;
   onDelete?: () => void;
+  onDiscontinue?: () => void;
   onSendForApproval?: () => void;
   onApprove?: () => void;
   onReject?: () => void;
@@ -780,8 +849,9 @@ function KanbanCard({ row, role, onEdit, onDelete, onSendForApproval, onApprove,
     {showDeleteConfirm && (
       <DeleteConfirmOverlay
         subject={row.subject}
+        mode={row.status === 'Live' ? 'discontinue' : 'delete'}
         onClose={() => setShowDeleteConfirm(false)}
-        onConfirm={() => { setShowDeleteConfirm(false); onDelete?.(); }}
+        onConfirm={() => { setShowDeleteConfirm(false); row.status === 'Live' ? onDiscontinue?.() : onDelete?.(); }}
       />
     )}
     <div className="bg-white rounded-[8px] border border-[#e5e5e5] flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
@@ -820,11 +890,20 @@ function KanbanCard({ row, role, onEdit, onDelete, onSendForApproval, onApprove,
                         const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
                         if (today >= start && today <= end) { setShowDeleteConfirm(true); return; }
                       }
-                      onDelete?.();
+                      row.status === 'Live' ? onDiscontinue?.() : onDelete?.();
                     }}
                   >
-                    <MdDeleteOutline size={15} color="#DA4040" />
-                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px]" style={{ color: '#DA4040' }}>Delete</span>
+                    {row.status === 'Live' ? (
+                      <>
+                        <MdBlock size={15} color="#DA4040" />
+                        <span className="font-['Montserrat',sans-serif] font-medium text-[13px]" style={{ color: '#DA4040' }}>Discontinue</span>
+                      </>
+                    ) : (
+                      <>
+                        <MdDeleteOutline size={15} color="#DA4040" />
+                        <span className="font-['Montserrat',sans-serif] font-medium text-[13px]" style={{ color: '#DA4040' }}>Delete</span>
+                      </>
+                    )}
                   </button>
                 </div>
               )}
@@ -921,29 +1000,99 @@ function KanbanCard({ row, role, onEdit, onDelete, onSendForApproval, onApprove,
   );
 }
 
-function RejectedCard({ row, onView }: {
+function DiscardedCard({ row, bucket, onView, onDelete }: {
   row: BroadcastMessageRow;
+  bucket: DiscardedBucket;
   onView: () => void;
+  onDelete: () => void;
 }) {
   const dateRange = row.startDate === '—' ? '—' : `${row.startDate} – ${row.endDate}`;
-  const rejectedColor = STATUS_COLOR.Rejected;
+  const bucketColor = BUCKET_COLOR[bucket];
   const [viewHovered, setViewHovered] = useState(false);
+  const [showAudience, setShowAudience] = useState(false);
+  const [showKebab, setShowKebab] = useState(false);
+  const kebabRef = useRef<HTMLDivElement>(null);
+  const daysLeft = getRetentionDaysLeft(row, bucket);
+
+  useEffect(() => {
+    if (!showKebab) return;
+    const handler = (e: MouseEvent) => {
+      if (kebabRef.current && !kebabRef.current.contains(e.target as Node)) {
+        setShowKebab(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showKebab]);
+
   return (
-    <div className="bg-white rounded-[8px] border border-[#e5e5e5] overflow-hidden flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+    <>
+    {showAudience && row.formData && (
+      <AudienceOverlay formData={row.formData} onClose={() => setShowAudience(false)} />
+    )}
+    <div className="bg-white rounded-[8px] border border-[#e5e5e5] flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div className="flex flex-col gap-[10px] p-[14px] flex-1 min-w-0">
-        <div className="flex flex-col flex-1 min-w-0">
-          <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px] text-[#000000]">{row.subject}</p>
-          {(row.type || dateRange !== '—') && (
-            <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
-              {row.type}{row.type && dateRange !== '—' && <span> • </span>}{dateRange !== '—' && dateRange}
+        <div className="flex items-start justify-between gap-[6px]">
+          <div className="flex flex-col flex-1 min-w-0">
+            <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px] text-[#000000]">{row.subject}</p>
+            {(row.type || dateRange !== '—') && (
+              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
+                {row.type}{row.type && dateRange !== '—' && <span> • </span>}{dateRange !== '—' && dateRange}
+              </p>
+            )}
+            <p className="font-['Montserrat',sans-serif] font-normal text-[11px] leading-[15px] text-[#b8b8b8] mt-[2px]">
+              Auto-deletes in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}
             </p>
-          )}
+          </div>
+          <div className="relative shrink-0" ref={kebabRef}>
+            <button
+              type="button"
+              className="flex items-center justify-center w-[24px] h-[24px] rounded-[4px] cursor-pointer hover:bg-[#f2f2f2]"
+              onClick={() => setShowKebab(v => !v)}
+            >
+              <BsThreeDotsVertical size={16} color="#27496D" />
+            </button>
+            {showKebab && (
+              <div
+                className="absolute top-full right-0 mt-[2px] bg-white rounded-[6px] border z-20 overflow-hidden"
+                style={{ borderColor: '#E5E5E5', boxShadow: '0 4px 12px rgba(0,0,0,0.10)', minWidth: '120px' }}
+              >
+                <button
+                  type="button"
+                  className="flex items-center gap-[8px] w-full px-[12px] h-[36px] cursor-pointer hover:bg-[#EFEFEF]"
+                  onClick={() => { setShowKebab(false); onDelete(); }}
+                >
+                  <MdDeleteOutline size={15} color="#DA4040" />
+                  <span className="font-['Montserrat',sans-serif] font-medium text-[13px]" style={{ color: '#DA4040' }}>Delete</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="flex items-center justify-end gap-[8px]">
+        <div className="flex items-center justify-between gap-[8px]">
+          {(() => {
+            const agencies = row.formData?.statesOrAgencies ?? [];
+            const packages = row.formData?.packages ?? [];
+            const roles = row.formData?.roles ?? [];
+            const count = agencies.length + packages.length + roles.length || (row.recipients ?? 0);
+            if (count === 0) return <span />;
+            const hasDetail = agencies.length > 0 || packages.length > 0 || roles.length > 0;
+            return (
+              <button
+                type="button"
+                className="flex items-center gap-[5px]"
+                style={{ cursor: hasDetail ? 'pointer' : 'default' }}
+                onClick={() => hasDetail && setShowAudience(true)}
+              >
+                <MdOutlineGroup size={15} color="#27496D" />
+                <span className="font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px]" style={{ color: '#27496D' }}>{count} {count === 1 ? 'Recipient' : 'Recipients'}</span>
+              </button>
+            );
+          })()}
           <button
             type="button"
             className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
-            style={{ color: viewHovered ? 'white' : rejectedColor, borderColor: rejectedColor, backgroundColor: viewHovered ? rejectedColor : 'white' }}
+            style={{ color: viewHovered ? 'white' : bucketColor, borderColor: bucketColor, backgroundColor: viewHovered ? bucketColor : 'white' }}
             onMouseEnter={() => setViewHovered(true)}
             onMouseLeave={() => setViewHovered(false)}
             onClick={onView}
@@ -953,42 +1102,54 @@ function RejectedCard({ row, onView }: {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
-function RejectedBoard({ rows, onView }: {
+const DISCARDED_COLUMNS: DiscardedBucket[] = ['Rejected', 'Expired', 'Discontinued'];
+
+function DiscardedBoard({ rows, onView, onDelete }: {
   rows: BroadcastMessageRow[];
-  onView: (row: BroadcastMessageRow) => void;
+  onView: (row: BroadcastMessageRow, bucket: DiscardedBucket) => void;
+  onDelete: (id: string) => void;
 }) {
-  const color = STATUS_COLOR.Rejected;
+  const bucketed = rows
+    .map((row) => ({ row, bucket: getDiscardedBucket(row) }))
+    .filter((x): x is { row: BroadcastMessageRow; bucket: DiscardedBucket } => x.bucket !== null);
+
   return (
     <div className="flex gap-[16px] w-full items-start">
-      <div className="flex flex-col gap-[10px] flex-1 min-w-0 bg-[#fcfcfc] rounded-[10px] p-[12px]">
-        <div className="flex items-center justify-between px-[2px]">
-          <div className="flex items-center gap-[7px]">
-            <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>Rejected</span>
-          </div>
-          <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{rows.length}</span>
-        </div>
-        <div className="flex flex-col gap-[8px]">
-          {rows.length === 0 ? (
-            <div className="border border-dashed border-[#e5e5e5] rounded-[8px] py-[28px] flex items-center justify-center bg-white">
-              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8]">No messages</p>
+      {DISCARDED_COLUMNS.map((bucket) => {
+        const colRows = bucketed.filter((x) => x.bucket === bucket).map((x) => x.row);
+        const color = BUCKET_COLOR[bucket];
+        return (
+          <div key={bucket} className="flex flex-col gap-[10px] flex-1 min-w-0 bg-[#fcfcfc] rounded-[10px] p-[12px]">
+            <div className="flex items-center justify-between px-[2px]">
+              <div className="flex items-center gap-[7px]">
+                <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{bucket}</span>
+              </div>
+              <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
             </div>
-          ) : (
-            rows.map((row) => (
-              <RejectedCard
-                key={row.id}
-                row={row}
-                onView={() => onView(row)}
-              />
-            ))
-          )}
-        </div>
-      </div>
-      {/* Invisible spacers so the single Rejected column keeps the same width as one column of the 3-column board */}
-      <div className="flex-1 min-w-0" aria-hidden="true" />
-      <div className="flex-1 min-w-0" aria-hidden="true" />
+            <div className="flex flex-col gap-[8px]">
+              {colRows.length === 0 ? (
+                <div className="border border-dashed border-[#e5e5e5] rounded-[8px] py-[28px] flex items-center justify-center bg-white">
+                  <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8]">No messages</p>
+                </div>
+              ) : (
+                colRows.map((row) => (
+                  <DiscardedCard
+                    key={row.id}
+                    row={row}
+                    bucket={bucket}
+                    onView={() => onView(row, bucket)}
+                    onDelete={() => onDelete(row.id)}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -999,11 +1160,12 @@ const KANBAN_COLUMNS: Array<{ status: MessageStatus; label: string }> = [
   { status: 'Live', label: 'Approved' },
 ];
 
-function KanbanBoard({ rows, role, onEdit, onDelete, onSendForApproval, onApprove, onReject }: {
+function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApproval, onApprove, onReject }: {
   rows: BroadcastMessageRow[];
   role: UserRole;
   onEdit: (row: BroadcastMessageRow) => void;
   onDelete: (id: string) => void;
+  onDiscontinue: (id: string) => void;
   onSendForApproval: (id: string) => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
@@ -1011,7 +1173,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onSendForApproval, onApprov
   return (
     <div className="flex gap-[16px] w-full items-start">
       {KANBAN_COLUMNS.map(({ status, label }) => {
-        const colRows = rows.filter((r) => r.status === status);
+        const colRows = rows.filter((r) => r.status === status && getDiscardedBucket(r) === null);
         const color = STATUS_COLOR[status];
         return (
           <div key={status} className="flex flex-col gap-[10px] flex-1 min-w-0 bg-[#fcfcfc] rounded-[10px] p-[12px]">
@@ -1034,6 +1196,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onSendForApproval, onApprov
                     role={role}
                     onEdit={() => onEdit(row)}
                     onDelete={() => onDelete(row.id)}
+                    onDiscontinue={() => onDiscontinue(row.id)}
                     onSendForApproval={() => onSendForApproval(row.id)}
                     onApprove={() => onApprove(row.id)}
                     onReject={() => onReject(row.id)}
@@ -1048,11 +1211,9 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onSendForApproval, onApprov
   );
 }
 
-function MessagePreviewModal({ row, onClose, onMoveToDrafts, onDelete }: {
+function MessagePreviewModal({ row, onClose }: {
   row: BroadcastMessageRow;
   onClose: () => void;
-  onMoveToDrafts?: () => void;
-  onDelete?: () => void;
 }) {
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
 
@@ -1147,34 +1308,6 @@ function MessagePreviewModal({ row, onClose, onMoveToDrafts, onDelete }: {
               <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
             )}
           </div>
-
-          {(onMoveToDrafts || onDelete) && (
-            <div className="flex items-center justify-end gap-[16px] px-[20px] shrink-0" style={{ borderTop: '1px solid #E5E5E5', backgroundColor: '#f8f8f8', height: '60px' }}>
-              {onDelete && (
-                <button
-                  type="button"
-                  className="flex items-center gap-[6px] font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
-                  style={{ color: '#DA4040' }}
-                  onClick={onDelete}
-                >
-                  <RiDeleteBinLine size={17} color="#DA4040" />
-                  Delete
-                </button>
-              )}
-              {onMoveToDrafts && (
-                <button
-                  type="button"
-                  className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[4px] border cursor-pointer"
-                  style={{ backgroundColor: '#e8f4ff', borderColor: '#2699fb', borderWidth: '1px' }}
-                  onClick={onMoveToDrafts}
-                >
-                  <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: '#2699fb' }}>
-                    Move to Drafts
-                  </span>
-                </button>
-              )}
-            </div>
-          )}
       </div>
     </div>
   );
@@ -1192,10 +1325,21 @@ export default function BroadcastStudioDashboard() {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
-  const [showRejected, setShowRejected] = useState(false);
+  const [showDiscarded, setShowDiscarded] = useState(false);
   const [editingRow, setEditingRow] = useState<BroadcastMessageRow | null>(null);
   const [reviewingRow, setReviewingRow] = useState<BroadcastMessageRow | null>(null);
   const [viewingRow, setViewingRow] = useState<BroadcastMessageRow | null>(null);
+  const [viewingDiscardedRow, setViewingDiscardedRow] = useState<{ row: BroadcastMessageRow; bucket: DiscardedBucket } | null>(null);
+
+  // Prune anything past its 30-day retention window in the discarded buckets.
+  useEffect(() => {
+    setMessages((prev) => prev.filter((m) => {
+      const bucket = getDiscardedBucket(m);
+      if (!bucket) return true;
+      return getRetentionDaysLeft(m, bucket) > 0;
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDelete = (id: string) => {
     setMessages((prev) => prev.filter((m) => m.id !== id));
@@ -1210,11 +1354,25 @@ export default function BroadcastStudioDashboard() {
   };
 
   const handleReject = (id: string) => {
-    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Rejected' } : m));
+    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Rejected', statusChangedAt: new Date().toISOString() } : m));
   };
 
-  const handleMoveToDrafts = (id: string) => {
-    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Draft' } : m));
+  const handleDiscontinue = (id: string) => {
+    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Discontinued', statusChangedAt: new Date().toISOString() } : m));
+  };
+
+  const handleCopyToDrafts = (row: BroadcastMessageRow) => {
+    const draft: BroadcastMessageRow = {
+      ...row,
+      id: Date.now().toString(),
+      status: 'Draft',
+      startDate: '—',
+      endDate: '—',
+      recipients: null,
+      statusChangedAt: undefined,
+    };
+    setMessages((prev) => [draft, ...prev]);
+    setSelectedStatus('Draft');
   };
 
   const handleMessageCreated = (data: MessageFormData & { title?: string; messageType?: string; startDate?: string; endDate?: string; statesOrAgencies?: string[]; searchMode?: string }) => {
@@ -1237,7 +1395,7 @@ export default function BroadcastStudioDashboard() {
     setSelectedStatus(newStatus);
   };
 
-  const liveCount = messages.filter((m) => m.status === 'Live').length;
+  const liveCount = messages.filter((m) => m.status === 'Live' && getDiscardedBucket(m) === null).length;
   const pendingCount = messages.filter((m) => m.status === 'Pending').length;
   const draftCount = messages.filter((m) => m.status === 'Draft').length;
 
@@ -1253,7 +1411,7 @@ export default function BroadcastStudioDashboard() {
 
   return (
     <div className="flex flex-col gap-[20px] items-start w-full pb-[8px]" data-name="Broadcast Studio Dashboard">
-      {viewMode === 'datagrid' && !showRejected && (
+      {viewMode === 'datagrid' && !showDiscarded && (
         <div className="flex items-center gap-[16px] w-full">
           <StatusCard label="Live" count={liveCount} color={STATUS_COLOR.Live} bg={STATUS_BG.Live} hoverBorder={STATUS_HOVER_BORDER.Live} hoverShadow={STATUS_HOVER_SHADOW.Live} active={selectedStatus === 'Live'} onClick={() => setSelectedStatus('Live')} />
           <StatusCard label="Pending Approval" count={pendingCount} color={STATUS_COLOR.Pending} bg={STATUS_BG.Pending} hoverBorder={STATUS_HOVER_BORDER.Pending} hoverShadow={STATUS_HOVER_SHADOW.Pending} active={selectedStatus === 'Pending'} onClick={() => setSelectedStatus('Pending')} />
@@ -1266,15 +1424,16 @@ export default function BroadcastStudioDashboard() {
       <div className="flex items-center gap-[12px] w-full">
         <SearchInput value={search} onChange={setSearch} />
         <NewMessageButton onClick={() => setIsComposeOpen(true)} />
-        <ShowRejectedToggle checked={showRejected} onChange={setShowRejected} />
+        <ShowDiscardedToggle checked={showDiscarded} onChange={setShowDiscarded} />
         <div className="flex-1" />
         {SHOW_VIEW_TOGGLE && <ViewToggle view={viewMode} onChange={setViewMode} />}
       </div>
 
-      {showRejected ? (
-        <RejectedBoard
-          rows={searchFiltered.filter((row) => row.status === 'Rejected')}
-          onView={(row) => setViewingRow(row)}
+      {showDiscarded ? (
+        <DiscardedBoard
+          rows={searchFiltered}
+          onView={(row, bucket) => setViewingDiscardedRow({ row, bucket })}
+          onDelete={handleDelete}
         />
       ) : viewMode === 'datagrid' ? (
         <MessageTable rows={filteredRows} />
@@ -1283,6 +1442,7 @@ export default function BroadcastStudioDashboard() {
           rows={searchFiltered}
           role={role}
           onDelete={handleDelete}
+          onDiscontinue={handleDiscontinue}
           onEdit={(row) => {
             if (row.status === 'Live') {
               setViewingRow(row);
@@ -1358,8 +1518,23 @@ export default function BroadcastStudioDashboard() {
         <MessagePreviewModal
           row={viewingRow}
           onClose={() => setViewingRow(null)}
-          onMoveToDrafts={viewingRow.status === 'Rejected' && role === 'super-admin' ? () => { handleMoveToDrafts(viewingRow.id); setViewingRow(null); } : undefined}
-          onDelete={viewingRow.status === 'Rejected' ? () => { handleDelete(viewingRow.id); setViewingRow(null); } : undefined}
+        />
+      )}
+
+      {viewingDiscardedRow && (
+        <ComposeMessageOverlay
+          onClose={() => setViewingDiscardedRow(null)}
+          overlayTitle={`${viewingDiscardedRow.bucket} Message`}
+          readOnly
+          initialData={{
+            title: viewingDiscardedRow.row.subject,
+            messageType: viewingDiscardedRow.row.type,
+            startDate: parseDisplayDate(viewingDiscardedRow.row.startDate),
+            endDate: parseDisplayDate(viewingDiscardedRow.row.endDate),
+            ...viewingDiscardedRow.row.formData,
+          }}
+          onDeleteRow={() => { handleDelete(viewingDiscardedRow.row.id); setViewingDiscardedRow(null); }}
+          onCopyToDrafts={role === 'super-admin' ? () => { handleCopyToDrafts(viewingDiscardedRow.row); setViewingDiscardedRow(null); } : undefined}
         />
       )}
 
