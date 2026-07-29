@@ -907,37 +907,47 @@ type FormData = {
 
 export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subject: string; onConfirm: () => void; onClose: () => void }) {
   const [mounted, setMounted] = useState(false);
+  const [closing, setClosing] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);
   }, []);
+
+  const handleClose = () => {
+    setClosing(true);
+    setTimeout(onClose, 300);
+  };
+  const handleConfirm = () => {
+    setClosing(true);
+    setTimeout(onConfirm, 300);
+  };
 
   return (
     <div className="fixed inset-0 z-50">
       <div
         className="absolute inset-0"
         style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
-        onClick={onClose}
+        onClick={handleClose}
       />
       <div
         className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
-        style={{ transform: mounted ? 'translateX(0)' : 'translateX(100%)' }}
+        style={{ transform: mounted && !closing ? 'translateX(0)' : 'translateX(100%)' }}
       >
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
           <p className="font-['Montserrat',sans-serif] font-medium text-[15px] leading-[21px] text-black">Delete Message</p>
-          <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
+          <button type="button" onClick={handleClose} className="cursor-pointer flex items-center">
             <IoIosClose size={26} color="#27496D" />
           </button>
         </div>
         <div className="flex-1 px-[16px] pt-[16px] pb-[24px]">
           <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px]" style={{ color: '#343434' }}>
-            You are about to permanently delete the <span className="font-semibold">"{subject}"</span> message. This action cannot be undone and the message will not be recoverable. You can always create a new message and send it for approval.
+            You are about to permanently delete the <span className="font-semibold">"{subject}"</span> message. This action cannot be undone and the message will not be recoverable. You can always create a new message and send it for approval, or move this message to drafts to continue working on it.
           </p>
         </div>
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderTop: '1px solid #CFCFCF', backgroundColor: '#f8f8f8', height: '60px' }}>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px]"
             style={{ color: '#27496D' }}
           >
@@ -945,7 +955,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
           </button>
           <button
             type="button"
-            onClick={onConfirm}
+            onClick={handleConfirm}
             className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px] rounded-[8px] border flex items-center gap-[6px]"
             style={{ color: '#DA4040', borderColor: '#DA4040', backgroundColor: '#fdeaea' }}
           >

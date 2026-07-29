@@ -348,7 +348,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     status: 'Rejected',
     startDate: 'Jul 25, 2026',
     endDate: 'Aug 1, 2026',
-    recipients: null,
+    recipients: 480,
     statusChangedAt: '2026-07-20T00:00:00.000Z',
     formData: {
       body: 'Placeholder rejected message for prototyping the Rejected bucket.',
@@ -372,7 +372,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     status: 'Rejected',
     startDate: '—',
     endDate: '—',
-    recipients: null,
+    recipients: 210,
     statusChangedAt: '2026-07-22T00:00:00.000Z',
     formData: {
       body: 'This is a placeholder message for prototyping purposes.',
@@ -767,24 +767,33 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete' }: 
   const title = isDiscontinue ? 'Discontinue Message' : 'Delete Message';
   const Icon = isDiscontinue ? MdBlock : MdDeleteOutline;
   const [mounted, setMounted] = useState(false);
+  const [closing, setClosing] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);
   }, []);
+  const handleClose = () => {
+    setClosing(true);
+    setTimeout(onClose, 300);
+  };
+  const handleConfirm = () => {
+    setClosing(true);
+    setTimeout(onConfirm, 300);
+  };
   return (
     <div className="fixed inset-0 z-50">
       <div
         className="absolute inset-0"
         style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
-        onClick={onClose}
+        onClick={handleClose}
       />
       <div
         className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
-        style={{ transform: mounted ? 'translateX(0)' : 'translateX(100%)' }}
+        style={{ transform: mounted && !closing ? 'translateX(0)' : 'translateX(100%)' }}
       >
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
           <p className="font-['Montserrat',sans-serif] font-medium text-[15px] leading-[21px] text-black">{title}</p>
-          <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
+          <button type="button" onClick={handleClose} className="cursor-pointer flex items-center">
             <IoIosClose size={26} color="#27496D" />
           </button>
         </div>
@@ -796,7 +805,7 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete' }: 
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderTop: '1px solid #CFCFCF', backgroundColor: '#f8f8f8', height: '60px' }}>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px]"
             style={{ color: '#27496D' }}
           >
@@ -804,7 +813,7 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete' }: 
           </button>
           <button
             type="button"
-            onClick={onConfirm}
+            onClick={handleConfirm}
             className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px] rounded-[8px] border flex items-center gap-[6px]"
             style={{ color: '#DA4040', borderColor: '#DA4040', backgroundColor: '#fdeaea' }}
           >
