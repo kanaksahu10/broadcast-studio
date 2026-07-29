@@ -7,20 +7,29 @@ import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOv
 
 type UserRole = 'super-admin' | 'executive-approver';
 
-function useRole(): UserRole {
-  const param = new URLSearchParams(window.location.search).get('role');
-  return param === 'executive-approver' ? 'executive-approver' : 'super-admin';
+function useRole(): [UserRole, (next: UserRole) => void] {
+  const [role, setRoleState] = useState<UserRole>(() => {
+    const param = new URLSearchParams(window.location.search).get('role');
+    return param === 'executive-approver' ? 'executive-approver' : 'super-admin';
+  });
+
+  const setRole = (next: UserRole) => {
+    setRoleState(next);
+    const url = new URL(window.location.href);
+    if (next === 'super-admin') url.searchParams.delete('role');
+    else url.searchParams.set('role', next);
+    window.history.replaceState({}, '', url.toString());
+  };
+
+  return [role, setRole];
 }
 
 // Prototype affordance: switch the viewer's role in one click (no URL editing).
 // Visible in the deployed build too, so PM/QA can self-serve both perspectives.
-function RoleToggle({ role }: { role: UserRole }) {
+function RoleToggle({ role, onChange }: { role: UserRole; onChange: (next: UserRole) => void }) {
   const switchRole = (next: UserRole) => {
     if (next === role) return;
-    const url = new URL(window.location.href);
-    if (next === 'super-admin') url.searchParams.delete('role');
-    else url.searchParams.set('role', next);
-    window.location.href = url.toString();
+    onChange(next);
   };
   const options: Array<{ key: UserRole; label: string; activeBg: string }> = [
     { key: 'super-admin', label: 'Super Admin', activeBg: '#2699fb' },
@@ -358,7 +367,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       messageColor: '#27496D',
       dismissible: 'Dismissible',
       hasCta: false,
-      statesOrAgencies: [],
+      statesOrAgencies: ['Lone Star Caregivers', 'Austin Family Support'],
       packages: [],
       roles: [],
     },
@@ -382,7 +391,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       messageColor: '#27496D',
       dismissible: 'Dismissible',
       hasCta: false,
-      statesOrAgencies: [],
+      statesOrAgencies: ['Empire Homecare Group'],
       packages: [],
       roles: [],
     },
@@ -415,7 +424,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
   },
 ];
 
-const STORAGE_KEY = 'bs-messages-v7';
+const STORAGE_KEY = 'bs-messages-v8';
 
 function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
@@ -1352,7 +1361,7 @@ function MessagePreviewModal({ row, onClose }: {
 }
 
 export default function BroadcastStudioDashboard() {
-  const role = useRole();
+  const [role, setRole] = useRole();
 
   useEffect(() => {
     document.title = role === 'executive-approver' ? 'BS - Executive Approver' : 'BS - Super Admin';
@@ -1576,7 +1585,7 @@ export default function BroadcastStudioDashboard() {
         />
       )}
 
-      <RoleToggle role={role} />
+      <RoleToggle role={role} onChange={setRole} />
 
       {isComposeOpen && (
         <ComposeMessageOverlay
