@@ -3,7 +3,7 @@ import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose } from 'react-icons/io';
 import { MdAdd, MdApps, MdBlock, MdBusiness, MdDeleteOutline, MdDesktopWindows, MdMoreVert, MdOutlineGroup, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
-import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton } from './ComposeMessageOverlay';
+import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay } from './ComposeMessageOverlay';
 
 type UserRole = 'super-admin' | 'executive-approver';
 
@@ -766,6 +766,11 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete' }: 
   const actionLabel = isDiscontinue ? 'DISCONTINUE' : 'DELETE';
   const title = isDiscontinue ? 'Discontinue Message' : 'Delete Message';
   const Icon = isDiscontinue ? MdBlock : MdDeleteOutline;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
   return (
     <div className="fixed inset-0 z-50">
       <div
@@ -773,7 +778,10 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete' }: 
         style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
         onClick={onClose}
       />
-      <div className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col">
+      <div
+        className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
+        style={{ transform: mounted ? 'translateX(0)' : 'translateX(100%)' }}
+      >
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
           <p className="font-['Montserrat',sans-serif] font-medium text-[15px] leading-[21px] text-black">{title}</p>
           <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
@@ -1011,6 +1019,7 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
   const [viewHovered, setViewHovered] = useState(false);
   const [showAudience, setShowAudience] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
   const daysLeft = getRetentionDaysLeft(row, bucket);
 
@@ -1029,6 +1038,13 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
     <>
     {showAudience && row.formData && (
       <AudienceOverlay formData={row.formData} onClose={() => setShowAudience(false)} />
+    )}
+    {showDeleteConfirm && (
+      <PermanentDeleteOverlay
+        subject={row.subject}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={() => { setShowDeleteConfirm(false); onDelete(); }}
+      />
     )}
     <div className="bg-white rounded-[8px] border border-[#e5e5e5] flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div className="flex flex-col gap-[10px] p-[14px] flex-1 min-w-0">
@@ -1060,7 +1076,7 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
                 <button
                   type="button"
                   className="flex items-center gap-[8px] w-full px-[12px] h-[36px] cursor-pointer hover:bg-[#EFEFEF]"
-                  onClick={() => { setShowKebab(false); onDelete(); }}
+                  onClick={() => { setShowKebab(false); setShowDeleteConfirm(true); }}
                 >
                   <MdDeleteOutline size={15} color="#DA4040" />
                   <span className="font-['Montserrat',sans-serif] font-medium text-[13px]" style={{ color: '#DA4040' }}>Delete</span>

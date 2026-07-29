@@ -905,6 +905,59 @@ type FormData = {
   pushNotification?: boolean;
 };
 
+export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subject: string; onConfirm: () => void; onClose: () => void }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div
+        className="absolute inset-0"
+        style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
+        onClick={onClose}
+      />
+      <div
+        className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
+        style={{ transform: mounted ? 'translateX(0)' : 'translateX(100%)' }}
+      >
+        <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
+          <p className="font-['Montserrat',sans-serif] font-medium text-[15px] leading-[21px] text-black">Delete Message</p>
+          <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
+            <IoIosClose size={26} color="#27496D" />
+          </button>
+        </div>
+        <div className="flex-1 px-[16px] pt-[16px] pb-[24px]">
+          <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px]" style={{ color: '#343434' }}>
+            You are about to permanently delete the <span className="font-semibold">"{subject}"</span> message. This action cannot be undone and the message will not be recoverable. You can always create a new message and send it for approval.
+          </p>
+        </div>
+        <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderTop: '1px solid #CFCFCF', backgroundColor: '#f8f8f8', height: '60px' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px]"
+            style={{ color: '#27496D' }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px] rounded-[8px] border flex items-center gap-[6px]"
+            style={{ color: '#DA4040', borderColor: '#DA4040', backgroundColor: '#fdeaea' }}
+          >
+            <RiDeleteBinLine size={15} color="#DA4040" />
+            DELETE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
@@ -918,6 +971,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   onDeleteRow?: () => void;
   onCopyToDrafts?: () => void;
 }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [body, setBody] = useState(initialData?.body ?? '');
   const [reason, setReason] = useState(initialData?.reason ?? '');
@@ -992,6 +1046,14 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
       <style>{`.date-input-no-native-icon::-webkit-calendar-picker-indicator { opacity: 0; position: absolute; right: 0; width: 24px; height: 100%; cursor: pointer; }`}</style>
+
+      {showDeleteConfirm && onDeleteRow && (
+        <PermanentDeleteOverlay
+          subject={title || 'Untitled'}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={() => { setShowDeleteConfirm(false); onDeleteRow(); }}
+        />
+      )}
 
       {/* Top header bar */}
       <div className="flex items-center justify-between h-[56px] px-[24px] border-b shrink-0" style={{ borderColor: BORDER }}>
@@ -1171,7 +1233,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                     type="button"
                     className="flex items-center gap-[6px] font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
                     style={{ color: '#DA4040' }}
-                    onClick={onDeleteRow}
+                    onClick={() => setShowDeleteConfirm(true)}
                   >
                     <RiDeleteBinLine size={17} color="#DA4040" />
                     Delete
