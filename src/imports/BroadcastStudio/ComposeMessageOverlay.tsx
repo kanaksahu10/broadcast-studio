@@ -7,6 +7,7 @@ import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle } from 'react-icons/fa';
 import { GrAnnounce } from 'react-icons/gr';
+import { RiDeleteBinLine } from 'react-icons/ri';
 
 type MessageType = '' | 'Announcement' | 'Emergency';
 type DisplayFormat = '' | 'Overlay' | 'Banner';
@@ -904,7 +905,70 @@ type FormData = {
   pushNotification?: boolean;
 };
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject }: {
+export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subject: string; onConfirm: () => void; onClose: () => void }) {
+  const [mounted, setMounted] = useState(false);
+  const [closing, setClosing] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const handleClose = () => {
+    setClosing(true);
+    setTimeout(onClose, 300);
+  };
+  const handleConfirm = () => {
+    setClosing(true);
+    setTimeout(onConfirm, 300);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div
+        className="absolute inset-0"
+        style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
+        onClick={handleClose}
+      />
+      <div
+        className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
+        style={{ transform: mounted && !closing ? 'translateX(0)' : 'translateX(100%)' }}
+      >
+        <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
+          <p className="font-['Montserrat',sans-serif] font-medium text-[15px] leading-[21px] text-black">Delete Message</p>
+          <button type="button" onClick={handleClose} className="cursor-pointer flex items-center">
+            <IoIosClose size={26} color="#27496D" />
+          </button>
+        </div>
+        <div className="flex-1 px-[16px] pt-[16px] pb-[24px]">
+          <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px]" style={{ color: '#343434' }}>
+            You are about to permanently delete the <span className="font-semibold">"{subject}"</span> message. This action cannot be undone and the message will not be recoverable. You can always create a new message and send it for approval, or move this message to drafts to continue working on it.
+          </p>
+        </div>
+        <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderTop: '1px solid #CFCFCF', backgroundColor: '#f8f8f8', height: '60px' }}>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px]"
+            style={{ color: '#27496D' }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px] rounded-[8px] border flex items-center gap-[6px]"
+            style={{ color: '#DA4040', borderColor: '#DA4040', backgroundColor: '#fdeaea' }}
+          >
+            <RiDeleteBinLine size={15} color="#DA4040" />
+            DELETE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -914,7 +978,10 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   readOnly?: boolean;
   onApprove?: () => void;
   onReject?: () => void;
+  onDeleteRow?: () => void;
+  onCopyToDrafts?: () => void;
 }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [body, setBody] = useState(initialData?.body ?? '');
   const [reason, setReason] = useState(initialData?.reason ?? '');
@@ -989,6 +1056,14 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
       <style>{`.date-input-no-native-icon::-webkit-calendar-picker-indicator { opacity: 0; position: absolute; right: 0; width: 24px; height: 100%; cursor: pointer; }`}</style>
+
+      {showDeleteConfirm && onDeleteRow && (
+        <PermanentDeleteOverlay
+          subject={title || 'Untitled'}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={() => { setShowDeleteConfirm(false); onDeleteRow(); }}
+        />
+      )}
 
       {/* Top header bar */}
       <div className="flex items-center justify-between h-[56px] px-[24px] border-b shrink-0" style={{ borderColor: BORDER }}>
@@ -1150,16 +1225,44 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           </div>
 
           {/* Action buttons below preview */}
-          <div className="flex items-center justify-between shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="font-['Montserrat',sans-serif] font-medium text-[13px] capitalize cursor-pointer"
-              style={{ color: NAVY }}
-            >
-              Cancel
-            </button>
-            {onApprove && onReject ? (
+          <div className="flex items-center justify-end shrink-0">
+            {!overlayTitle && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="font-['Montserrat',sans-serif] font-medium text-[13px] capitalize cursor-pointer mr-auto"
+                style={{ color: NAVY }}
+              >
+                Cancel
+              </button>
+            )}
+            {onDeleteRow || onCopyToDrafts ? (
+              <div className="flex items-center gap-[16px]">
+                {onDeleteRow && (
+                  <button
+                    type="button"
+                    className="flex items-center gap-[6px] font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+                    style={{ color: '#DA4040' }}
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    <RiDeleteBinLine size={17} color="#DA4040" />
+                    Delete
+                  </button>
+                )}
+                {onCopyToDrafts && (
+                  <button
+                    type="button"
+                    className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[4px] border cursor-pointer"
+                    style={{ backgroundColor: '#e8f4ff', borderColor: '#2699fb', borderWidth: '1px' }}
+                    onClick={onCopyToDrafts}
+                  >
+                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: '#2699fb' }}>
+                      Copy to Drafts
+                    </span>
+                  </button>
+                )}
+              </div>
+            ) : onApprove && onReject ? (
                 <div className="flex items-center gap-[8px]">
                   <button
                     type="button"
