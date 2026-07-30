@@ -168,3 +168,5 @@ A "Viewing as" control fixed to the bottom-left of the screen: the label sits ab
 ---
 
 _This spec is generated from the working prototype. When behavior and this doc disagree, the prototype wins — flag the mismatch so we update the doc._
+
+_**Kept up to date manually.** When a PR changes UX behavior, visual specs, design tokens, or acceptance criteria, update this doc in the same PR. The mirrored Confluence page ([UX] Prototype Spec & Handoff, under the PRD) should be updated to match._
