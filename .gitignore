@@ -11,3 +11,6 @@ dist-ssr
 # logs
 *.log
 npm-debug.log*
+
+# claude code — machine-local permissions, not shared
+.claude/settings.local.json

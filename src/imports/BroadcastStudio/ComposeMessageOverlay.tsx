@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
+import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps } from 'react-icons/md';
+import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdOutlineContentCopy } from 'react-icons/md';
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
-import { FaRegCheckCircle } from 'react-icons/fa';
+import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
 import { GrAnnounce } from 'react-icons/gr';
-import { RiDeleteBinLine } from 'react-icons/ri';
+import { RiDeleteBinLine, RiCheckLine } from 'react-icons/ri';
 
 type MessageType = '' | 'Announcement' | 'Emergency';
 type DisplayFormat = '' | 'Overlay' | 'Banner';
@@ -21,24 +22,39 @@ interface Agency {
   state: string;
   package: string;
   role: string;
+  employeeCount: number;
 }
 
 const AGENCIES: Agency[] = [
-  { id: '1', name: 'Sunrise Home Care', state: 'California', package: 'Enterprise', role: 'Owner' },
-  { id: '2', name: 'Golden Gate Health Partners', state: 'California', package: 'Premium', role: 'Admin' },
-  { id: '3', name: 'Lone Star Caregivers', state: 'Texas', package: 'Standard', role: 'Care Coordinator' },
-  { id: '4', name: 'Austin Family Support', state: 'Texas', package: 'Premium', role: 'Admin' },
-  { id: '5', name: 'Empire Homecare Group', state: 'New York', package: 'Enterprise', role: 'Owner' },
-  { id: '6', name: 'Brooklyn Senior Services', state: 'New York', package: 'Standard', role: 'Field Staff' },
-  { id: '7', name: 'Sunshine State Care', state: 'Florida', package: 'Premium', role: 'Care Coordinator' },
-  { id: '8', name: 'Everglades Health Network', state: 'Florida', package: 'Standard', role: 'Admin' },
-  { id: '9', name: 'Cascade Caregivers', state: 'Washington', package: 'Enterprise', role: 'Owner' },
-  { id: '10', name: 'Windy City Homecare', state: 'Illinois', package: 'Premium', role: 'Field Staff' },
+  { id: '1', name: 'Sunrise Home Care', state: 'California', package: 'Enterprise', role: 'Owner', employeeCount: 1200 },
+  { id: '2', name: 'Golden Gate Health Partners', state: 'California', package: 'Premium', role: 'Admin', employeeCount: 340 },
+  { id: '3', name: 'Lone Star Caregivers', state: 'Texas', package: 'Standard', role: 'Care Coordinator', employeeCount: 210 },
+  { id: '4', name: 'Austin Family Support', state: 'Texas', package: 'Premium', role: 'Admin', employeeCount: 180 },
+  { id: '5', name: 'Empire Homecare Group', state: 'New York', package: 'Enterprise', role: 'Owner', employeeCount: 950 },
+  { id: '6', name: 'Brooklyn Senior Services', state: 'New York', package: 'Standard', role: 'Field Staff', employeeCount: 275 },
+  { id: '7', name: 'Sunshine State Care', state: 'Florida', package: 'Premium', role: 'Care Coordinator', employeeCount: 410 },
+  { id: '8', name: 'Everglades Health Network', state: 'Florida', package: 'Standard', role: 'Admin', employeeCount: 165 },
+  { id: '9', name: 'Cascade Caregivers', state: 'Washington', package: 'Enterprise', role: 'Owner', employeeCount: 530 },
+  { id: '10', name: 'Windy City Homecare', state: 'Illinois', package: 'Premium', role: 'Field Staff', employeeCount: 295 },
 ];
 
 const STATES = Array.from(new Set(AGENCIES.map((a) => a.state)));
 const PACKAGES = Array.from(new Set(AGENCIES.map((a) => a.package)));
 const ROLES = Array.from(new Set(AGENCIES.map((a) => a.role)));
+
+/**
+ * Recipient count = number of employees within the selected agencies/states,
+ * further filtered down by package and role (an intersection over AGENCIES,
+ * not a count of selected filter chips).
+ */
+export function getAudienceRecipientCount(statesOrAgencies: string[], packages: string[], roles: string[], searchMode: string = 'Agency'): number {
+  let matching = searchMode === 'State'
+    ? (statesOrAgencies.length > 0 ? AGENCIES.filter((a) => statesOrAgencies.includes(a.state)) : [])
+    : (statesOrAgencies.length > 0 ? AGENCIES.filter((a) => statesOrAgencies.includes(a.name)) : []);
+  if (packages.length > 0) matching = matching.filter((a) => packages.includes(a.package));
+  if (roles.length > 0) matching = matching.filter((a) => roles.includes(a.role));
+  return matching.reduce((sum, a) => sum + a.employeeCount, 0);
+}
 const STATE_ABBR: Record<string, string> = {
   'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
   'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
@@ -67,15 +83,24 @@ const ROLE_SUBTEXT: Record<string, string> = {
   'Field Staff': 'Caregiver and field worker',
 };
 
-const FEATURE_PATHS = ['Dashboard', 'Scheduling', 'Billing', 'Clients', 'Employees', 'Broadcast Studio'];
-const FREQUENCY_OPTIONS = ['Once', 'Every Login', 'Daily', 'Weekly'];
+// Mirrors the app's main nav, so a feature-specific message targets a real destination.
+const FEATURE_PATHS = ['Dashboard', 'Operations', 'Scheduling', 'Payroll', 'Billing', 'Clients', 'Employees', 'Smart Billing', 'Reporting', 'Fax', 'Agency Management', 'My Account'];
+const DEPARTMENT_OPTIONS = ['Admin Services', 'Billing', 'Customer Success', 'Marketing', 'Product', 'Support'];
+// Stand-in for real per-user auth: this prototype has no individual accounts,
+// only the org user shown in the sidebar, so Author auto-populates with that
+// same name rather than a selectable/editable value.
+const CURRENT_USER_NAME = 'John Doe';
 const MESSAGE_COLOR_OPTIONS = ['#DA4040', '#27496D'];
+// Layout toggle: false = form left / preview right (default). true = preview left / form right.
+// Kept as a flag (not deleted) so both layouts stay available to switch back to.
+const PREVIEW_ON_LEFT = false;
 
 /* -- Design tokens copied from the GEOH "Overlay - New Message" Figma frame -- */
 const BORDER = '#e5e5e5';
 const LABEL_GREY = '#646464';
 const NAVY = '#334c6d';
 const PRIMARY = '#2699fb';
+const ICON_LIGHT = '#8a8a8a';
 const PLACEHOLDER = '#b8b8b8';
 
 function SectionHeader({ children }: { children: string }) {
@@ -93,6 +118,14 @@ function FieldShell({ label, height, disabled, open, children }: { label: string
       </p>
       {children}
     </div>
+  );
+}
+
+function StaticField({ label, value }: { label: string; value: string }) {
+  return (
+    <FieldShell label={label} disabled>
+      <p className="font-['Montserrat',sans-serif] font-normal text-[13px]" style={{ color: '#000000' }}>{value}</p>
+    </FieldShell>
   );
 }
 
@@ -218,49 +251,175 @@ function SelectField({
   );
 }
 
-function DateField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (v: string) => void; disabled?: boolean }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DAY_OF_WEEK_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-  const today = (() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  })();
+function pad2(n: number) {
+  return String(n).padStart(2, '0');
+}
+
+function dateToISO(d: Date) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function isSameDay(a: Date | null, b: Date | null) {
+  return !!a && !!b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function DateField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (v: string) => void; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const selectedDate = value ? new Date(`${value}T00:00:00`) : null;
 
   const displayValue = value
     ? (() => { const [yyyy, mm, dd] = value.split('-'); return `${mm} / ${dd} / ${yyyy}`; })()
     : null;
 
+  const openCalendar = () => {
+    const base = selectedDate ?? today;
+    setViewYear(base.getFullYear());
+    setViewMonth(base.getMonth());
+    setOpen(true);
+  };
+
+  const changeMonth = (delta: number) => {
+    let y = viewYear;
+    let m = viewMonth + delta;
+    if (m < 0) { m = 11; y -= 1; }
+    if (m > 11) { m = 0; y += 1; }
+    setViewYear(y);
+    setViewMonth(m);
+  };
+
+  const firstOfMonth = new Date(viewYear, viewMonth, 1);
+  const startWeekday = firstOfMonth.getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+  const cells: Array<{ day: number; date: Date; inMonth: boolean }> = [];
+  for (let i = 0; i < startWeekday; i++) {
+    const day = daysInPrevMonth - startWeekday + 1 + i;
+    cells.push({ day, date: new Date(viewYear, viewMonth - 1, day), inMonth: false });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ day: d, date: new Date(viewYear, viewMonth, d), inMonth: true });
+  }
+  let nextDay = 1;
+  while (cells.length < 42) {
+    cells.push({ day: nextDay, date: new Date(viewYear, viewMonth + 1, nextDay), inMonth: false });
+    nextDay++;
+  }
+
+  const calendarOpen = open && !disabled;
+
   return (
-    <FieldShell label={label} disabled={disabled}>
-      <div className="flex items-center justify-between w-full relative">
-        <div className="relative flex-1 pr-[24px]">
+    <div className="relative w-full" ref={containerRef}>
+      <FieldShell label={label} disabled={disabled} open={calendarOpen}>
+        <div className="flex items-center justify-between w-full gap-[8px]">
           <span
-            className="font-['Montserrat',sans-serif] font-normal text-[13px] pointer-events-none select-none"
+            className="font-['Montserrat',sans-serif] font-normal text-[13px] select-none"
             style={{ color: value ? '#000000' : '#B8B8B8' }}
           >
             {displayValue ?? '00 / 00 / 0000'}
           </span>
           {!disabled && (
-            <input
-              ref={inputRef}
-              type="date"
-              value={value}
-              min={today}
-              onChange={(e) => onChange(e.target.value)}
-              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-            />
+            <div className="flex items-center gap-[8px] shrink-0">
+              {value && (
+                <button type="button" onClick={() => onChange('')} className="flex items-center justify-center cursor-pointer">
+                  <IoIosClose size={22} color="#27496D" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={openCalendar}
+                className="flex items-center justify-center cursor-pointer"
+                style={{ width: 22, height: 22 }}
+              >
+                <BiCalendarEvent size={16} color="#27496D" />
+              </button>
+            </div>
           )}
         </div>
-        {!disabled && (
-          <BiCalendarEvent
-            className="absolute right-0 cursor-pointer"
-            size={18}
-            color="#27496D"
-            onClick={() => (inputRef.current as any)?.showPicker?.()}
-          />
-        )}
-      </div>
-    </FieldShell>
+      </FieldShell>
+
+      {calendarOpen && (
+          <div
+            className="absolute top-full left-0 w-full bg-white rounded-b-[4px] border shadow-lg z-50 overflow-hidden"
+            style={{ borderColor: BORDER }}
+          >
+            <div className="flex items-center justify-between px-[16px] h-[45px]">
+              <p className="font-['Montserrat',sans-serif] font-medium text-[14px] text-black">
+                {MONTH_NAMES[viewMonth]} {viewYear}
+              </p>
+              <div className="flex items-center gap-[14px]">
+                <BiCalendarEvent size={16} color="#27496D" />
+                <button type="button" onClick={() => changeMonth(-1)} className="cursor-pointer flex items-center">
+                  <IoIosArrowBack size={16} color="#27496D" />
+                </button>
+                <button type="button" onClick={() => changeMonth(1)} className="cursor-pointer flex items-center">
+                  <IoIosArrowForward size={16} color="#27496D" />
+                </button>
+              </div>
+            </div>
+            {/* 237px grid: 33px weekday row + 6 day rows at 34px, matching the design-system spec. */}
+            <div className="grid grid-cols-7 border-t [&>*:nth-child(7n)]:border-r-0 [&>*:nth-last-child(-n+7)]:border-b-0" style={{ borderColor: BORDER }}>
+              {DAY_OF_WEEK_LABELS.map((d, i) => (
+                <div
+                  key={`wd-${i}`}
+                  className="flex items-center justify-center h-[33px] border-r border-b"
+                  style={{ borderColor: BORDER, backgroundColor: '#F8F8F8' }}
+                >
+                  <span className="font-['Montserrat',sans-serif] font-semibold text-[13px]" style={{ color: '#050505' }}>{d}</span>
+                </div>
+              ))}
+              {cells.map((cell, i) => {
+                const isToday = isSameDay(cell.date, today);
+                const isSelected = isSameDay(cell.date, selectedDate);
+                // Only today and future dates are selectable — a broadcast can't be scheduled backwards.
+                const isDisabledCell = cell.date < today;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={isDisabledCell}
+                    onClick={() => { onChange(dateToISO(cell.date)); setOpen(false); }}
+                    className={`h-[34px] px-[3px] py-[2px] border-r border-b ${isDisabledCell ? 'cursor-default' : 'cursor-pointer'}`}
+                    style={{ borderColor: BORDER, backgroundColor: cell.inMonth ? '#FFFFFF' : '#F2F2F2' }}
+                  >
+                    <span
+                      className={`flex items-center justify-center w-full h-full rounded-[8px] border font-['Montserrat',sans-serif] text-[13px] ${
+                        isSelected || isDisabledCell ? 'border-transparent' : 'border-transparent hover:bg-[#E8F4FF] hover:border-[#2699FB]/[0.6667]'
+                      }`}
+                      style={{
+                        fontWeight: isToday || isSelected ? 700 : 400,
+                        color: isSelected ? '#FFFFFF' : isDisabledCell ? '#D1D3D4' : '#27496D',
+                        backgroundColor: isSelected ? '#2699FB' : 'transparent',
+                        borderColor: isSelected ? 'rgba(38,153,251,0.6667)' : undefined,
+                      }}
+                    >
+                      {cell.day}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+      )}
+    </div>
   );
 }
 
@@ -418,25 +577,32 @@ function RadioField({ label, value, onChange, options, disabled }: { label: stri
   );
 }
 
-function ColorField({ label, value, onChange, options, disabled }: { label: string; value: string; onChange: (v: string) => void; options: string[]; disabled?: boolean }) {
+function ColorField({ label, value, onChange, options, optionLabels, disabled }: { label: string; value: string; onChange: (v: string) => void; options: string[]; optionLabels?: Record<string, string>; disabled?: boolean }) {
   return (
     <FieldShell label={label} disabled={disabled}>
-      <div className="flex gap-[12px] items-center w-full">
+      <div className="flex flex-col gap-[14px] w-full pb-[6px]">
         {options.map((opt) => (
           <button
             key={opt}
             type="button"
             onClick={() => onChange(opt)}
-            className="flex items-center justify-center rounded-full cursor-pointer shrink-0"
-            style={{
-              width: 26,
-              height: 26,
-              backgroundColor: opt,
-              boxShadow: value === opt ? `0 0 0 2px #ffffff, 0 0 0 4px ${opt}` : 'none',
-            }}
-            aria-label={opt}
+            className="flex items-center gap-[8px] cursor-pointer"
           >
-            {value === opt && <MdCheck size={14} color="white" />}
+            <span
+              className="flex items-center justify-center rounded-full shrink-0"
+              style={{
+                width: 26,
+                height: 26,
+                backgroundColor: opt,
+                boxShadow: value === opt ? `0 0 0 2px #ffffff, 0 0 0 4px ${opt}` : 'none',
+              }}
+              aria-label={opt}
+            >
+              {value === opt && <MdCheck size={14} color="white" />}
+            </span>
+            {optionLabels?.[opt] && (
+              <span className="font-['Montserrat',sans-serif] font-medium text-[12px] text-black">{optionLabels[opt]}</span>
+            )}
           </button>
         ))}
       </div>
@@ -468,13 +634,40 @@ function ToggleRow({ label, checked, onChange, disabled }: { label: string; chec
   );
 }
 
-function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestinationChange, disabled }: {
+function CheckboxRow({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={() => !disabled && onChange(!checked)}
+      className="flex items-start gap-[8px] w-full"
+      style={{ cursor: disabled ? 'default' : 'pointer' }}
+    >
+      <span
+        className="flex items-center justify-center rounded-none shrink-0 transition-colors"
+        style={{
+          width: 18,
+          height: 18,
+          border: `1.5px solid ${checked ? PRIMARY : ICON_LIGHT}`,
+          backgroundColor: 'white',
+          opacity: disabled ? 0.5 : 1,
+        }}
+      >
+        {checked && <RiCheckLine size={13} color={PRIMARY} />}
+      </span>
+      <span className="font-['Montserrat',sans-serif] font-medium text-[12px] text-black text-left">{label}</span>
+    </button>
+  );
+}
+
+function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestinationChange, stopOnClick, onStopOnClickChange, disabled }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: string;
   destination: string;
   onLabelChange: (v: string) => void;
   onDestinationChange: (v: string) => void;
+  stopOnClick: boolean;
+  onStopOnClickChange: (v: boolean) => void;
   disabled?: boolean;
 }) {
   return (
@@ -489,6 +682,7 @@ function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestin
         <div className="flex flex-col gap-[16px] w-full">
           <TextAreaField label="Label *" value={label} onChange={onLabelChange} placeholder="Link text shown in banner & overlay" disabled={disabled} />
           <TextField label="Destination URL *" value={destination} onChange={onDestinationChange} placeholder="https://..." disabled={disabled} />
+          <CheckboxRow label="Stop showing the message once clicked" checked={stopOnClick} onChange={onStopOnClickChange} disabled={disabled} />
         </div>
       )}
     </div>
@@ -887,13 +1081,15 @@ type FormData = {
   messageType?: string;
   startDate?: string;
   endDate?: string;
+  noEndDate?: boolean;
   body?: string;
   reason?: string;
+  department?: string;
+  author?: string;
   displayFormat?: string;
   placement?: string;
   featurePath?: string;
   messageColor?: string;
-  frequency?: string;
   searchMode?: string;
   statesOrAgencies?: string[];
   packages?: string[];
@@ -902,6 +1098,7 @@ type FormData = {
   hasCta?: boolean;
   ctaLabel?: string;
   ctaDestination?: string;
+  stopOnCtaClick?: boolean;
   pushNotification?: boolean;
 };
 
@@ -968,7 +1165,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts, currentUserName }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -980,12 +1177,15 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   onReject?: () => void;
   onDeleteRow?: () => void;
   onCopyToDrafts?: () => void;
+  /** Whoever is composing — stamped as the author on a brand-new message. */
+  currentUserName?: string;
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [body, setBody] = useState(initialData?.body ?? '');
   const [reason, setReason] = useState(initialData?.reason ?? '');
-  const [messageType, setMessageType] = useState<MessageType>((initialData?.messageType as MessageType) ?? '');
+  const [department, setDepartment] = useState(initialData?.department ?? '');
+  const author = initialData?.author ?? currentUserName ?? CURRENT_USER_NAME;
   const [messageColor, setMessageColor] = useState(initialData?.messageColor ?? MESSAGE_COLOR_OPTIONS[1]);
   const [displayFormat, setDisplayFormat] = useState<DisplayFormat>((initialData?.displayFormat as DisplayFormat) ?? '');
   const [placement, setPlacement] = useState<Placement>((initialData?.placement as Placement) ?? '');
@@ -993,6 +1193,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [hasCta, setHasCta] = useState(initialData?.hasCta ?? false);
   const [ctaLabel, setCtaLabel] = useState(initialData?.ctaLabel ?? '');
   const [ctaDestination, setCtaDestination] = useState(initialData?.ctaDestination ?? '');
+  const [stopOnCtaClick, setStopOnCtaClick] = useState(initialData?.stopOnCtaClick ?? false);
 
   const [searchMode, setSearchMode] = useState<SearchMode>((initialData?.searchMode as SearchMode) ?? 'Agency');
   const [statesOrAgencies, setStatesOrAgencies] = useState<string[]>(initialData?.statesOrAgencies ?? []);
@@ -1001,42 +1202,37 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
   const [startDate, setStartDate] = useState(initialData?.startDate ?? '');
   const [endDate, setEndDate] = useState(initialData?.endDate ?? '');
-  const [frequency, setFrequency] = useState(initialData?.frequency ?? '');
+  const [noEndDate, setNoEndDate] = useState(initialData?.noEndDate ?? false);
   const [dismissible, setDismissible] = useState<Dismissible>((initialData?.dismissible as Dismissible) ?? 'Dismissible');
   const [pushNotification, setPushNotification] = useState(initialData?.pushNotification ?? false);
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
+  const [isSubmitHovered, setIsSubmitHovered] = useState(false);
 
-  const isAnnouncement = messageType === 'Announcement';
-  const isEmergency = messageType === 'Emergency';
+  const isEmergency = displayFormat === 'Banner' && messageColor === '#DA4040';
 
-  let matching = searchMode === 'State'
-    ? (statesOrAgencies.length > 0 ? AGENCIES.filter((a) => statesOrAgencies.includes(a.state)) : [])
-    : (statesOrAgencies.length > 0 ? AGENCIES.filter((a) => statesOrAgencies.includes(a.name)) : []);
-  if (packages.length > 0) matching = matching.filter((a) => packages.includes(a.package));
-  if (roles.length > 0) matching = matching.filter((a) => roles.includes(a.role));
-  const audienceCount = matching.length;
+  const audienceCount = getAudienceRecipientCount(statesOrAgencies, packages, roles, searchMode);
 
   const isFormValid =
     title.trim() !== '' &&
     body.trim() !== '' &&
     reason.trim() !== '' &&
-    messageType !== '' &&
+    department !== '' &&
+    displayFormat !== '' &&
     startDate !== '' &&
-    frequency !== '' &&
     statesOrAgencies.length > 0 &&
     (!hasCta || (ctaLabel.trim() !== '' && ctaDestination.trim() !== '')) &&
-    (messageType !== 'Announcement' || (
-      displayFormat !== '' &&
-      placement !== '' &&
-      (placement !== 'Feature Specific' || featurePath !== '')
-    ));
+    placement !== '' &&
+    (placement !== 'Feature Specific' || featurePath !== '');
+
+  const showFooter = !!onDeleteRow || !!onCopyToDrafts || !!(onApprove && onReject) || !readOnly;
 
   const handleSearchModeChange = (v: string) => {
     setSearchMode(v as SearchMode);
     setStatesOrAgencies([]);
   };
 
-  const allFormData: FormData = { title, messageType, startDate, endDate, body, reason, displayFormat, placement, featurePath, messageColor, frequency, searchMode, statesOrAgencies, packages, roles, dismissible, hasCta, ctaLabel, ctaDestination, pushNotification };
+  const messageType: MessageType = displayFormat === '' ? '' : (isEmergency ? 'Emergency' : 'Announcement');
+  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, author, displayFormat, placement, featurePath, messageColor, searchMode, statesOrAgencies, packages, roles, dismissible, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
 
   const handleSubmit = () => {
     onMessageCreated?.(allFormData);
@@ -1048,9 +1244,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     onClose();
   };
 
-  const effectiveFormat: DisplayFormat = isEmergency ? 'Banner' : isAnnouncement ? displayFormat : '';
-  const effectiveDismissible = isEmergency ? false : dismissible === 'Dismissible';
-  const effectiveBannerColor = isEmergency ? '#DA4040' : messageColor;
+  const effectiveFormat: DisplayFormat = displayFormat;
+  const effectiveDismissible = dismissible === 'Dismissible';
+  const effectiveBannerColor = messageColor;
   const hasPreview = effectiveFormat !== '';
 
   return (
@@ -1076,30 +1272,34 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
       {/* Body: left form + right preview */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
-        {/* LEFT — scrollable form, fixed 399px */}
-        <div style={{ width: '399px', minWidth: '399px', maxWidth: '399px', overflowY: 'auto', borderRight: `1px solid ${BORDER}`, position: 'relative' }} className="p-[24px] flex flex-col gap-[16px]">
+        {/* Scrollable form, fixed 399px — left by default, right if PREVIEW_ON_LEFT */}
+        <div style={{ width: '399px', minWidth: '399px', maxWidth: '399px', overflowY: 'auto', [PREVIEW_ON_LEFT ? 'borderLeft' : 'borderRight']: `1px solid ${BORDER}`, position: 'relative', order: PREVIEW_ON_LEFT ? 2 : 1 }} className="p-[24px] flex flex-col gap-[16px]">
           {readOnly && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} />}
+
+          {/* Author Details card */}
+          <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Author Details</p>
+            <StaticField label="Author" value={author} />
+            <SelectField label="Department *" value={department} onChange={setDepartment} placeholder="Select department..." options={DEPARTMENT_OPTIONS} disabled={readOnly} />
+          </div>
 
           {/* Message Details card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Message Details</p>
-            <SelectField label="Message Type *" value={messageType} onChange={(v) => setMessageType(v as MessageType)} placeholder="Select message type..." options={['Announcement', 'Emergency']} disabled={readOnly} />
-            {isEmergency && (
-              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] mt-[-12px]" style={{ color: '#B8B8B8' }}>
-                Emergency messages are always sent as a non-dismissible, app-wide red banner.
-              </p>
+            <RadioField label="Display Format *" value={displayFormat} onChange={(v) => setDisplayFormat(v as DisplayFormat)} options={['Overlay', 'Banner']} disabled={readOnly} />
+            {displayFormat === 'Banner' && (
+              <ColorField
+                label="Message Color"
+                value={messageColor}
+                onChange={setMessageColor}
+                options={MESSAGE_COLOR_OPTIONS}
+                optionLabels={{ '#DA4040': 'Emergency', '#27496D': 'Regular' }}
+                disabled={readOnly}
+              />
             )}
-            {isAnnouncement && (
-              <>
-                <SelectField label="Display Format *" value={displayFormat} onChange={(v) => setDisplayFormat(v as DisplayFormat)} placeholder="Select display format..." options={['Overlay', 'Banner']} disabled={readOnly} />
-                {displayFormat === 'Banner' && (
-                  <ColorField label="Message Color" value={messageColor} onChange={setMessageColor} options={MESSAGE_COLOR_OPTIONS} disabled={readOnly} />
-                )}
-                <SelectField label="Placement *" value={placement} onChange={(v) => setPlacement(v as Placement)} placeholder="Select placement..." options={['App-wide', 'Feature Specific']} disabled={readOnly} />
-                {placement === 'Feature Specific' && (
-                  <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} disabled={readOnly} />
-                )}
-              </>
+            <SelectField label="Placement *" value={placement} onChange={(v) => setPlacement(v as Placement)} placeholder="Select placement..." options={['App-wide', 'Feature Specific']} disabled={readOnly} />
+            {placement === 'Feature Specific' && (
+              <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} disabled={readOnly} />
             )}
             <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={readOnly} />
             <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={readOnly} />
@@ -1110,17 +1310,22 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Date &amp; Time</p>
             <DateField label="Start Date *" value={startDate} onChange={setStartDate} disabled={readOnly} />
-            <DateField label="End Date" value={endDate} onChange={setEndDate} disabled={readOnly} />
-            <SelectField label="Frequency *" value={frequency} onChange={setFrequency} placeholder="Select frequency..." options={FREQUENCY_OPTIONS} disabled={readOnly} />
+            <DateField label="End Date" value={endDate} onChange={setEndDate} disabled={readOnly || noEndDate} />
+            <CheckboxRow
+              label="No end date"
+              checked={noEndDate}
+              onChange={(v) => { setNoEndDate(v); if (v) setEndDate(''); }}
+              disabled={readOnly}
+            />
           </div>
 
           {/* Audience card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
-            <div className="flex flex-wrap items-center justify-between gap-x-[8px] gap-y-[2px]">
+            <div className="flex flex-col">
               <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Audience</p>
-              <span className="font-['Montserrat',sans-serif] font-medium text-[12px] shrink-0" style={{ color: NAVY }}>
+              <p className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] text-[#585858]">
                 {audienceCount} {audienceCount === 1 ? 'recipient' : 'recipients'} will see this message
-              </span>
+              </p>
             </div>
             <RadioField label="Search By *" value={searchMode} onChange={handleSearchModeChange} options={['Agency', 'State']} disabled={readOnly} />
             <MultiSelectField
@@ -1139,9 +1344,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           {/* Display Settings card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Display Settings</p>
-            {!isEmergency && (
-              <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} disabled={readOnly} />
-            )}
+            <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} disabled={readOnly} />
             <CtaBox
               checked={hasCta}
               onChange={setHasCta}
@@ -1149,14 +1352,16 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               destination={ctaDestination}
               onLabelChange={setCtaLabel}
               onDestinationChange={setCtaDestination}
+              stopOnClick={stopOnCtaClick}
+              onStopOnClickChange={setStopOnCtaClick}
               disabled={readOnly}
             />
-            {isEmergency && <ToggleRow label="Also send as push notification" checked={pushNotification} onChange={setPushNotification} disabled={readOnly} />}
+            <ToggleRow label="Also send as push notification" checked={pushNotification} onChange={setPushNotification} disabled={readOnly} />
           </div>
         </div>
 
-        {/* RIGHT — preview + actions */}
-        <div style={{ flex: 1, minWidth: 0, backgroundColor: '#f8f8f8' }} className="flex flex-col p-[24px] gap-[16px]">
+        {/* Preview + device toggle — right by default, left if PREVIEW_ON_LEFT */}
+        <div style={{ flex: 1, minWidth: 0, backgroundColor: '#f8f8f8', order: PREVIEW_ON_LEFT ? 1 : 2 }} className="flex flex-col p-[24px] gap-[16px]">
           {/* Preview card */}
           <div className="bg-white rounded-[8px] border flex flex-col flex-1 overflow-hidden" style={{ borderColor: BORDER }}>
             <div className="px-[16px] py-[12px] border-b flex items-center justify-between gap-[12px] shrink-0" style={{ borderColor: BORDER }}>
@@ -1215,124 +1420,116 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 <div className="flex-1 flex flex-col items-center justify-center gap-[10px] py-[40px]">
                   <MdPreview size={40} color="#d1d3d4" />
                   <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8] text-center max-w-[220px]">
-                    {messageType === ''
-                      ? 'Preview will appear here once you select a message type.'
-                      : 'Preview will appear here once you select a display format.'}
+                    Preview will appear here once you select a display format.
                   </p>
                 </div>
               )}
             </div>
           </div>
-
-          {/* Action buttons below preview */}
-          <div className="flex items-center justify-end shrink-0">
-            {!overlayTitle && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="font-['Montserrat',sans-serif] font-medium text-[13px] capitalize cursor-pointer mr-auto"
-                style={{ color: NAVY }}
-              >
-                Cancel
-              </button>
-            )}
-            {onDeleteRow || onCopyToDrafts ? (
-              <div className="flex items-center gap-[16px]">
-                {onDeleteRow && (
-                  <button
-                    type="button"
-                    className="flex items-center gap-[6px] font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
-                    style={{ color: '#DA4040' }}
-                    onClick={() => setShowDeleteConfirm(true)}
-                  >
-                    <RiDeleteBinLine size={17} color="#DA4040" />
-                    Delete
-                  </button>
-                )}
-                {onCopyToDrafts && (
-                  <button
-                    type="button"
-                    className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[4px] border cursor-pointer"
-                    style={{ backgroundColor: '#e8f4ff', borderColor: '#2699fb', borderWidth: '1px' }}
-                    onClick={onCopyToDrafts}
-                  >
-                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: '#2699fb' }}>
-                      Copy to Drafts
-                    </span>
-                  </button>
-                )}
-              </div>
-            ) : onApprove && onReject ? (
-                <div className="flex items-center gap-[8px]">
-                  <button
-                    type="button"
-                    onClick={onReject}
-                    className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[4px] border cursor-pointer"
-                    style={{ backgroundColor: '#fdeaea', borderColor: '#DA4040', borderWidth: '1px' }}
-                  >
-                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: '#DA4040' }}>
-                      Reject
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onApprove}
-                    className="rounded-[8px] px-[16px] h-[32px] flex items-center gap-[8px] cursor-pointer"
-                    style={{ backgroundColor: '#00AA00' }}
-                  >
-                    <FaRegCheckCircle size={15} color="white" />
-                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: 'white' }}>
-                      Approve
-                    </span>
-                  </button>
-                </div>
-            ) : !readOnly ? (
-              <div className="flex items-center gap-[8px]">
-                <button
-                  type="button"
-                  onClick={handleSaveAsDraft}
-                  className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[4px] border cursor-pointer"
-                  style={{ backgroundColor: '#e8f4ff', borderColor: PRIMARY, borderWidth: '1px' }}
-                >
-                  <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: PRIMARY }}>
-                    Save as Draft
-                  </span>
-                </button>
-                <div className="relative group">
-                  <button
-                    type="button"
-                    onClick={isFormValid ? handleSubmit : undefined}
-                    disabled={!isFormValid}
-                    className="rounded-[8px] px-[16px] h-[32px] flex items-center gap-[8px]"
-                    style={{
-                      backgroundColor: isFormValid ? PRIMARY : '#e1e3e4',
-                      cursor: isFormValid ? 'pointer' : 'not-allowed',
-                    }}
-                  >
-                    <MdSend size={17} color={isFormValid ? 'white' : '#a1a3a4'} />
-                    <span
-                      className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase"
-                      style={{ color: isFormValid ? 'white' : '#a1a3a4' }}
-                    >
-                      {submitLabel ?? 'Send for Approval'}
-                    </span>
-                  </button>
-                  {!isFormValid && (
-                    <div
-                      className="absolute bottom-full left-1/2 -translate-x-1/2 mb-[8px] w-max max-w-[220px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 rounded-[4px] px-[8px] py-[10px] z-50"
-                      style={{ backgroundColor: '#3b5c79' }}
-                    >
-                      <p className="font-['Montserrat',sans-serif] font-medium text-[12px] text-white leading-[17px]">
-                        Please fill in all required fields to proceed
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : null}
-          </div>
         </div>
       </div>
+
+      {/* Action buttons — full-width footer bar across the whole overlay */}
+      {showFooter && (
+      <div className="shrink-0 border-t px-[24px] py-[16px] flex items-center justify-end" style={{ borderColor: BORDER, backgroundColor: 'white' }}>
+        {onDeleteRow || onCopyToDrafts ? (
+          <div className="flex items-center gap-[16px]">
+            {onDeleteRow && (
+              <button
+                type="button"
+                className="flex items-center gap-[6px] font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+                style={{ color: '#DA4040' }}
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <RiDeleteBinLine size={17} color="#DA4040" />
+                Delete
+              </button>
+            )}
+            {onCopyToDrafts && (
+              <button
+                type="button"
+                className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
+                onClick={onCopyToDrafts}
+              >
+                <MdOutlineContentCopy size={15} />
+                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase">
+                  Copy to Drafts
+                </span>
+              </button>
+            )}
+          </div>
+        ) : onApprove && onReject ? (
+            <div className="flex items-center gap-[8px]">
+              <button
+                type="button"
+                onClick={onReject}
+                className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#fdeaea] border-[#DA4040] text-[#DA4040] hover:bg-[#DA4040] hover:text-white"
+              >
+                <FaRegTimesCircle size={15} />
+                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase">
+                  Reject
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={onApprove}
+                className="rounded-[8px] px-[16px] h-[32px] flex items-center gap-[8px] cursor-pointer"
+                style={{ backgroundColor: '#00AA00' }}
+              >
+                <FaRegCheckCircle size={15} color="white" />
+                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: 'white' }}>
+                  Approve
+                </span>
+              </button>
+            </div>
+        ) : !readOnly ? (
+          <div className="flex items-center gap-[8px]">
+            <button
+              type="button"
+              onClick={handleSaveAsDraft}
+              className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
+            >
+              <MdOutlineSaveAlt size={15} />
+              <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase">
+                Save as Draft
+              </span>
+            </button>
+            <div className="relative group">
+              <button
+                type="button"
+                onClick={isFormValid ? handleSubmit : undefined}
+                onMouseEnter={() => setIsSubmitHovered(true)}
+                onMouseLeave={() => setIsSubmitHovered(false)}
+                disabled={!isFormValid}
+                className="rounded-[8px] px-[16px] h-[32px] flex items-center gap-[8px] transition-colors duration-150"
+                style={{
+                  backgroundColor: isFormValid ? (isSubmitHovered ? '#2C9FFF' : PRIMARY) : '#e1e3e4',
+                  cursor: isFormValid ? 'pointer' : 'not-allowed',
+                }}
+              >
+                <MdSend size={17} color={isFormValid ? 'white' : '#a1a3a4'} />
+                <span
+                  className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase"
+                  style={{ color: isFormValid ? 'white' : '#a1a3a4' }}
+                >
+                  {submitLabel ?? 'Send for Approval'}
+                </span>
+              </button>
+              {!isFormValid && (
+                <div
+                  className="absolute bottom-full right-0 mb-[8px] w-max max-w-[220px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 rounded-[4px] px-[8px] py-[10px] z-50"
+                  style={{ backgroundColor: '#3b5c79' }}
+                >
+                  <p className="font-['Montserrat',sans-serif] font-medium text-[12px] text-white leading-[17px]">
+                    Please fill in all required fields to proceed
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </div>
+      )}
     </div>
   );
 }
