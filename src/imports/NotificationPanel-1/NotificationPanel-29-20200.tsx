@@ -1,17 +1,18 @@
 import svgPaths from "./svg-e55i34ge9x";
+import { getUserIdentity, type UserIdentity } from '../BroadcastStudio/userIdentity';
 
 function MinWidth() {
   return <div className="relative size-[24px]" data-name="min-width" />;
 }
 
-function Frame() {
+function Frame({ identity }: { identity: UserIdentity }) {
   return (
     <div className="bg-white relative shrink-0 w-full">
       <div className="flex flex-row items-center overflow-clip rounded-[inherit] size-full">
         <div className="content-stretch flex items-center px-[20px] py-[19px] relative size-full border-r border-[#e5e5e5]">
-          <div className="bg-[#3eb361] content-stretch flex flex-col items-center justify-center relative rounded-[100px] shrink-0 size-[20px]" data-name="Avatar">
+          <div className="content-stretch flex flex-col items-center justify-center relative rounded-[100px] shrink-0 size-[20px]" data-name="Avatar" style={{ backgroundColor: identity.avatarColor }}>
             <div className="-translate-x-1/2 -translate-y-1/2 absolute flex flex-col font-['Montserrat',sans-serif] font-medium justify-center leading-[0] left-1/2 not-italic text-[10px] text-center text-white top-1/2 whitespace-nowrap">
-              <p className="leading-[16px]">JD</p>
+              <p className="leading-[16px]">{identity.initials}</p>
             </div>
             <div className="flex items-center justify-center relative shrink-0 size-[24px]" style={{ "--transform-inner-width": "300", "--transform-inner-height": "0" } as React.CSSProperties}>
               <div className="-rotate-90 flex-none">
@@ -172,7 +173,7 @@ function Frame5() {
   );
 }
 
-function Frame2() {
+function Frame2({ identity }: { identity: UserIdentity }) {
   return (
     <div className="absolute content-stretch flex flex-col items-start left-[-1px] top-0 w-[60px]">
       <Frame1 />
@@ -183,10 +184,10 @@ function Frame2() {
   );
 }
 
-export default function NotificationPanel() {
+export default function NotificationPanel({ identity = getUserIdentity('super-admin') }: { identity?: UserIdentity }) {
   return (
     <div className="bg-white border-[#e5e5e5] border-l border-solid relative size-full" data-name="notification panel">
-      <Frame2 />
+      <Frame2 identity={identity} />
     </div>
   );
 }

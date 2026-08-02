@@ -15,6 +15,7 @@ import NotificationPanel from '../NotificationPanel-1/NotificationPanel-29-20200
 import { useState, useRef, useEffect } from 'react';
 import kebabSvgPaths from '../Menus/svg-duzgfqtilr';
 import BroadcastStudioDashboard from './BroadcastStudioDashboard';
+import { useRole, getUserIdentity, type UserIdentity } from './userIdentity';
 
 interface GoalTemplate {
   id: string;
@@ -135,7 +136,7 @@ function KebabMenu({
   );
 }
 
-function TopBar({ onHamburgerClick, sidebarCollapsed }: { onHamburgerClick: () => void; sidebarCollapsed: boolean }) {
+function TopBar({ onHamburgerClick, sidebarCollapsed, identity }: { onHamburgerClick: () => void; sidebarCollapsed: boolean; identity: UserIdentity }) {
   return (
     <div className="absolute inset-x-0 top-0 h-[59px] bg-white border-b border-[#dfdfdf] z-10 flex items-center" data-name="Top Bar">
       {/* Logo + Hamburger — same width as sidebar */}
@@ -153,8 +154,8 @@ function TopBar({ onHamburgerClick, sidebarCollapsed }: { onHamburgerClick: () =
       </div>
       {/* User avatar */}
       <div className="flex items-center justify-center w-[60px] h-[59px] border-l border-[#e5e5e5] shrink-0">
-        <div className="relative bg-[#3eb361] rounded-full size-[32px] flex items-center justify-center">
-          <span className="font-['Montserrat',sans-serif] font-medium text-[12px] text-white">JD</span>
+        <div className="relative rounded-full size-[32px] flex items-center justify-center" style={{ backgroundColor: identity.avatarColor }}>
+          <span className="font-['Montserrat',sans-serif] font-medium text-[12px] text-white">{identity.initials}</span>
           <div className="absolute bg-white drop-shadow-[0px_2px_2px_rgba(0,0,0,0.08)] rounded-full size-[14px] -bottom-[3px] -right-[3px] flex items-center justify-center">
             <svg viewBox="0 0 6 3" className="w-[6px] h-[3px]">
               <path d="M0 0L3 3L6 0H0Z" fill="black" />
@@ -214,25 +215,25 @@ function MinWidth() {
   return <div className="relative size-[40px]" data-name="min-width" />;
 }
 
-function Frame1() {
+function Frame1({ identity }: { identity: UserIdentity }) {
   return (
     <div className="content-stretch flex flex-col font-['Montserrat',sans-serif] font-normal items-start leading-[0] not-italic relative shrink-0 w-[132px]">
       <div className="flex flex-col justify-center relative shrink-0 text-[#334c6d] text-[12px] w-full">
         <p className="leading-[17px]">GEOH Demonstration</p>
       </div>
       <div className="flex flex-col justify-center relative shrink-0 text-[16px] text-black w-full">
-        <p className="leading-[22px]">John Doe</p>
+        <p className="leading-[22px] whitespace-nowrap">{identity.name}</p>
       </div>
     </div>
   );
 }
 
-function Frame2() {
+function Frame2({ identity }: { identity: UserIdentity }) {
   return (
     <div className="content-stretch flex gap-[16px] items-center relative shrink-0">
-      <div className="bg-[#3eb361] content-stretch flex flex-col items-center justify-center relative rounded-[8px] shrink-0 size-[48px]" data-name="Avatar">
+      <div className="content-stretch flex flex-col items-center justify-center relative rounded-[8px] shrink-0 size-[48px]" data-name="Avatar" style={{ backgroundColor: identity.avatarColor }}>
         <div className="-translate-x-1/2 -translate-y-1/2 absolute flex flex-col font-['Montserrat',sans-serif] font-medium justify-center leading-[0] left-1/2 not-italic text-[19px] text-center text-white top-[calc(50%+0.5px)] whitespace-nowrap">
-          <p className="leading-[25px]">JD</p>
+          <p className="leading-[25px]">{identity.initials}</p>
         </div>
         <div className="flex items-center justify-center relative shrink-0 size-[40px]" style={{ "--transform-inner-width": "1200", "--transform-inner-height": "0" } as React.CSSProperties}>
           <div className="-rotate-90 flex-none">
@@ -240,15 +241,15 @@ function Frame2() {
           </div>
         </div>
       </div>
-      <Frame1 />
+      <Frame1 identity={identity} />
     </div>
   );
 }
 
-function Frame3() {
+function Frame3({ identity }: { identity: UserIdentity }) {
   return (
     <div className="content-stretch flex items-center justify-between relative shrink-0 w-full">
-      <Frame2 />
+      <Frame2 identity={identity} />
       <div className="relative shrink-0 size-[21px]" data-name="react-icons/io/IoMdArrowDropdown">
         <div className="absolute bottom-[37.5%] left-1/4 right-1/4 top-[37.5%]" data-name="Vector">
           <svg className="absolute block inset-0 size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 10.5 5.25">
@@ -1391,6 +1392,9 @@ function Container({ goalTemplates }: { goalTemplates: GoalTemplate[] }) {
 export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioProps) {
   const [expandedSection, setExpandedSection] = useState<'clients' | 'agency' | 'superAdmin' | null>('superAdmin');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Owned here so the chrome and the dashboard share one source of truth for who is viewing.
+  const [role, setRole] = useRole();
+  const identity = getUserIdentity(role);
 
   // Collapsed rail shows only the first word of each nav label (e.g. "Super
   // Administrator" -> "Super"); expanded restores the full label.
@@ -1424,9 +1428,9 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
 
   return (
     <div className="bg-[#f8f8f8] relative size-full" data-name="Agency Management - Goal Templates">
-      <TopBar onHamburgerClick={() => setSidebarCollapsed(s => !s)} sidebarCollapsed={sidebarCollapsed} />
+      <TopBar onHamburgerClick={() => setSidebarCollapsed(s => !s)} sidebarCollapsed={sidebarCollapsed} identity={identity} />
       <div className="absolute right-0 top-[59px] bottom-0 w-[60px] border-l border-[#e5e5e5] z-50">
-        <NotificationPanel />
+        <NotificationPanel identity={identity} />
       </div>
       <div className={`absolute bg-[#eaeaea] bottom-0 left-0 top-[59px] overflow-hidden transition-[width] duration-200 ${sidebarCollapsed ? 'sidebar-collapsed w-[69px]' : 'w-[329px]'}`} data-name="Sidebar Menu">
         <div className="content-stretch flex flex-col items-start overflow-y-auto relative rounded-[inherit] size-full">
@@ -1438,7 +1442,7 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
                   <div className="absolute bg-[#efefef] inset-0" data-name="Background">
                     <div aria-hidden="true" className="absolute border-[#dfdfdf] border-b border-solid inset-0 pointer-events-none" />
                   </div>
-                  <Frame3 />
+                  <Frame3 identity={identity} />
                 </div>
               </div>
               <div className="bg-[#eaeaea] content-stretch flex flex-col gap-[10px] h-[45px] items-start justify-center p-[16px] relative shrink-0 w-full" data-name="Organization Switcher">
@@ -1457,8 +1461,8 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
                 className="w-full flex items-center justify-center shrink-0"
                 style={{ height: 45, backgroundColor: '#efefef', borderBottom: '1px solid #dfdfdf' }}
               >
-                <div className="bg-[#3eb361] rounded-[8px] flex items-center justify-center shrink-0" style={{ width: 30, height: 30 }}>
-                  <span className="font-['Montserrat',sans-serif] font-medium text-white" style={{ fontSize: 12, lineHeight: '15px' }}>JD</span>
+                <div className="rounded-[8px] flex items-center justify-center shrink-0" style={{ width: 30, height: 30, backgroundColor: identity.avatarColor }}>
+                  <span className="font-['Montserrat',sans-serif] font-medium text-white" style={{ fontSize: 12, lineHeight: '15px' }}>{identity.initials}</span>
                 </div>
               </div>
               <div
@@ -1858,7 +1862,7 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
           {expandedSection === 'agency' ? (
             <Container goalTemplates={goalTemplates} />
           ) : (
-            <BroadcastStudioDashboard />
+            <BroadcastStudioDashboard role={role} onRoleChange={setRole} />
           )}
         </div>
       </div>

@@ -2,27 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose } from 'react-icons/io';
-import { MdAdd, MdApps, MdBlock, MdBusiness, MdDeleteOutline, MdDesktopWindows, MdMoreVert, MdOutlineGroup, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
-import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay } from './ComposeMessageOverlay';
-
-type UserRole = 'super-admin' | 'executive-approver';
-
-function useRole(): [UserRole, (next: UserRole) => void] {
-  const [role, setRoleState] = useState<UserRole>(() => {
-    const param = new URLSearchParams(window.location.search).get('role');
-    return param === 'executive-approver' ? 'executive-approver' : 'super-admin';
-  });
-
-  const setRole = (next: UserRole) => {
-    setRoleState(next);
-    const url = new URL(window.location.href);
-    if (next === 'super-admin') url.searchParams.delete('role');
-    else url.searchParams.set('role', next);
-    window.history.replaceState({}, '', url.toString());
-  };
-
-  return [role, setRole];
-}
+import { MdAdd, MdApps, MdBlock, MdBusiness, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
+import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount } from './ComposeMessageOverlay';
+import { getUserIdentity, type UserRole } from './userIdentity';
 
 // Prototype affordance: switch the viewer's role in one click (no URL editing).
 // Visible in the deployed build too, so PM/QA can self-serve both perspectives.
@@ -36,13 +18,7 @@ function RoleToggle({ role, onChange }: { role: UserRole; onChange: (next: UserR
     { key: 'executive-approver', label: 'Executive Approver', activeBg: '#27496D' },
   ];
   return (
-    <div className="fixed bottom-[16px] left-[16px] z-[9999] flex flex-col items-start gap-[4px]">
-      <span
-        className="font-['Montserrat',sans-serif] font-semibold text-[9px] uppercase tracking-[0.08em] pl-[2px]"
-        style={{ color: '#8b8b8b' }}
-      >
-        Viewing as
-      </span>
+    <div className="fixed top-[13px] right-[90px] z-[9999] flex flex-col items-end gap-[4px]">
       <div
         className="flex items-center rounded-[8px] overflow-hidden border"
         style={{ borderColor: '#E5E5E5', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.10)' }}
@@ -75,8 +51,8 @@ type MessageStatus = 'Live' | 'Pending' | 'Draft' | 'Rejected' | 'Discontinued';
 type MessageType = '' | 'Announcement' | 'Emergency';
 
 interface MessageFormData {
-  body?: string; reason?: string; displayFormat?: string; placement?: string; featurePath?: string;
-  messageColor?: string; frequency?: string; searchMode?: string; statesOrAgencies?: string[];
+  body?: string; reason?: string; department?: string; author?: string; noEndDate?: boolean; displayFormat?: string; placement?: string; featurePath?: string;
+  messageColor?: string; searchMode?: string; statesOrAgencies?: string[];
   packages?: string[]; roles?: string[]; dismissible?: string; hasCta?: boolean;
   ctaLabel?: string; ctaDestination?: string; pushNotification?: boolean;
 }
@@ -93,6 +69,14 @@ interface BroadcastMessageRow {
   recipients: number | null;
   formData?: MessageFormData;
   statusChangedAt?: string;
+  /**
+   * Who authored this draft. Only meaningful while status is 'Draft' — drafts
+   * are private to the role that created them. Stand-in for a real per-user
+   * author id: this prototype only models two roles (no individual accounts),
+   * so scoping is per-role rather than per-person. The real backend should
+   * scope drafts to the individual author, since many people can share a role.
+   */
+  authorRole?: UserRole;
 }
 
 const STATUS_COLOR: Record<MessageStatus, string> = {
@@ -146,15 +130,52 @@ function getDiscardedBucket(row: BroadcastMessageRow): DiscardedBucket | null {
     const end = new Date(row.endDate);
     if (today > end) return 'Expired';
   }
+  // A Pending message whose window has passed without a decision is treated
+  // as rejected — it's moot now, and sitting in the queue forever would just
+  // be noise for the approver.
+  if (row.status === 'Pending' && row.endDate !== '—') {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const end = new Date(row.endDate);
+    if (today > end) return 'Rejected';
+  }
   return null;
 }
 
 function getRetentionDaysLeft(row: BroadcastMessageRow, bucket: DiscardedBucket): number {
-  const enteredAt = bucket === 'Expired'
+  // Expired (Live past its window) and auto-rejected (Pending past its window)
+  // are both date-driven, not action-driven, so retention counts from the
+  // message's own end date rather than a statusChangedAt that was never set.
+  const enteredAt = bucket === 'Expired' || (bucket === 'Rejected' && row.status === 'Pending')
     ? new Date(row.endDate)
     : (row.statusChangedAt ? new Date(row.statusChangedAt) : new Date());
   const elapsedDays = Math.floor((Date.now() - enteredAt.getTime()) / MS_PER_DAY);
   return Math.max(0, RETENTION_DAYS - elapsedDays);
+}
+
+/**
+ * Drafts are private to the role that authored them; every other status is
+ * shared across roles. This prototype has no individual user accounts (only
+ * a super-admin/executive-approver role toggle), so "private" here means
+ * per-role — the real backend should scope drafts to the individual author.
+ */
+function isDraftVisibleToRole(row: BroadcastMessageRow, role: UserRole): boolean {
+  return row.status !== 'Draft' || row.authorRole === role;
+}
+
+function isMessageCurrentlyLive(row: BroadcastMessageRow): boolean {
+  if (row.status !== 'Live' || row.startDate === '—') return false;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(row.startDate);
+  const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
+  return today >= start && today <= end;
+}
+
+function getRecipientCount(row: BroadcastMessageRow): number {
+  const agencies = row.formData?.statesOrAgencies ?? [];
+  const packages = row.formData?.packages ?? [];
+  const roles = row.formData?.roles ?? [];
+  if (agencies.length === 0) return row.recipients ?? 0;
+  return getAudienceRecipientCount(agencies, packages, roles, row.formData?.searchMode) || (row.recipients ?? 0);
 }
 
 function formatDisplayDate(dateStr: string): string {
@@ -183,7 +204,10 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     startDate: 'Aug 1, 2026',
     endDate: 'Aug 8, 2026',
     recipients: null,
+    authorRole: 'super-admin',
     formData: {
+      author: 'John Doe',
+      department: 'Support',
       body: 'Q3 compliance training is now available. Please complete all assigned modules before the end of the quarter to stay certified.',
       reason: 'Quarterly compliance',
       displayFormat: 'Overlay',
@@ -208,7 +232,10 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     startDate: '—',
     endDate: '—',
     recipients: null,
+    authorRole: 'executive-approver',
     formData: {
+      author: 'Jennifer James',
+      department: 'Marketing',
       body: 'Introducing our new employee referral program — earn bonuses for every successful hire you refer.',
       displayFormat: 'Banner',
       placement: 'Global',
@@ -216,6 +243,59 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       dismissible: 'Dismissible',
       hasCta: false,
       statesOrAgencies: ['Austin Family Support'],
+      packages: [],
+      roles: [],
+    },
+  },
+  {
+    id: 'seed-d3',
+    subject: 'System Outage Alert Draft',
+    type: 'Emergency',
+    audience: 'Sunrise Home Care',
+    channel: 'Push',
+    status: 'Draft',
+    startDate: 'Aug 5, 2026',
+    endDate: '—',
+    recipients: null,
+    authorRole: 'super-admin',
+    formData: {
+      author: 'John Doe',
+      department: 'Product',
+      noEndDate: true,
+      body: 'We are currently investigating reports of a service disruption. Updates will follow as more information becomes available.',
+      reason: 'Incident response',
+      displayFormat: 'Banner',
+      placement: 'Global',
+      messageColor: '#DA4040',
+      dismissible: 'Non-Dismissible',
+      hasCta: false,
+      pushNotification: true,
+      statesOrAgencies: ['Sunrise Home Care'],
+      packages: [],
+      roles: [],
+    },
+  },
+  {
+    id: 'seed-d4',
+    subject: 'New Benefits Partner Announcement',
+    type: 'Announcement',
+    audience: 'Cascade Caregivers',
+    channel: 'Email',
+    status: 'Draft',
+    startDate: '—',
+    endDate: '—',
+    recipients: null,
+    authorRole: 'executive-approver',
+    formData: {
+      author: 'Jennifer James',
+      department: 'Admin Services',
+      body: 'We are excited to announce a new partnership that expands your benefits options starting next quarter.',
+      displayFormat: 'Overlay',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: false,
+      statesOrAgencies: ['Cascade Caregivers'],
       packages: [],
       roles: [],
     },
@@ -233,6 +313,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     endDate: 'Jul 27, 2026',
     recipients: 3150,
     formData: {
+      author: 'John Doe',
+      department: 'Support',
       body: 'Our offices will be closed for the upcoming holiday. Emergency on-call support remains available throughout the closure.',
       reason: 'Holiday schedule',
       displayFormat: 'Overlay',
@@ -258,6 +340,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     endDate: 'Jul 19, 2026',
     recipients: 892,
     formData: {
+      author: 'John Doe',
+      department: 'Product',
       body: 'The client portal will undergo emergency maintenance tonight from 11 PM to 2 AM. Access will be intermittent during this window.',
       reason: 'Emergency maintenance',
       displayFormat: 'Banner',
@@ -269,6 +353,59 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       statesOrAgencies: ['Austin Family Support', 'Empire Homecare Group'],
       packages: [],
       roles: ['Administrator'],
+    },
+  },
+  {
+    id: 'seed-p3',
+    subject: 'New Mobile App Release',
+    type: 'Announcement',
+    audience: 'Sunshine State Care +1',
+    channel: 'Email',
+    status: 'Pending',
+    startDate: 'Aug 10, 2026',
+    endDate: 'Aug 24, 2026',
+    recipients: 2100,
+    formData: {
+      author: 'John Doe',
+      department: 'Product',
+      body: 'Our redesigned mobile app is rolling out next week with faster scheduling and a new messaging inbox.',
+      reason: 'Product launch',
+      displayFormat: 'Overlay',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: true,
+      ctaLabel: "See what's new",
+      ctaDestination: '#',
+      statesOrAgencies: ['Sunshine State Care', 'Everglades Health Network'],
+      packages: [],
+      roles: [],
+    },
+  },
+  {
+    id: 'seed-p4',
+    subject: 'Payroll System Maintenance Window',
+    type: 'Emergency',
+    audience: 'Windy City Homecare',
+    channel: 'Push',
+    status: 'Pending',
+    startDate: 'Aug 3, 2026',
+    endDate: 'Aug 4, 2026',
+    recipients: 640,
+    formData: {
+      author: 'John Doe',
+      department: 'Billing',
+      body: 'Payroll systems will be offline for scheduled maintenance. Time-off requests submitted during this window may be delayed.',
+      reason: 'Planned maintenance',
+      displayFormat: 'Banner',
+      placement: 'Global',
+      messageColor: '#DA4040',
+      dismissible: 'Non-Dismissible',
+      hasCta: false,
+      pushNotification: true,
+      statesOrAgencies: ['Windy City Homecare'],
+      packages: [],
+      roles: [],
     },
   },
 
@@ -284,6 +421,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     endDate: 'Jul 27, 2026',
     recipients: 1204,
     formData: {
+      author: 'John Doe',
+      department: 'Support',
       body: 'Summer hours are now in effect. Review the updated shift schedule to see how your availability windows have changed.',
       displayFormat: 'Banner',
       placement: 'Feature Specific',
@@ -309,6 +448,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     endDate: 'Jul 28, 2026',
     recipients: 42,
     formData: {
+      author: 'John Doe',
+      department: 'Billing',
       body: 'Effective immediately: overtime must be pre-approved by a supervisor. Unapproved overtime will not be compensated.',
       reason: 'Policy change',
       displayFormat: 'Banner',
@@ -333,6 +474,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     endDate: 'Aug 15, 2026',
     recipients: 560,
     formData: {
+      author: 'John Doe',
+      department: 'Customer Success',
       body: 'Benefits open enrollment begins August 1st. Take a few minutes to review your options and make any changes for the coming year.',
       displayFormat: 'Overlay',
       placement: 'Global',
@@ -342,6 +485,59 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       ctaLabel: 'Review benefits',
       ctaDestination: '#',
       statesOrAgencies: ['Sunrise Home Care', 'Austin Family Support'],
+      packages: [],
+      roles: [],
+    },
+  },
+  {
+    id: 'seed-a4',
+    subject: 'Severe Weather Advisory',
+    type: 'Emergency',
+    audience: 'Empire Homecare Group +1',
+    channel: 'Push',
+    status: 'Live',
+    startDate: 'Jul 28, 2026',
+    endDate: 'Aug 3, 2026',
+    recipients: 3400,
+    formData: {
+      author: 'John Doe',
+      department: 'Admin Services',
+      body: "A severe weather advisory is in effect for your area. Please review your agency's emergency procedures.",
+      reason: 'Safety notice',
+      displayFormat: 'Banner',
+      placement: 'Global',
+      messageColor: '#DA4040',
+      dismissible: 'Non-Dismissible',
+      hasCta: false,
+      pushNotification: true,
+      statesOrAgencies: ['Empire Homecare Group', 'Brooklyn Senior Services'],
+      packages: [],
+      roles: [],
+    },
+  },
+  {
+    id: 'seed-a5',
+    subject: 'New Wellness Program Rollout',
+    type: 'Announcement',
+    audience: 'Cascade Caregivers',
+    channel: 'Email',
+    status: 'Live',
+    startDate: 'Aug 20, 2026',
+    endDate: '—',
+    recipients: 980,
+    formData: {
+      author: 'John Doe',
+      department: 'Customer Success',
+      noEndDate: true,
+      body: 'Our new employee wellness program launches soon, offering mental health resources and fitness reimbursements.',
+      displayFormat: 'Overlay',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: true,
+      ctaLabel: 'Learn more',
+      ctaDestination: '#',
+      statesOrAgencies: ['Cascade Caregivers'],
       packages: [],
       roles: [],
     },
@@ -360,6 +556,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     recipients: 480,
     statusChangedAt: '2026-07-20T00:00:00.000Z',
     formData: {
+      author: 'John Doe',
+      department: 'Billing',
       body: 'Placeholder rejected message for prototyping the Rejected bucket.',
       reason: 'Needs budget sign-off',
       displayFormat: 'Overlay',
@@ -384,6 +582,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     recipients: 210,
     statusChangedAt: '2026-07-22T00:00:00.000Z',
     formData: {
+      author: 'John Doe',
+      department: 'Support',
       body: 'This is a placeholder message for prototyping purposes.',
       reason: 'Placeholder reason',
       displayFormat: 'Banner',
@@ -410,6 +610,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     recipients: 640,
     statusChangedAt: '2026-07-24T00:00:00.000Z',
     formData: {
+      author: 'John Doe',
+      department: 'Product',
       body: 'The legacy client portal has been discontinued. Please use the new portal for all requests going forward.',
       reason: 'Superseded by new portal',
       displayFormat: 'Overlay',
@@ -485,7 +687,7 @@ function NewMessageButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="bg-[#2699fb] content-stretch flex gap-[6px] items-center px-[12px] py-[8px] rounded-[8px] shrink-0 cursor-pointer"
+      className="bg-[#2699fb] hover:bg-[#2C9FFF] transition-colors duration-150 content-stretch flex gap-[6px] items-center px-[12px] py-[8px] rounded-[8px] shrink-0 cursor-pointer"
       data-name="New Message Button"
     >
       <MdAdd className="shrink-0" size={17} color="white" />
@@ -677,11 +879,51 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
   Discontinued: 'View',
 };
 
-function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
+function Tooltip({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+  const [tooltipY, setTooltipY] = useState<number | null>(null);
+  const [suppressed, setSuppressed] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  const isExcluded = (target: EventTarget | null) => (target as HTMLElement | null)?.closest?.('[data-no-tooltip]') != null;
+  const visible = tooltipY !== null && !suppressed;
+
+  const clampY = (rawY: number) => {
+    const gap = 4;
+    const containerH = containerRef.current?.getBoundingClientRect().height ?? 0;
+    const tooltipH = tooltipRef.current?.getBoundingClientRect().height ?? 36;
+    const maxY = Math.max(gap, containerH - tooltipH - gap);
+    return Math.min(Math.max(rawY, gap), maxY);
+  };
+
   return (
-    <div className="relative inline-flex group">
+    <div
+      ref={containerRef}
+      className={className ?? 'relative inline-flex group'}
+      onMouseMove={(e) => {
+        const excluded = isExcluded(e.target);
+        setSuppressed(excluded);
+        if (excluded) return;
+        setTooltipY((prev) => {
+          if (prev !== null) return prev; // captured once — stays put while hovering
+          const rect = containerRef.current?.getBoundingClientRect();
+          return rect ? clampY(e.clientY - rect.top + 8) : prev;
+        });
+      }}
+      onMouseOut={(e) => {
+        const related = e.relatedTarget as Node | null;
+        if (!related || !containerRef.current?.contains(related)) {
+          setTooltipY(null);
+          setSuppressed(false);
+        }
+      }}
+    >
       {children}
-      <div className="pointer-events-none absolute right-0 top-full mt-[8px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20 whitespace-nowrap">
+      <div
+        ref={tooltipRef}
+        className="pointer-events-none absolute right-0 transition-opacity duration-150 z-20 whitespace-nowrap"
+        style={{ top: tooltipY ?? 0, opacity: visible ? 1 : 0 }}
+      >
         <div className="rounded-[6px] p-[12px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: '#3B5C79' }}>
           {label}
         </div>
@@ -728,7 +970,7 @@ function AudienceSection({ label, items, variant }: { label: string; items: stri
   );
 }
 
-function AudienceOverlay({ formData, onClose }: { formData: NonNullable<BroadcastMessageRow['formData']>; onClose: () => void }) {
+function AudienceOverlay({ formData, recipientCount, onClose }: { formData: NonNullable<BroadcastMessageRow['formData']>; recipientCount: number; onClose: () => void }) {
   const agencies = formData.statesOrAgencies ?? [];
   const packages = formData.packages ?? [];
   const roles = formData.roles ?? [];
@@ -760,6 +1002,9 @@ function AudienceOverlay({ formData, onClose }: { formData: NonNullable<Broadcas
             <IoIosClose size={26} color="#27496D" />
           </button>
         </div>
+        <p className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] text-[#585858] px-[16px] pt-[12px] shrink-0">
+          {recipientCount} {recipientCount === 1 ? 'recipient' : 'recipients'} will see this message
+        </p>
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-[16px] py-[16px] flex flex-col gap-[12px]">
           <AudienceSection label="Agencies" items={agencies} variant="agency" />
@@ -782,7 +1027,7 @@ function AudienceOverlay({ formData, onClose }: { formData: NonNullable<Broadcas
   );
 }
 
-function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete' }: { subject: string; onConfirm: () => void; onClose: () => void; mode?: 'delete' | 'discontinue' }) {
+function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete', isLive = true }: { subject: string; onConfirm: () => void; onClose: () => void; mode?: 'delete' | 'discontinue'; isLive?: boolean }) {
   const isDiscontinue = mode === 'discontinue';
   const verb = isDiscontinue ? 'discontinue' : 'delete';
   const actionLabel = isDiscontinue ? 'DISCONTINUE' : 'DELETE';
@@ -821,7 +1066,9 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete' }: 
         </div>
         <div className="flex-1 px-[16px] pt-[16px] pb-[24px]">
           <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px]" style={{ color: '#343434' }}>
-            You are about to {verb} the <span className="font-semibold">"{subject}"</span> message which is live right now. This will remove the announcement from all the recipients immediately.
+            {isLive
+              ? <>You are about to {verb} the <span className="font-semibold">"{subject}"</span> message which is live right now. This will remove the announcement from all the recipients immediately.</>
+              : <>You are about to {verb} the <span className="font-semibold">"{subject}"</span> message before it goes live. This will cancel it so it's never shown to any recipients.</>}
           </p>
         </div>
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderTop: '1px solid #CFCFCF', backgroundColor: '#f8f8f8', height: '60px' }}>
@@ -859,14 +1106,14 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
   onReject?: () => void;
 }) {
   const color = STATUS_COLOR[row.status];
-  const dateRange = row.startDate === '—' ? '—' : `${row.startDate} – ${row.endDate}`;
+  const dateRange = row.startDate === '—' ? '—' : row.endDate === '—' ? `${row.startDate} – Until stopped` : `${row.startDate} – ${row.endDate}`;
   const isSuperAdmin = role === 'super-admin';
   const isDraft = row.status === 'Draft';
   const isPending = row.status === 'Pending';
   const [showAudience, setShowAudience] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isButtonHovered, setIsButtonHovered] = useState(false);
+  const [isCardHovered, setIsCardHovered] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -883,29 +1130,46 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
   return (
     <>
     {showAudience && row.formData && (
-      <AudienceOverlay formData={row.formData} onClose={() => setShowAudience(false)} />
+      <AudienceOverlay formData={row.formData} recipientCount={getRecipientCount(row)} onClose={() => setShowAudience(false)} />
     )}
     {showDeleteConfirm && (
       <DeleteConfirmOverlay
         subject={row.subject}
         mode={row.status === 'Live' ? 'discontinue' : 'delete'}
+        isLive={isMessageCurrentlyLive(row)}
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={() => { setShowDeleteConfirm(false); row.status === 'Live' ? onDiscontinue?.() : onDelete?.(); }}
       />
     )}
-    <div className="bg-white rounded-[8px] border border-[#e5e5e5] flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+    <Tooltip label={getActionTooltip(row.status, role)} className="relative flex w-full group">
+    <div
+      className="bg-white rounded-[8px] border flex w-full cursor-pointer transition-colors duration-100"
+      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderColor: isCardHovered ? color : '#e5e5e5' }}
+      onClick={onEdit}
+      onMouseEnter={() => setIsCardHovered(true)}
+      onMouseLeave={() => setIsCardHovered(false)}
+    >
       <div className="flex flex-col gap-[10px] p-[14px] flex-1 min-w-0">
         <div className="flex items-start justify-between gap-[6px]">
           <div className="flex flex-col flex-1 min-w-0">
             <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px] text-[#000000]">{row.subject}</p>
-            {(row.type || dateRange !== '—') && (
-              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
-                {row.type}{row.type && dateRange !== '—' && <span> • </span>}{dateRange !== '—' && dateRange}
+            {(row.formData?.author || row.formData?.department) && (
+              <p className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
+                <MdPersonOutline size={13} color="#8b8b8b" />
+                {row.formData?.author}
+                {row.formData?.author && row.formData?.department && <span> · </span>}
+                {row.formData?.department}
+              </p>
+            )}
+            {dateRange !== '—' && (
+              <p className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
+                <MdDateRange size={13} color="#8b8b8b" />
+                {dateRange}
               </p>
             )}
           </div>
-          {(isDraft || row.status === 'Live') && (
-            <div className="relative shrink-0" ref={kebabRef}>
+          {(isDraft || (row.status === 'Live' && !isSuperAdmin)) && (
+            <div className="relative shrink-0" ref={kebabRef} data-no-tooltip onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 className="flex items-center justify-center w-[24px] h-[24px] rounded-[4px] cursor-pointer hover:bg-[#f2f2f2]"
@@ -923,13 +1187,8 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
                     className="flex items-center gap-[8px] w-full px-[12px] h-[36px] cursor-pointer hover:bg-[#EFEFEF]"
                     onClick={() => {
                       setShowKebab(false);
-                      if (row.status === 'Live' && row.startDate !== '—') {
-                        const today = new Date(); today.setHours(0, 0, 0, 0);
-                        const start = new Date(row.startDate);
-                        const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
-                        if (today >= start && today <= end) { setShowDeleteConfirm(true); return; }
-                      }
-                      row.status === 'Live' ? onDiscontinue?.() : onDelete?.();
+                      if (row.status === 'Live') { setShowDeleteConfirm(true); return; }
+                      onDelete?.();
                     }}
                   >
                     {row.status === 'Live' ? (
@@ -975,66 +1234,26 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
             const agencies = row.formData?.statesOrAgencies ?? [];
             const packages = row.formData?.packages ?? [];
             const roles = row.formData?.roles ?? [];
-            const count = agencies.length + packages.length + roles.length || (row.recipients ?? 0);
+            const count = getRecipientCount(row);
             if (count === 0) return <span />;
             const hasDetail = agencies.length > 0 || packages.length > 0 || roles.length > 0;
             return (
               <button
                 type="button"
-                className="flex items-center gap-[5px]"
+                className={`flex items-center gap-[5px] ${hasDetail ? 'group/recipients' : ''}`}
+                data-no-tooltip
                 style={{ cursor: hasDetail ? 'pointer' : 'default' }}
-                onClick={() => hasDetail && setShowAudience(true)}
+                onClick={(e) => { e.stopPropagation(); hasDetail && setShowAudience(true); }}
               >
                 <MdOutlineGroup size={15} color="#27496D" />
-                <span className="font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px]" style={{ color: '#27496D' }}>{count} {count === 1 ? 'Recipient' : 'Recipients'}</span>
+                <span className={`font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px] text-[#27496d] transition-colors ${hasDetail ? 'group-hover/recipients:text-[#2699fb] group-hover/recipients:underline' : ''}`}>{count} {count === 1 ? 'Recipient' : 'Recipients'}</span>
               </button>
             );
           })()}
-          {isDraft && (
-            <Tooltip label={getActionTooltip('Draft', role)}>
-              <button
-                type="button"
-                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
-                style={{ color: isButtonHovered ? 'white' : color, borderColor: color, backgroundColor: isButtonHovered ? color : 'white' }}
-                onMouseEnter={() => setIsButtonHovered(true)}
-                onMouseLeave={() => setIsButtonHovered(false)}
-                onClick={onEdit}
-              >
-                Edit
-              </button>
-            </Tooltip>
-          )}
-          {isPending && (
-            <Tooltip label={getActionTooltip('Pending', role)}>
-              <button
-                type="button"
-                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
-                style={{ color: isButtonHovered ? 'white' : color, borderColor: color, backgroundColor: isButtonHovered ? color : 'white' }}
-                onMouseEnter={() => setIsButtonHovered(true)}
-                onMouseLeave={() => setIsButtonHovered(false)}
-                onClick={onEdit}
-              >
-                Review
-              </button>
-            </Tooltip>
-          )}
-          {row.status === 'Live' && (
-            <Tooltip label={getActionTooltip('Live', role)}>
-              <button
-                type="button"
-                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
-                style={{ color: isButtonHovered ? 'white' : color, borderColor: color, backgroundColor: isButtonHovered ? color : 'white' }}
-                onMouseEnter={() => setIsButtonHovered(true)}
-                onMouseLeave={() => setIsButtonHovered(false)}
-                onClick={onEdit}
-              >
-                View
-              </button>
-            </Tooltip>
-          )}
         </div>
       </div>
     </div>
+    </Tooltip>
     </>
   );
 }
@@ -1045,9 +1264,9 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
   onView: () => void;
   onDelete: () => void;
 }) {
-  const dateRange = row.startDate === '—' ? '—' : `${row.startDate} – ${row.endDate}`;
+  const dateRange = row.startDate === '—' ? '—' : row.endDate === '—' ? `${row.startDate} – Until stopped` : `${row.startDate} – ${row.endDate}`;
   const bucketColor = BUCKET_COLOR[bucket];
-  const [viewHovered, setViewHovered] = useState(false);
+  const [isCardHovered, setIsCardHovered] = useState(false);
   const [showAudience, setShowAudience] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -1068,7 +1287,7 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
   return (
     <>
     {showAudience && row.formData && (
-      <AudienceOverlay formData={row.formData} onClose={() => setShowAudience(false)} />
+      <AudienceOverlay formData={row.formData} recipientCount={getRecipientCount(row)} onClose={() => setShowAudience(false)} />
     )}
     {showDeleteConfirm && (
       <PermanentDeleteOverlay
@@ -1077,21 +1296,33 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
         onConfirm={() => { setShowDeleteConfirm(false); onDelete(); }}
       />
     )}
-    <div className="bg-white rounded-[8px] border border-[#e5e5e5] flex" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+    <div
+      className="bg-white rounded-[8px] border flex w-full cursor-pointer transition-colors duration-100"
+      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderColor: isCardHovered ? bucketColor : '#e5e5e5' }}
+      onClick={onView}
+      onMouseEnter={() => setIsCardHovered(true)}
+      onMouseLeave={() => setIsCardHovered(false)}
+    >
       <div className="flex flex-col gap-[10px] p-[14px] flex-1 min-w-0">
         <div className="flex items-start justify-between gap-[6px]">
           <div className="flex flex-col flex-1 min-w-0">
             <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px] text-[#000000]">{row.subject}</p>
-            {(row.type || dateRange !== '—') && (
-              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
-                {row.type}{row.type && dateRange !== '—' && <span> • </span>}{dateRange !== '—' && dateRange}
+            {(row.formData?.author || row.formData?.department) && (
+              <p className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
+                <MdPersonOutline size={13} color="#8b8b8b" />
+                {row.formData?.author}
+                {row.formData?.author && row.formData?.department && <span> · </span>}
+                {row.formData?.department}
               </p>
             )}
-            <p className="font-['Montserrat',sans-serif] font-normal text-[11px] leading-[15px] text-[#b8b8b8] mt-[2px]">
-              Auto-deletes in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}
-            </p>
+            {dateRange !== '—' && (
+              <p className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
+                <MdDateRange size={13} color="#8b8b8b" />
+                {dateRange}
+              </p>
+            )}
           </div>
-          <div className="relative shrink-0" ref={kebabRef}>
+          <div className="relative shrink-0" ref={kebabRef} onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               className="flex items-center justify-center w-[24px] h-[24px] rounded-[4px] cursor-pointer hover:bg-[#f2f2f2]"
@@ -1121,31 +1352,24 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
             const agencies = row.formData?.statesOrAgencies ?? [];
             const packages = row.formData?.packages ?? [];
             const roles = row.formData?.roles ?? [];
-            const count = agencies.length + packages.length + roles.length || (row.recipients ?? 0);
+            const count = getRecipientCount(row);
             if (count === 0) return <span />;
             const hasDetail = agencies.length > 0 || packages.length > 0 || roles.length > 0;
             return (
               <button
                 type="button"
-                className="flex items-center gap-[5px]"
+                className={`flex items-center gap-[5px] ${hasDetail ? 'group/recipients' : ''}`}
                 style={{ cursor: hasDetail ? 'pointer' : 'default' }}
-                onClick={() => hasDetail && setShowAudience(true)}
+                onClick={(e) => { e.stopPropagation(); hasDetail && setShowAudience(true); }}
               >
                 <MdOutlineGroup size={15} color="#27496D" />
-                <span className="font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px]" style={{ color: '#27496D' }}>{count} {count === 1 ? 'Recipient' : 'Recipients'}</span>
+                <span className={`font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px] text-[#27496d] transition-colors ${hasDetail ? 'group-hover/recipients:text-[#2699fb] group-hover/recipients:underline' : ''}`}>{count} {count === 1 ? 'Recipient' : 'Recipients'}</span>
               </button>
             );
           })()}
-          <button
-            type="button"
-            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[13px] px-[12px] py-[8px] rounded-[6px] border transition-colors duration-100 cursor-pointer"
-            style={{ color: viewHovered ? 'white' : bucketColor, borderColor: bucketColor, backgroundColor: viewHovered ? bucketColor : 'white' }}
-            onMouseEnter={() => setViewHovered(true)}
-            onMouseLeave={() => setViewHovered(false)}
-            onClick={onView}
-          >
-            View
-          </button>
+          <p className="font-['Montserrat',sans-serif] font-normal text-[11px] leading-[15px] text-[#b8b8b8] shrink-0">
+            Auto-deletes in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}
+          </p>
         </div>
       </div>
     </div>
@@ -1220,7 +1444,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
   return (
     <div className="flex gap-[16px] w-full items-start">
       {KANBAN_COLUMNS.map(({ status, label }) => {
-        const colRows = rows.filter((r) => r.status === status && getDiscardedBucket(r) === null);
+        const colRows = rows.filter((r) => r.status === status && getDiscardedBucket(r) === null && isDraftVisibleToRole(r, role));
         const color = STATUS_COLOR[status];
         return (
           <div key={status} className="flex flex-col gap-[10px] flex-1 min-w-0 bg-[#fcfcfc] rounded-[10px] p-[12px]">
@@ -1270,7 +1494,7 @@ function MessagePreviewModal({ row, onClose }: {
   const body = row.formData?.body || row.subject;
   const hasCta = row.formData?.hasCta ?? false;
   const ctaLabel = row.formData?.ctaLabel || 'Learn more';
-  const dismissible = !isEmergency && row.formData?.dismissible !== 'Non-Dismissible';
+  const dismissible = row.formData?.dismissible !== 'Non-Dismissible';
   const isFeatureSpecific = row.formData?.placement === 'Feature Specific';
   const featurePath = row.formData?.featurePath || '';
 
@@ -1296,7 +1520,9 @@ function MessagePreviewModal({ row, onClose }: {
           <div className="flex items-center justify-between px-[20px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', height: '56px' }}>
             <div className="flex flex-col gap-[4px]">
               <p className="font-['Montserrat',sans-serif] font-semibold text-[15px] leading-[20px] text-black">Message Preview</p>
-              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[16px]" style={{ color: '#8b8b8b' }}>{row.subject}</p>
+              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[16px]" style={{ color: '#8b8b8b' }}>
+                {[row.subject, row.formData?.author, row.formData?.department].filter(Boolean).join(' · ')}
+              </p>
             </div>
             <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
               <IoIosClose size={26} color="#27496D" />
@@ -1315,14 +1541,6 @@ function MessagePreviewModal({ row, onClose }: {
                   {statusChipText}
                 </span>
               )}
-              {row.type && (
-                <span
-                  className="flex items-center font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
-                  style={{ backgroundColor: chipBg, color: chipColor }}
-                >
-                  {row.type}
-                </span>
-              )}
               {placementChips.map((chip) => (
                 <span
                   key={chip}
@@ -1332,6 +1550,15 @@ function MessagePreviewModal({ row, onClose }: {
                   {chip}
                 </span>
               ))}
+              {effectiveFormat === 'Banner' && row.formData?.pushNotification && (
+                <span
+                  className="flex items-center gap-[4px] font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
+                  style={{ backgroundColor: chipBg, color: chipColor }}
+                >
+                  <MdOutlineNotificationsActive size={12} />
+                  Push Notification
+                </span>
+              )}
             </div>
             <div className="flex items-center rounded-[6px] border border-[#e5e5e5] bg-white overflow-hidden shrink-0">
               <button type="button" onClick={() => setDeviceView('desktop')} className="flex items-center justify-center w-[32px] h-[32px] transition-colors duration-150" style={{ backgroundColor: deviceView === 'desktop' ? '#27496d' : 'white' }} title="Desktop view">
@@ -1360,8 +1587,7 @@ function MessagePreviewModal({ row, onClose }: {
   );
 }
 
-export default function BroadcastStudioDashboard() {
-  const [role, setRole] = useRole();
+export default function BroadcastStudioDashboard({ role, onRoleChange }: { role: UserRole; onRoleChange: (next: UserRole) => void }) {
 
   useEffect(() => {
     document.title = role === 'executive-approver' ? 'BS - Executive Approver' : 'BS - Super Admin';
@@ -1417,6 +1643,7 @@ export default function BroadcastStudioDashboard() {
       endDate: '—',
       recipients: null,
       statusChangedAt: undefined,
+      authorRole: role,
     };
     setMessages((prev) => [draft, ...prev]);
     setSelectedStatus('Draft');
@@ -1444,7 +1671,7 @@ export default function BroadcastStudioDashboard() {
 
   const liveCount = messages.filter((m) => m.status === 'Live' && getDiscardedBucket(m) === null).length;
   const pendingCount = messages.filter((m) => m.status === 'Pending').length;
-  const draftCount = messages.filter((m) => m.status === 'Draft').length;
+  const draftCount = messages.filter((m) => m.status === 'Draft' && m.authorRole === role).length;
 
   const query = search.trim().toLowerCase();
   const searchFiltered = messages.filter(
@@ -1454,7 +1681,7 @@ export default function BroadcastStudioDashboard() {
       row.audience.toLowerCase().includes(query)
   );
 
-  const filteredRows = searchFiltered.filter((row) => row.status === selectedStatus);
+  const filteredRows = searchFiltered.filter((row) => row.status === selectedStatus && isDraftVisibleToRole(row, role));
 
   return (
     <div className="flex flex-col gap-[20px] items-start w-full pb-[8px]" data-name="Broadcast Studio Dashboard">
@@ -1470,8 +1697,8 @@ export default function BroadcastStudioDashboard() {
 
       <div className="flex items-center gap-[12px] w-full">
         <SearchInput value={search} onChange={setSearch} />
-        <NewMessageButton onClick={() => setIsComposeOpen(true)} />
         <ShowDiscardedToggle checked={showDiscarded} onChange={setShowDiscarded} />
+        <NewMessageButton onClick={() => setIsComposeOpen(true)} />
         <div className="flex-1" />
         {SHOW_VIEW_TOGGLE && <ViewToggle view={viewMode} onChange={setViewMode} />}
       </div>
@@ -1509,6 +1736,7 @@ export default function BroadcastStudioDashboard() {
         <ComposeMessageOverlay
           onClose={() => setEditingRow(null)}
           overlayTitle="Edit Message"
+          submitLabel={role === 'executive-approver' ? 'Publish' : 'Send for Approval'}
           initialData={{
             title: editingRow.subject,
             messageType: editingRow.type,
@@ -1534,6 +1762,7 @@ export default function BroadcastStudioDashboard() {
               startDate: data.startDate ? formatDisplayDate(data.startDate) : '—',
               endDate: data.endDate ? formatDisplayDate(data.endDate) : '—',
               recipients: null,
+              authorRole: role,
               formData: data,
             }, ...prev.filter((m) => m.id !== editingRow!.id)]);
             setSelectedStatus('Draft');
@@ -1585,12 +1814,13 @@ export default function BroadcastStudioDashboard() {
         />
       )}
 
-      <RoleToggle role={role} onChange={setRole} />
+      <RoleToggle role={role} onChange={onRoleChange} />
 
       {isComposeOpen && (
         <ComposeMessageOverlay
           onClose={() => setIsComposeOpen(false)}
           onMessageCreated={handleMessageCreated}
+          currentUserName={getUserIdentity(role).name}
           submitLabel={role === 'executive-approver' ? 'Publish' : 'Send for Approval'}
           onSaveAsDraft={(data) => {
             const agencies = data.statesOrAgencies ?? [];
@@ -1606,6 +1836,7 @@ export default function BroadcastStudioDashboard() {
                 startDate: data.startDate ? formatDisplayDate(data.startDate) : '—',
                 endDate: data.endDate ? formatDisplayDate(data.endDate) : '—',
                 recipients: null,
+                authorRole: role,
                 formData: data,
               },
               ...prev,

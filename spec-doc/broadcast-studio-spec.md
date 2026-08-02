@@ -91,6 +91,7 @@ Three columns: **Drafts**, **Pending Approval**, **Approved**. Each column heade
 - **AC1** Given messages exist, each appears in the column matching its status (Draft → Drafts, Pending → Pending Approval, Live → Approved).
 - **AC2** Given a column has no messages, it shows the "No messages" empty state and a count of 0.
 - **AC3** The board and its actions are identical across roles except where noted in §4.6.
+- **AC4** **Drafts are private to their author.** A draft is only visible to the same role that created it — a draft saved while viewing as Super Admin does not appear in the Drafts column (or its count) while viewing as Executive Approver, and vice versa. Pending and Approved are shared across roles as before; only Draft is scoped. In the prototype, "author" is approximated by the create-time role (there are no individual user accounts to tag) — see the build note in §6.
 
 ### 4.2 Message card
 Card shows subject, type + date range, a recipient count, and a primary action. Approved cards show a **Live** (green) or **Scheduled** (blue) chip based on today's date vs the message's start/end.
@@ -164,6 +165,7 @@ A "Viewing as" control fixed to the bottom-left of the screen: the label sits ab
 - **"Preview on my screen"** — a possible second action that renders the real banner/overlay live in the reviewer's *own* session (scoped to the current user), with a forced exit (floating "Exit preview" control + Esc + navigate-clear) so non-dismissable banners don't trap. Not yet built.
 - Confirm real data sources for Agencies / Packages / Roles / Feature Paths.
 - Confirm analytics/metrics (open rate, click rate) requirements — currently stubbed and hidden.
+- **Draft privacy needs real per-user scoping, not per-role (build note).** The prototype has no individual user accounts — only a Super Admin / Executive Approver role toggle (§4.9) — so §4.1 AC4 approximates "private to the author" as "private to the author's role." In production there will be many individual Super Admins (and Executive Approvers); each one's drafts must be private to *them*, not visible to every other user sharing their role. When real auth/user accounts land, drafts should be scoped to the authenticated user's id, not their role.
 
 ---
 
