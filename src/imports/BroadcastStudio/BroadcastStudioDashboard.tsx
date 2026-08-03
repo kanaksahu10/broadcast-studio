@@ -1599,7 +1599,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
               </div>
               <span
                 className="font-['Montserrat',sans-serif] font-medium text-[11px] rounded-full px-[7px] py-[2px]"
-                style={isPending ? { backgroundColor: '#FF8800', color: '#FFFFFF' } : { backgroundColor: '#efefef', color: '#9a9a9a' }}
+                style={isPending ? { backgroundColor: '#FEFAD1', color: '#FF8800' } : { backgroundColor: '#efefef', color: '#9a9a9a' }}
               >
                 {colRows.length}
               </span>
