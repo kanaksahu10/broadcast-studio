@@ -1231,6 +1231,9 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
         })()}
         <div className="flex items-center justify-between gap-[8px]">
           {(() => {
+            // Recipient count only means something once a message is approved and
+            // actually delivering — on Drafts and Pending the audience isn't final yet.
+            if (row.status !== 'Live') return <span />;
             const agencies = row.formData?.statesOrAgencies ?? [];
             const packages = row.formData?.packages ?? [];
             const roles = row.formData?.roles ?? [];
@@ -1267,7 +1270,6 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
   const dateRange = row.startDate === '—' ? '—' : row.endDate === '—' ? `${row.startDate} – Until stopped` : `${row.startDate} – ${row.endDate}`;
   const bucketColor = BUCKET_COLOR[bucket];
   const [isCardHovered, setIsCardHovered] = useState(false);
-  const [showAudience, setShowAudience] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
@@ -1286,9 +1288,6 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
 
   return (
     <>
-    {showAudience && row.formData && (
-      <AudienceOverlay formData={row.formData} recipientCount={getRecipientCount(row)} onClose={() => setShowAudience(false)} />
-    )}
     {showDeleteConfirm && (
       <PermanentDeleteOverlay
         subject={row.subject}
@@ -1347,26 +1346,8 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
             )}
           </div>
         </div>
-        <div className="flex items-center justify-between gap-[8px]">
-          {(() => {
-            const agencies = row.formData?.statesOrAgencies ?? [];
-            const packages = row.formData?.packages ?? [];
-            const roles = row.formData?.roles ?? [];
-            const count = getRecipientCount(row);
-            if (count === 0) return <span />;
-            const hasDetail = agencies.length > 0 || packages.length > 0 || roles.length > 0;
-            return (
-              <button
-                type="button"
-                className={`flex items-center gap-[5px] ${hasDetail ? 'group/recipients' : ''}`}
-                style={{ cursor: hasDetail ? 'pointer' : 'default' }}
-                onClick={(e) => { e.stopPropagation(); hasDetail && setShowAudience(true); }}
-              >
-                <MdOutlineGroup size={15} color="#27496D" />
-                <span className={`font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px] text-[#27496d] transition-colors ${hasDetail ? 'group-hover/recipients:text-[#2699fb] group-hover/recipients:underline' : ''}`}>{count} {count === 1 ? 'Recipient' : 'Recipients'}</span>
-              </button>
-            );
-          })()}
+        {/* Discarded messages aren't delivering, so the recipient count is dropped here. */}
+        <div className="flex items-center justify-end gap-[8px]">
           <p className="font-['Montserrat',sans-serif] font-normal text-[11px] leading-[15px] text-[#b8b8b8] shrink-0">
             Auto-deletes in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}
           </p>
