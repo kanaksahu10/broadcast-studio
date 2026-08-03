@@ -4,7 +4,7 @@ import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs
 import { IoIosClose } from 'react-icons/io';
 import { MdAdd, MdApps, MdBlock, MdBusiness, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
-import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextField } from './ComposeMessageOverlay';
+import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField } from './ComposeMessageOverlay';
 import { getUserIdentity, type UserRole } from './userIdentity';
 
 // Prototype affordance: switch the viewer's role in one click (no URL editing).
@@ -1072,10 +1072,10 @@ function RejectConfirmOverlay({ subject, onConfirm, onClose }: { subject: string
           </button>
         </div>
         <div className="flex-1 px-[16px] pt-[16px] pb-[24px] flex flex-col gap-[16px]">
-          <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px]" style={{ color: '#343434' }}>
+          <p className="font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px]" style={{ color: '#343434' }}>
             You are about to reject the <span className="font-semibold">"{subject}"</span> message. It will move to the Rejected bucket and the author can copy it back to Drafts to revise it.
           </p>
-          <TextField
+          <TextAreaField
             label="Reason"
             value={reason}
             onChange={setReason}

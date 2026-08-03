@@ -143,7 +143,7 @@ export function TextField({ label, value, onChange, placeholder, disabled }: { l
   );
 }
 
-function TextAreaField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
+export function TextAreaField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
