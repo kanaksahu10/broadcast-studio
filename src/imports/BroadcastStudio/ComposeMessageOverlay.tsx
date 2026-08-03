@@ -3,7 +3,7 @@ import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdOutlineContentCopy } from 'react-icons/md';
+import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdOutlineContentCopy, MdError } from 'react-icons/md';
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
@@ -1165,7 +1165,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts, currentUserName }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts, currentUserName, rejectionReason }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -1179,6 +1179,8 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   onCopyToDrafts?: () => void;
   /** Whoever is composing — stamped as the author on a brand-new message. */
   currentUserName?: string;
+  /** Approver's note from rejecting this message — surfaced as a banner above Author Details. */
+  rejectionReason?: string;
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [title, setTitle] = useState(initialData?.title ?? '');
@@ -1275,6 +1277,19 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
         {/* Scrollable form, fixed 399px — left by default, right if PREVIEW_ON_LEFT */}
         <div style={{ width: '399px', minWidth: '399px', maxWidth: '399px', overflowY: 'auto', [PREVIEW_ON_LEFT ? 'borderLeft' : 'borderRight']: `1px solid ${BORDER}`, position: 'relative', order: PREVIEW_ON_LEFT ? 2 : 1 }} className="p-[24px] flex flex-col gap-[16px]">
           {readOnly && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} />}
+
+          {rejectionReason && (
+            <div
+              className="flex items-start gap-[8px] rounded-[4px] border px-[12px] py-[10px]"
+              style={{ backgroundColor: '#FFE9E9', borderColor: '#DDB6B6' }}
+            >
+              <MdError size={16} color="#DA4040" className="shrink-0 mt-[1px]" />
+              <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: '#DA4040' }}>
+                <span className="font-semibold">Reject Reason: </span>
+                {rejectionReason}
+              </p>
+            </div>
+          )}
 
           {/* Author Details card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
