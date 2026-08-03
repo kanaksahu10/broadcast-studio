@@ -129,7 +129,7 @@ function StaticField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function TextField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
+export function TextField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
   return (
     <FieldShell label={label} disabled={disabled}>
       <input
