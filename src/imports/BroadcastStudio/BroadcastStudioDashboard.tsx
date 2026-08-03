@@ -1586,21 +1586,13 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
       {KANBAN_COLUMNS.map(({ status, label }) => {
         const colRows = rows.filter((r) => r.status === status && getDiscardedBucket(r) === null && isDraftVisibleToRole(r, role));
         const color = STATUS_COLOR[status];
-        // Pending's counter badge uses Warning bg/text to draw the eye;
-        // every column keeps the same neutral background.
-        const isPending = status === 'Pending';
         return (
           <div key={status} className="flex flex-col gap-[10px] flex-1 min-w-0 bg-[#fcfcfc] rounded-[10px] p-[12px]">
             <div className="flex items-center justify-between px-[2px]">
               <div className="flex items-center gap-[7px]">
                 <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{label}</span>
               </div>
-              <span
-                className="font-['Montserrat',sans-serif] font-medium text-[11px] rounded-full px-[7px] py-[2px]"
-                style={isPending ? { backgroundColor: '#FEFAD1', color: '#FF8800' } : { backgroundColor: '#efefef', color: '#9a9a9a' }}
-              >
-                {colRows.length}
-              </span>
+              <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
             </div>
             <div className="flex flex-col gap-[8px]">
               {colRows.length === 0 ? (
