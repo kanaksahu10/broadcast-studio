@@ -3,7 +3,8 @@ import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose } from 'react-icons/io';
 import { MdAdd, MdApps, MdBlock, MdBusiness, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
-import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount } from './ComposeMessageOverlay';
+import { FaRegTimesCircle } from 'react-icons/fa';
+import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField } from './ComposeMessageOverlay';
 import { getUserIdentity, type UserRole } from './userIdentity';
 
 // Prototype affordance: switch the viewer's role in one click (no URL editing).
@@ -77,12 +78,14 @@ interface BroadcastMessageRow {
    * scope drafts to the individual author, since many people can share a role.
    */
   authorRole?: UserRole;
+  /** Optional note the approver left when rejecting. Only set on rejected messages. */
+  rejectionReason?: string;
 }
 
 const STATUS_COLOR: Record<MessageStatus, string> = {
   Live: '#00aa00',
   Pending: '#ff8800',
-  Draft: '#8a8a8a',
+  Draft: '#787774', // Tag/Grey text-border token
   Rejected: '#DA4040',
   Discontinued: '#FC7F15',
 };
@@ -90,7 +93,7 @@ const STATUS_COLOR: Record<MessageStatus, string> = {
 const STATUS_BG: Record<MessageStatus, string> = {
   Live: '#eeffee',
   Pending: '#fefad1',
-  Draft: '#f0f0f0',
+  Draft: '#F1F1EF', // Tag/Grey background token
   Rejected: '#fdeaea',
   Discontinued: '#fef1e4',
 };
@@ -406,6 +409,86 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       statesOrAgencies: ['Windy City Homecare'],
       packages: [],
       roles: [],
+    },
+  },
+  {
+    id: 'seed-p5',
+    subject: 'Fall Enrollment Campaign Kickoff',
+    type: 'Announcement',
+    audience: 'Brooklyn Senior Services +1',
+    channel: 'Email',
+    status: 'Pending',
+    startDate: 'Sep 1, 2026',
+    endDate: 'Sep 30, 2026',
+    recipients: 1540,
+    formData: {
+      author: 'John Doe',
+      department: 'Marketing',
+      body: 'Open enrollment kicks off next month — remind your team to complete their benefits selections before the deadline.',
+      reason: 'Enrollment campaign',
+      displayFormat: 'Overlay',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: true,
+      ctaLabel: 'Start enrollment',
+      ctaDestination: '#',
+      statesOrAgencies: ['Brooklyn Senior Services', 'Cascade Caregivers'],
+      packages: [],
+      roles: [],
+    },
+  },
+  {
+    id: 'seed-p6',
+    subject: 'Service Outage — East Coast Region',
+    type: 'Emergency',
+    audience: 'All',
+    channel: 'Push',
+    status: 'Pending',
+    startDate: 'Aug 12, 2026',
+    endDate: 'Aug 12, 2026',
+    recipients: 4300,
+    formData: {
+      author: 'John Doe',
+      department: 'Customer Success',
+      body: 'We are aware of a service disruption affecting East Coast agencies and are actively working on a fix. Updates to follow.',
+      reason: 'Active incident',
+      displayFormat: 'Banner',
+      placement: 'Global',
+      messageColor: '#DA4040',
+      dismissible: 'Non-Dismissible',
+      hasCta: false,
+      pushNotification: true,
+      statesOrAgencies: [],
+      packages: [],
+      roles: [],
+    },
+  },
+  {
+    id: 'seed-p7',
+    subject: 'Updated Data Retention Policy',
+    type: 'Announcement',
+    audience: 'Everglades Health Network',
+    channel: 'Email',
+    status: 'Pending',
+    startDate: 'Aug 25, 2026',
+    endDate: 'Sep 8, 2026',
+    recipients: 780,
+    formData: {
+      author: 'John Doe',
+      department: 'Admin Services',
+      body: 'Our data retention policy has been updated to align with new state requirements. Review the changes before they take effect.',
+      reason: 'Policy update',
+      displayFormat: 'Overlay',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: true,
+      ctaLabel: 'Read the policy',
+      ctaDestination: '#',
+      statesOrAgencies: ['Everglades Health Network'],
+      packages: [],
+      roles: ['Administrator'],
     },
   },
 
@@ -1027,6 +1110,82 @@ function AudienceOverlay({ formData, recipientCount, onClose }: { formData: NonN
   );
 }
 
+/**
+ * Approver-facing reject step. Mirrors DeleteConfirmOverlay so every
+ * destructive confirmation in the board looks the same, with an optional
+ * reason the approver can leave for the author.
+ *
+ * Sits above the Review overlay (z-60 vs z-50) so the message stays visible
+ * behind it while the approver types.
+ */
+function RejectConfirmOverlay({ subject, onConfirm, onClose }: { subject: string; onConfirm: (reason: string) => void; onClose: () => void }) {
+  const [reason, setReason] = useState('');
+  const [mounted, setMounted] = useState(false);
+  const [closing, setClosing] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const handleClose = () => {
+    setClosing(true);
+    setTimeout(onClose, 300);
+  };
+  const handleConfirm = () => {
+    setClosing(true);
+    setTimeout(() => onConfirm(reason.trim()), 300);
+  };
+  return (
+    <div className="fixed inset-0 z-[60]">
+      <div
+        className="absolute inset-0"
+        style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
+        onClick={handleClose}
+      />
+      <div
+        className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
+        style={{ transform: mounted && !closing ? 'translateX(0)' : 'translateX(100%)' }}
+      >
+        <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
+          <p className="font-['Montserrat',sans-serif] font-medium text-[15px] leading-[21px] text-black">Reject Message</p>
+          <button type="button" onClick={handleClose} className="cursor-pointer flex items-center">
+            <IoIosClose size={26} color="#27496D" />
+          </button>
+        </div>
+        <div className="flex-1 px-[16px] pt-[16px] pb-[24px] flex flex-col gap-[16px]">
+          <p className="font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px]" style={{ color: '#343434' }}>
+            You are about to reject the <span className="font-semibold">"{subject}"</span> message. It will move to the Rejected bucket and the author can copy it back to Drafts to revise it.
+          </p>
+          <TextAreaField
+            label="Reason"
+            value={reason}
+            onChange={setReason}
+            placeholder="Optional — shared with the author"
+          />
+        </div>
+        <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderTop: '1px solid #CFCFCF', backgroundColor: '#f8f8f8', height: '60px' }}>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px]"
+            style={{ color: '#27496D' }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] cursor-pointer px-[12px] py-[8px] rounded-[8px] border flex items-center gap-[6px]"
+            style={{ color: '#DA4040', borderColor: '#DA4040', backgroundColor: '#fdeaea' }}
+          >
+            <FaRegTimesCircle size={15} color="#DA4040" />
+            REJECT
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete', isLive = true }: { subject: string; onConfirm: () => void; onClose: () => void; mode?: 'delete' | 'discontinue'; isLive?: boolean }) {
   const isDiscontinue = mode === 'discontinue';
   const verb = isDiscontinue ? 'discontinue' : 'delete';
@@ -1231,6 +1390,9 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
         })()}
         <div className="flex items-center justify-between gap-[8px]">
           {(() => {
+            // Recipient count only means something once a message is approved and
+            // actually delivering — on Drafts and Pending the audience isn't final yet.
+            if (row.status !== 'Live') return <span />;
             const agencies = row.formData?.statesOrAgencies ?? [];
             const packages = row.formData?.packages ?? [];
             const roles = row.formData?.roles ?? [];
@@ -1267,7 +1429,6 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
   const dateRange = row.startDate === '—' ? '—' : row.endDate === '—' ? `${row.startDate} – Until stopped` : `${row.startDate} – ${row.endDate}`;
   const bucketColor = BUCKET_COLOR[bucket];
   const [isCardHovered, setIsCardHovered] = useState(false);
-  const [showAudience, setShowAudience] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
@@ -1286,9 +1447,6 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
 
   return (
     <>
-    {showAudience && row.formData && (
-      <AudienceOverlay formData={row.formData} recipientCount={getRecipientCount(row)} onClose={() => setShowAudience(false)} />
-    )}
     {showDeleteConfirm && (
       <PermanentDeleteOverlay
         subject={row.subject}
@@ -1347,26 +1505,8 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
             )}
           </div>
         </div>
-        <div className="flex items-center justify-between gap-[8px]">
-          {(() => {
-            const agencies = row.formData?.statesOrAgencies ?? [];
-            const packages = row.formData?.packages ?? [];
-            const roles = row.formData?.roles ?? [];
-            const count = getRecipientCount(row);
-            if (count === 0) return <span />;
-            const hasDetail = agencies.length > 0 || packages.length > 0 || roles.length > 0;
-            return (
-              <button
-                type="button"
-                className={`flex items-center gap-[5px] ${hasDetail ? 'group/recipients' : ''}`}
-                style={{ cursor: hasDetail ? 'pointer' : 'default' }}
-                onClick={(e) => { e.stopPropagation(); hasDetail && setShowAudience(true); }}
-              >
-                <MdOutlineGroup size={15} color="#27496D" />
-                <span className={`font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px] text-[#27496d] transition-colors ${hasDetail ? 'group-hover/recipients:text-[#2699fb] group-hover/recipients:underline' : ''}`}>{count} {count === 1 ? 'Recipient' : 'Recipients'}</span>
-              </button>
-            );
-          })()}
+        {/* Discarded messages aren't delivering, so the recipient count is dropped here. */}
+        <div className="flex items-center justify-end gap-[8px]">
           <p className="font-['Montserrat',sans-serif] font-normal text-[11px] leading-[15px] text-[#b8b8b8] shrink-0">
             Auto-deletes in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}
           </p>
@@ -1601,6 +1741,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
   const [showDiscarded, setShowDiscarded] = useState(false);
   const [editingRow, setEditingRow] = useState<BroadcastMessageRow | null>(null);
   const [reviewingRow, setReviewingRow] = useState<BroadcastMessageRow | null>(null);
+  const [rejectingRow, setRejectingRow] = useState<BroadcastMessageRow | null>(null);
   const [viewingRow, setViewingRow] = useState<BroadcastMessageRow | null>(null);
   const [viewingDiscardedRow, setViewingDiscardedRow] = useState<{ row: BroadcastMessageRow; bucket: DiscardedBucket } | null>(null);
 
@@ -1626,8 +1767,10 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Live' } : m));
   };
 
-  const handleReject = (id: string) => {
-    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Rejected', statusChangedAt: new Date().toISOString() } : m));
+  const handleReject = (id: string, reason?: string) => {
+    setMessages((prev) => prev.map((m) => m.id === id
+      ? { ...m, status: 'Rejected', statusChangedAt: new Date().toISOString(), ...(reason ? { rejectionReason: reason } : {}) }
+      : m));
   };
 
   const handleDiscontinue = (id: string) => {
@@ -1778,7 +1921,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           readOnly={role !== 'executive-approver'}
           {...(role === 'executive-approver' ? {
             onApprove: () => { handleApprove(reviewingRow.id); setReviewingRow(null); },
-            onReject: () => { handleReject(reviewingRow.id); setReviewingRow(null); },
+            onReject: () => setRejectingRow(reviewingRow),
           } : {})}
           initialData={{
             title: reviewingRow.subject,
@@ -1786,6 +1929,18 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
             startDate: parseDisplayDate(reviewingRow.startDate),
             endDate: parseDisplayDate(reviewingRow.endDate),
             ...reviewingRow.formData,
+          }}
+        />
+      )}
+
+      {rejectingRow && (
+        <RejectConfirmOverlay
+          subject={rejectingRow.subject}
+          onClose={() => setRejectingRow(null)}
+          onConfirm={(reason) => {
+            handleReject(rejectingRow.id, reason);
+            setRejectingRow(null);
+            setReviewingRow(null);
           }}
         />
       )}
@@ -1802,6 +1957,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           onClose={() => setViewingDiscardedRow(null)}
           overlayTitle={`${viewingDiscardedRow.bucket} Message`}
           readOnly
+          rejectionReason={viewingDiscardedRow.row.rejectionReason}
           initialData={{
             title: viewingDiscardedRow.row.subject,
             messageType: viewingDiscardedRow.row.type,

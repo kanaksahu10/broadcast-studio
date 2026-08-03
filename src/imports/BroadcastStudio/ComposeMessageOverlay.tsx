@@ -8,7 +8,7 @@ import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
 import { GrAnnounce } from 'react-icons/gr';
-import { RiDeleteBinLine, RiCheckLine } from 'react-icons/ri';
+import { RiDeleteBinLine, RiCheckLine, RiErrorWarningLine } from 'react-icons/ri';
 
 type MessageType = '' | 'Announcement' | 'Emergency';
 type DisplayFormat = '' | 'Overlay' | 'Banner';
@@ -121,15 +121,7 @@ function FieldShell({ label, height, disabled, open, children }: { label: string
   );
 }
 
-function StaticField({ label, value }: { label: string; value: string }) {
-  return (
-    <FieldShell label={label} disabled>
-      <p className="font-['Montserrat',sans-serif] font-normal text-[13px]" style={{ color: '#000000' }}>{value}</p>
-    </FieldShell>
-  );
-}
-
-function TextField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
+export function TextField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
   return (
     <FieldShell label={label} disabled={disabled}>
       <input
@@ -143,7 +135,7 @@ function TextField({ label, value, onChange, placeholder, disabled }: { label: s
   );
 }
 
-function TextAreaField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
+export function TextAreaField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -1165,7 +1157,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts, currentUserName }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts, currentUserName, rejectionReason }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -1179,6 +1171,8 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   onCopyToDrafts?: () => void;
   /** Whoever is composing — stamped as the author on a brand-new message. */
   currentUserName?: string;
+  /** Approver's note from rejecting this message — surfaced as a banner above Author Details. */
+  rejectionReason?: string;
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [title, setTitle] = useState(initialData?.title ?? '');
@@ -1276,10 +1270,26 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
         <div style={{ width: '399px', minWidth: '399px', maxWidth: '399px', overflowY: 'auto', [PREVIEW_ON_LEFT ? 'borderLeft' : 'borderRight']: `1px solid ${BORDER}`, position: 'relative', order: PREVIEW_ON_LEFT ? 2 : 1 }} className="p-[24px] flex flex-col gap-[16px]">
           {readOnly && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} />}
 
-          {/* Author Details card */}
+          {rejectionReason && (
+            <div
+              className="flex items-start gap-[8px] rounded-[4px] px-[12px] py-[10px]"
+              style={{ backgroundColor: '#FFE9E9' }}
+            >
+              <RiErrorWarningLine size={16} color="#DA4040" className="shrink-0 mt-[1px]" />
+              <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: '#DA4040' }}>
+                <span className="font-semibold">Rejection Reason: </span>
+                {rejectionReason}
+              </p>
+            </div>
+          )}
+
+          {/* Author card — no separate "Author Details" heading, since the
+              "Author:" line already says what this card is. */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
-            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Author Details</p>
-            <StaticField label="Author" value={author} />
+            <p className="font-['Montserrat',sans-serif] text-[13px] leading-[18px]">
+              <span className="font-semibold" style={{ color: LABEL_GREY }}>Author: </span>
+              <span className="font-normal" style={{ color: '#000000' }}>{author}</span>
+            </p>
             <SelectField label="Department *" value={department} onChange={setDepartment} placeholder="Select department..." options={DEPARTMENT_OPTIONS} disabled={readOnly} />
           </div>
 
