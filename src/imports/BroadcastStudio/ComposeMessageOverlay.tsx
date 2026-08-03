@@ -3,12 +3,12 @@ import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdOutlineContentCopy, MdError } from 'react-icons/md';
+import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdOutlineContentCopy } from 'react-icons/md';
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
 import { GrAnnounce } from 'react-icons/gr';
-import { RiDeleteBinLine, RiCheckLine } from 'react-icons/ri';
+import { RiDeleteBinLine, RiCheckLine, RiErrorWarningLine } from 'react-icons/ri';
 
 type MessageType = '' | 'Announcement' | 'Emergency';
 type DisplayFormat = '' | 'Overlay' | 'Banner';
@@ -1280,12 +1280,12 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
           {rejectionReason && (
             <div
-              className="flex items-start gap-[8px] rounded-[4px] border px-[12px] py-[10px]"
-              style={{ backgroundColor: '#FFE9E9', borderColor: '#DDB6B6' }}
+              className="flex items-start gap-[8px] rounded-[4px] px-[12px] py-[10px]"
+              style={{ backgroundColor: '#FFE9E9' }}
             >
-              <MdError size={16} color="#DA4040" className="shrink-0 mt-[1px]" />
+              <RiErrorWarningLine size={16} color="#DA4040" className="shrink-0 mt-[1px]" />
               <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: '#DA4040' }}>
-                <span className="font-semibold">Reject Reason: </span>
+                <span className="font-semibold">Rejection Reason: </span>
                 {rejectionReason}
               </p>
             </div>
