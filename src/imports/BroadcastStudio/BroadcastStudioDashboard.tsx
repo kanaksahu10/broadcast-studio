@@ -85,7 +85,7 @@ interface BroadcastMessageRow {
 const STATUS_COLOR: Record<MessageStatus, string> = {
   Live: '#00aa00',
   Pending: '#ff8800',
-  Draft: '#8a8a8a',
+  Draft: '#787774', // Tag/Grey text-border token
   Rejected: '#DA4040',
   Discontinued: '#FC7F15',
 };
@@ -93,7 +93,7 @@ const STATUS_COLOR: Record<MessageStatus, string> = {
 const STATUS_BG: Record<MessageStatus, string> = {
   Live: '#eeffee',
   Pending: '#fefad1',
-  Draft: '#f0f0f0',
+  Draft: '#F1F1EF', // Tag/Grey background token
   Rejected: '#fdeaea',
   Discontinued: '#fef1e4',
 };
