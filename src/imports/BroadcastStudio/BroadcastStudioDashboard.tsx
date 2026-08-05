@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose } from 'react-icons/io';
@@ -980,35 +980,52 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
 
 function getActionTooltip(status: MessageStatus, role: UserRole): string {
   const isSuperAdmin = role === 'super-admin';
-  if (status === 'Draft') return 'Edit this draft message';
+  if (status === 'Draft') return 'Messages you’re still working on before sending them for approval';
   if (status === 'Pending') {
-    return isSuperAdmin ? 'Review only, no editing' : 'Approve or reject this message';
+    return isSuperAdmin
+      ? 'Messages waiting on someone else’s approval — you can review but not edit them'
+      : 'Messages waiting for your approval or rejection';
   }
-  return 'Preview this live message';
+  return 'Messages that are live now or scheduled to go live';
 }
 
 function getBucketTooltip(bucket: DiscardedBucket): string {
-  if (bucket === 'Rejected') return 'View this rejected message';
-  if (bucket === 'Expired') return 'View this expired message';
-  return 'View this discontinued message';
+  if (bucket === 'Rejected') return 'Messages an approver rejected during review';
+  if (bucket === 'Expired') return 'Messages whose live window has already ended';
+  return 'Messages that were manually stopped while live';
 }
 
-// A small info icon next to a column/bucket header — hover to see what
-// clicking a card in that column does. Replaces the old per-card hover
-// tooltip, which covered the entire card and got in the way.
+// A small info icon next to a column/bucket header explaining what that
+// whole bucket holds. Replaces the old per-card hover tooltip, which
+// covered the entire card and got in the way.
 function ColumnInfoTooltip({ label }: { label: string }) {
   const [hovered, setHovered] = useState(false);
+  // Defaults to opening rightward; flips to open leftward if it would run
+  // past the edge of the viewport (e.g. the last column in the row).
+  const [align, setAlign] = useState<'right' | 'left'>('right');
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!hovered) return;
+    const el = tooltipRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.right > window.innerWidth - 8) setAlign('left');
+    else if (rect.left < 8) setAlign('right');
+  }, [hovered]);
+
   return (
     <div
       className="relative inline-flex items-center shrink-0"
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseLeave={() => { setHovered(false); setAlign('right'); }}
     >
       <MdInfoOutline size={14} color="#27496D" className="cursor-help" />
       {hovered && (
         <div
-          className="absolute left-full top-1/2 -translate-y-1/2 ml-[8px] z-30 whitespace-nowrap rounded-[6px] px-[12px] py-[8px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white"
-          style={{ backgroundColor: '#3B5C79' }}
+          ref={tooltipRef}
+          className={`absolute top-1/2 -translate-y-1/2 z-30 whitespace-normal rounded-[6px] px-[12px] py-[8px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white ${align === 'right' ? 'left-full ml-[8px]' : 'right-full mr-[8px]'}`}
+          style={{ backgroundColor: '#3B5C79', width: 'max-content', maxWidth: '240px' }}
         >
           {label}
         </div>
