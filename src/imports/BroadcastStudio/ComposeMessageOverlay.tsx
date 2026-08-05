@@ -86,6 +86,7 @@ const ROLE_SUBTEXT: Record<string, string> = {
 // Mirrors the app's main nav, so a feature-specific message targets a real destination.
 const FEATURE_PATHS = ['Dashboard', 'Operations', 'Scheduling', 'Payroll', 'Billing', 'Clients', 'Employees', 'Smart Billing', 'Reporting', 'Fax', 'Agency Management', 'My Account'];
 const DEPARTMENT_OPTIONS = ['Admin Services', 'Billing', 'Customer Success', 'Marketing', 'Product', 'Support'];
+const CATEGORY_OPTIONS = ['Billing Notice', 'Emergency', 'New Release', 'Upsell', 'Custom'];
 // Stand-in for real per-user auth: this prototype has no individual accounts,
 // only the org user shown in the sidebar, so Author auto-populates with that
 // same name rather than a selectable/editable value.
@@ -1077,6 +1078,8 @@ type FormData = {
   body?: string;
   reason?: string;
   department?: string;
+  messageCategory?: string;
+  customCategoryName?: string;
   author?: string;
   displayFormat?: string;
   placement?: string;
@@ -1179,6 +1182,8 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [body, setBody] = useState(initialData?.body ?? '');
   const [reason, setReason] = useState(initialData?.reason ?? '');
   const [department, setDepartment] = useState(initialData?.department ?? '');
+  const [messageCategory, setMessageCategory] = useState(initialData?.messageCategory ?? '');
+  const [customCategoryName, setCustomCategoryName] = useState(initialData?.customCategoryName ?? '');
   const author = initialData?.author ?? currentUserName ?? CURRENT_USER_NAME;
   const [messageColor, setMessageColor] = useState(initialData?.messageColor ?? MESSAGE_COLOR_OPTIONS[1]);
   const [displayFormat, setDisplayFormat] = useState<DisplayFormat>((initialData?.displayFormat as DisplayFormat) ?? '');
@@ -1226,7 +1231,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   };
 
   const messageType: MessageType = displayFormat === '' ? '' : (isEmergency ? 'Emergency' : 'Announcement');
-  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, author, displayFormat, placement, featurePath, messageColor, searchMode, statesOrAgencies, packages, roles, dismissible, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
+  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, searchMode, statesOrAgencies, packages, roles, dismissible, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
 
   const handleSubmit = () => {
     onMessageCreated?.(allFormData);
@@ -1291,6 +1296,10 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               <span className="font-normal" style={{ color: '#000000' }}>{author}</span>
             </p>
             <SelectField label="Department *" value={department} onChange={setDepartment} placeholder="Select department..." options={DEPARTMENT_OPTIONS} disabled={readOnly} />
+            <SelectField label="Message Category" value={messageCategory} onChange={setMessageCategory} placeholder="Select category..." options={CATEGORY_OPTIONS} disabled={readOnly} />
+            {messageCategory === 'Custom' && (
+              <TextField label="Category Name" value={customCategoryName} onChange={setCustomCategoryName} placeholder="Type a category name" disabled={readOnly} />
+            )}
           </div>
 
           {/* Message Details card */}

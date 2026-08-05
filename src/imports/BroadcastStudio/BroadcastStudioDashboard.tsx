@@ -52,7 +52,7 @@ type MessageStatus = 'Live' | 'Pending' | 'Draft' | 'Rejected' | 'Discontinued';
 type MessageType = '' | 'Announcement' | 'Emergency';
 
 interface MessageFormData {
-  body?: string; reason?: string; department?: string; author?: string; noEndDate?: boolean; displayFormat?: string; placement?: string; featurePath?: string;
+  body?: string; reason?: string; department?: string; messageCategory?: string; customCategoryName?: string; author?: string; noEndDate?: boolean; displayFormat?: string; placement?: string; featurePath?: string;
   messageColor?: string; searchMode?: string; statesOrAgencies?: string[];
   packages?: string[]; roles?: string[]; dismissible?: string; hasCta?: boolean;
   ctaLabel?: string; ctaDestination?: string; pushNotification?: boolean;
@@ -187,6 +187,29 @@ function isMessageCurrentlyLive(row: BroadcastMessageRow): boolean {
   const start = new Date(row.startDate);
   const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
   return today >= start && today <= end;
+}
+
+// The optional "Message Category" tag: the chosen preset label, or the
+// author's own typed name when they picked "Custom". Empty/unset shows no tag.
+function getCategoryLabel(row: BroadcastMessageRow): string | null {
+  const category = row.formData?.messageCategory;
+  if (!category) return null;
+  if (category === 'Custom') {
+    const custom = row.formData?.customCategoryName?.trim();
+    return custom || null;
+  }
+  return category;
+}
+
+function CategoryTag({ label }: { label: string }) {
+  return (
+    <span
+      className="flex items-center self-start font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]"
+      style={{ backgroundColor: '#F2F2F2', color: '#585858' }}
+    >
+      {label}
+    </span>
+  );
 }
 
 function getRecipientCount(row: BroadcastMessageRow): number {
@@ -1427,26 +1450,39 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
             </div>
           )}
         </div>
-        {row.status === 'Live' && row.startDate !== '—' && (() => {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const start = new Date(row.startDate);
-          const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
-          const isLive = today >= start && today <= end;
-          const isScheduled = today < start;
-          if (isLive) return (
-            <span className="flex items-center gap-[5px] self-start font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]" style={{ backgroundColor: '#EEFFEE', color: '#00AA00' }}>
-              <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: '#00AA00' }} />
-              Live
-            </span>
+        {(() => {
+          const categoryLabel = getCategoryLabel(row);
+          let liveBadge: React.ReactNode = null;
+          if (row.status === 'Live' && row.startDate !== '—') {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const start = new Date(row.startDate);
+            const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
+            const isLive = today >= start && today <= end;
+            const isScheduled = today < start;
+            if (isLive) {
+              liveBadge = (
+                <span className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]" style={{ backgroundColor: '#EEFFEE', color: '#00AA00' }}>
+                  <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: '#00AA00' }} />
+                  Live
+                </span>
+              );
+            } else if (isScheduled) {
+              liveBadge = (
+                <span className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]" style={{ backgroundColor: '#E8F4FF', color: '#2699FB' }}>
+                  <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: '#2699FB' }} />
+                  Scheduled
+                </span>
+              );
+            }
+          }
+          if (!liveBadge && !categoryLabel) return null;
+          return (
+            <div className="flex items-center gap-[6px] flex-wrap self-start">
+              {liveBadge}
+              {categoryLabel && <CategoryTag label={categoryLabel} />}
+            </div>
           );
-          if (isScheduled) return (
-            <span className="flex items-center gap-[5px] self-start font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]" style={{ backgroundColor: '#E8F4FF', color: '#2699FB' }}>
-              <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: '#2699FB' }} />
-              Scheduled
-            </span>
-          );
-          return null;
         })()}
         <div className="flex items-center justify-between gap-[8px]">
           {(() => {
@@ -1581,6 +1617,7 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
             )}
           </div>
         </div>
+        {getCategoryLabel(row) && <CategoryTag label={getCategoryLabel(row)!} />}
         {/* Discarded messages aren't delivering, so the recipient count is dropped here. */}
         <div className="flex items-center justify-end gap-[8px]">
           <p className="font-['Montserrat',sans-serif] font-normal text-[11px] leading-[15px] text-[#b8b8b8] shrink-0">
