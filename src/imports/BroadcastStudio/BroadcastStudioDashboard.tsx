@@ -154,8 +154,11 @@ function getColumnKey(row: BroadcastMessageRow): string {
 const SEEN_COLUMNS_KEY = 'bs-seen-columns-v1';
 
 // A newly-moved card's border holds its highlight color for this long
-// before dropping back — a single flicker, not a repeating blink.
+// before dropping back — a single flicker, not a repeating blink. The color
+// change itself eases in and back out over FLICKER_FADE_MS, rather than
+// snapping instantly.
 const FLICKER_HOLD_MS = 400;
+const FLICKER_FADE_MS = 300;
 
 function getRetentionDaysLeft(row: BroadcastMessageRow, bucket: DiscardedBucket): number {
   // Expired (Live past its window) and auto-rejected (Pending past its window)
@@ -1287,19 +1290,22 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isCardHovered, setIsCardHovered] = useState(false);
-  // A single border flicker for a card that just landed in this column.
-  // `highlight` often flips true a tick after this component's first mount
-  // (the parent's own-mount diff effect runs after the initial commit), so
-  // this reacts to the prop rather than only seeding state from it at mount
-  // time.
+  // A single border flicker for a card that just landed in this column: eases
+  // in, holds, eases back out. `highlight` often flips true a tick after this
+  // component's first mount (the parent's own-mount diff effect runs after
+  // the initial commit), so this reacts to the prop rather than only seeding
+  // state from it at mount time.
   const [flickerOn, setFlickerOn] = useState(false);
+  const [flickerActive, setFlickerActive] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!highlight) return;
+    setFlickerActive(true);
     setFlickerOn(true);
-    const id = setTimeout(() => setFlickerOn(false), FLICKER_HOLD_MS);
-    return () => clearTimeout(id);
+    const offId = setTimeout(() => setFlickerOn(false), FLICKER_HOLD_MS);
+    const doneId = setTimeout(() => setFlickerActive(false), FLICKER_HOLD_MS + FLICKER_FADE_MS);
+    return () => { clearTimeout(offId); clearTimeout(doneId); };
   }, [highlight]);
 
   useEffect(() => {
@@ -1334,8 +1340,8 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
         boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
         borderColor: isCardHovered || flickerOn ? color : '#e5e5e5',
         transitionProperty: 'border-color',
-        transitionDuration: '60ms',
-        transitionTimingFunction: 'linear',
+        transitionDuration: flickerActive ? `${FLICKER_FADE_MS}ms` : '100ms',
+        transitionTimingFunction: 'ease-in-out',
       }}
       onClick={onEdit}
       onMouseEnter={() => setIsCardHovered(true)}
@@ -1466,14 +1472,17 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [flickerOn, setFlickerOn] = useState(false);
+  const [flickerActive, setFlickerActive] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
   const daysLeft = getRetentionDaysLeft(row, bucket);
 
   useEffect(() => {
     if (!highlight) return;
+    setFlickerActive(true);
     setFlickerOn(true);
-    const id = setTimeout(() => setFlickerOn(false), FLICKER_HOLD_MS);
-    return () => clearTimeout(id);
+    const offId = setTimeout(() => setFlickerOn(false), FLICKER_HOLD_MS);
+    const doneId = setTimeout(() => setFlickerActive(false), FLICKER_HOLD_MS + FLICKER_FADE_MS);
+    return () => { clearTimeout(offId); clearTimeout(doneId); };
   }, [highlight]);
 
   useEffect(() => {
@@ -1502,8 +1511,8 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
         boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
         borderColor: isCardHovered || flickerOn ? bucketColor : '#e5e5e5',
         transitionProperty: 'border-color',
-        transitionDuration: '60ms',
-        transitionTimingFunction: 'linear',
+        transitionDuration: flickerActive ? `${FLICKER_FADE_MS}ms` : '100ms',
+        transitionTimingFunction: 'ease-in-out',
       }}
       onClick={onView}
       onMouseEnter={() => setIsCardHovered(true)}
