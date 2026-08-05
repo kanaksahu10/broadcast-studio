@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose } from 'react-icons/io';
-import { MdAdd, MdApps, MdBlock, MdBusiness, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
+import { MdAdd, MdApps, MdBlock, MdBusiness, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
 import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField } from './ComposeMessageOverlay';
 import { getUserIdentity, type UserRole } from './userIdentity';
@@ -978,59 +978,6 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
   Discontinued: 'View',
 };
 
-function Tooltip({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
-  const [tooltipY, setTooltipY] = useState<number | null>(null);
-  const [suppressed, setSuppressed] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-
-  const isExcluded = (target: EventTarget | null) => (target as HTMLElement | null)?.closest?.('[data-no-tooltip]') != null;
-  const visible = tooltipY !== null && !suppressed;
-
-  const clampY = (rawY: number) => {
-    const gap = 4;
-    const containerH = containerRef.current?.getBoundingClientRect().height ?? 0;
-    const tooltipH = tooltipRef.current?.getBoundingClientRect().height ?? 36;
-    const maxY = Math.max(gap, containerH - tooltipH - gap);
-    return Math.min(Math.max(rawY, gap), maxY);
-  };
-
-  return (
-    <div
-      ref={containerRef}
-      className={className ?? 'relative inline-flex group'}
-      onMouseMove={(e) => {
-        const excluded = isExcluded(e.target);
-        setSuppressed(excluded);
-        if (excluded) return;
-        setTooltipY((prev) => {
-          if (prev !== null) return prev; // captured once — stays put while hovering
-          const rect = containerRef.current?.getBoundingClientRect();
-          return rect ? clampY(e.clientY - rect.top + 8) : prev;
-        });
-      }}
-      onMouseOut={(e) => {
-        const related = e.relatedTarget as Node | null;
-        if (!related || !containerRef.current?.contains(related)) {
-          setTooltipY(null);
-          setSuppressed(false);
-        }
-      }}
-    >
-      {children}
-      <div
-        ref={tooltipRef}
-        className="pointer-events-none absolute right-0 transition-opacity duration-150 z-20 whitespace-nowrap"
-        style={{ top: tooltipY ?? 0, opacity: visible ? 1 : 0 }}
-      >
-        <div className="rounded-[6px] p-[12px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: '#3B5C79' }}>
-          {label}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function getActionTooltip(status: MessageStatus, role: UserRole): string {
   const isSuperAdmin = role === 'super-admin';
   if (status === 'Draft') return 'Edit this draft message';
@@ -1038,6 +985,36 @@ function getActionTooltip(status: MessageStatus, role: UserRole): string {
     return isSuperAdmin ? 'Review only, no editing' : 'Approve or reject this message';
   }
   return 'Preview this live message';
+}
+
+function getBucketTooltip(bucket: DiscardedBucket): string {
+  if (bucket === 'Rejected') return 'View this rejected message';
+  if (bucket === 'Expired') return 'View this expired message';
+  return 'View this discontinued message';
+}
+
+// A small info icon next to a column/bucket header — hover to see what
+// clicking a card in that column does. Replaces the old per-card hover
+// tooltip, which covered the entire card and got in the way.
+function ColumnInfoTooltip({ label }: { label: string }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      className="relative inline-flex items-center shrink-0"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <MdInfoOutline size={14} color="#27496D" className="cursor-help" />
+      {hovered && (
+        <div
+          className="absolute left-full top-1/2 -translate-y-1/2 ml-[8px] z-30 whitespace-nowrap rounded-[6px] px-[12px] py-[8px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white"
+          style={{ backgroundColor: '#3B5C79' }}
+        >
+          {label}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function AudienceChip({ label, variant }: { label: string; variant: 'agency' | 'package' | 'role' }) {
@@ -1333,7 +1310,6 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
         onConfirm={() => { setShowDeleteConfirm(false); row.status === 'Live' ? onDiscontinue?.() : onDelete?.(); }}
       />
     )}
-    <Tooltip label={getActionTooltip(row.status, role)} className="relative flex w-full group">
     <div
       className="bg-white rounded-[8px] border flex w-full cursor-pointer"
       style={{
@@ -1367,7 +1343,7 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
             )}
           </div>
           {(isDraft || (row.status === 'Live' && !isSuperAdmin)) && (
-            <div className="relative shrink-0" ref={kebabRef} data-no-tooltip onClick={(e) => e.stopPropagation()}>
+            <div className="relative shrink-0" ref={kebabRef} onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 className="flex items-center justify-center w-[24px] h-[24px] rounded-[4px] cursor-pointer hover:bg-[#f2f2f2]"
@@ -1442,7 +1418,6 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
               <button
                 type="button"
                 className={`flex items-center gap-[5px] ${hasDetail ? 'group/recipients' : ''}`}
-                data-no-tooltip
                 style={{ cursor: hasDetail ? 'pointer' : 'default' }}
                 onClick={(e) => { e.stopPropagation(); hasDetail && setShowAudience(true); }}
               >
@@ -1454,7 +1429,6 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
         </div>
       </div>
     </div>
-    </Tooltip>
     </>
   );
 }
@@ -1596,6 +1570,7 @@ function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
             <div className="flex items-center justify-between px-[2px]">
               <div className="flex items-center gap-[7px]">
                 <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{bucket}</span>
+                <ColumnInfoTooltip label={getBucketTooltip(bucket)} />
               </div>
               <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
             </div>
@@ -1651,6 +1626,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
             <div className="flex items-center justify-between px-[2px]">
               <div className="flex items-center gap-[7px]">
                 <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{label}</span>
+                <ColumnInfoTooltip label={getActionTooltip(status, role)} />
               </div>
               <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
             </div>
