@@ -1741,11 +1741,14 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
   );
 }
 
-function MessagePreviewModal({ row, onClose }: {
+function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
   row: BroadcastMessageRow;
+  role: UserRole;
   onClose: () => void;
+  onDiscontinue?: () => void;
 }) {
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
+  const [showDiscontinueConfirm, setShowDiscontinueConfirm] = useState(false);
 
   const isEmergency = row.type === 'Emergency';
   const effectiveFormat: 'Overlay' | 'Banner' = isEmergency ? 'Banner' : ((row.formData?.displayFormat as 'Overlay' | 'Banner') || 'Overlay');
@@ -1772,8 +1775,19 @@ function MessagePreviewModal({ row, onClose }: {
   const statusChipText = previewStatus ? `${previewStatus}: ${scheduleRange}` : null;
   const placementChips = isFeatureSpecific ? ['Feature Specific', ...(featurePath ? [featurePath] : [])] : ['App-wide'];
 
+  const canDiscontinue = role === 'executive-approver' && row.status === 'Live';
+
   return (
     <div className="fixed inset-0 z-50">
+      {showDiscontinueConfirm && (
+        <DeleteConfirmOverlay
+          subject={row.subject}
+          mode="discontinue"
+          isLive={isMessageCurrentlyLive(row)}
+          onClose={() => setShowDiscontinueConfirm(false)}
+          onConfirm={() => { setShowDiscontinueConfirm(false); onDiscontinue?.(); }}
+        />
+      )}
       <div className="absolute inset-0 bg-white flex flex-col overflow-hidden">
           {/* Header — the modal's own close is always the exit */}
           <div className="flex items-center justify-between px-[20px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', height: '56px' }}>
@@ -1841,6 +1855,22 @@ function MessagePreviewModal({ row, onClose }: {
               <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
             )}
           </div>
+
+          {/* Footer — Discontinue is the only action here, and only for the
+              Executive Approver, mirroring the kebab-menu flow on the card. */}
+          {canDiscontinue && (
+            <div className="shrink-0 border-t px-[24px] py-[16px] flex items-center justify-end" style={{ borderColor: '#E5E5E5', backgroundColor: 'white' }}>
+              <button
+                type="button"
+                className="flex items-center gap-[6px] font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+                style={{ color: '#DA4040' }}
+                onClick={() => setShowDiscontinueConfirm(true)}
+              >
+                <MdBlock size={17} color="#DA4040" />
+                Discontinue
+              </button>
+            </div>
+          )}
       </div>
     </div>
   );
@@ -2113,7 +2143,9 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       {viewingRow && (
         <MessagePreviewModal
           row={viewingRow}
+          role={role}
           onClose={() => setViewingRow(null)}
+          onDiscontinue={() => { handleDiscontinue(viewingRow.id); setViewingRow(null); }}
         />
       )}
 
