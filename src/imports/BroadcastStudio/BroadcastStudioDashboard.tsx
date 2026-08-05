@@ -157,7 +157,7 @@ const SEEN_COLUMNS_KEY = 'bs-seen-columns-v1';
 // before dropping back — a single flicker, not a repeating blink. The color
 // change itself eases in and back out over FLICKER_FADE_MS, rather than
 // snapping instantly.
-const FLICKER_HOLD_MS = 400;
+const FLICKER_HOLD_MS = 600;
 const FLICKER_FADE_MS = 300;
 
 function getRetentionDaysLeft(row: BroadcastMessageRow, bucket: DiscardedBucket): number {
