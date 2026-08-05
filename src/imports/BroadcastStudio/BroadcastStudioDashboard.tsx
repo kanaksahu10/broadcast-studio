@@ -153,6 +153,10 @@ function getColumnKey(row: BroadcastMessageRow): string {
 
 const SEEN_COLUMNS_KEY = 'bs-seen-columns-v1';
 
+// A newly-moved card's border blinks on/off/on/off at this cadence — a
+// quick "blink-blink" rather than a slow single fade.
+const BLINK_STEP_MS = 110;
+
 function getRetentionDaysLeft(row: BroadcastMessageRow, bucket: DiscardedBucket): number {
   // Expired (Live past its window) and auto-rejected (Pending past its window)
   // are both date-driven, not action-driven, so retention counts from the
@@ -1283,21 +1287,18 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isCardHovered, setIsCardHovered] = useState(false);
-  // One-shot border flicker for a card that just landed in this column: hold
-  // the highlight color briefly, ease it back out slowly, then return to the
-  // normal snappy hover transition. `highlight` often flips true a tick after
+  // A quick double-blink on the border for a card that just landed in this
+  // column: on/off/on/off, fast. `highlight` often flips true a tick after
   // this component's first mount (the parent's own-mount diff effect runs
   // after the initial commit), so this reacts to the prop rather than only
   // seeding state from it at mount time.
-  const [flickerPhase, setFlickerPhase] = useState<'on' | 'fading' | 'done'>('done');
+  const [flickerOn, setFlickerOn] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!highlight) return;
-    setFlickerPhase('on');
-    const holdId = setTimeout(() => setFlickerPhase('fading'), 700);
-    const doneId = setTimeout(() => setFlickerPhase('done'), 700 + 600);
-    return () => { clearTimeout(holdId); clearTimeout(doneId); };
+    const steps = [true, false, true, false].map((on, i) => setTimeout(() => setFlickerOn(on), i * BLINK_STEP_MS));
+    return () => steps.forEach(clearTimeout);
   }, [highlight]);
 
   useEffect(() => {
@@ -1330,10 +1331,10 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
       className="bg-white rounded-[8px] border flex w-full cursor-pointer"
       style={{
         boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-        borderColor: isCardHovered || flickerPhase === 'on' ? color : '#e5e5e5',
+        borderColor: isCardHovered || flickerOn ? color : '#e5e5e5',
         transitionProperty: 'border-color',
-        transitionDuration: flickerPhase === 'fading' ? '600ms' : '100ms',
-        transitionTimingFunction: 'ease-out',
+        transitionDuration: '60ms',
+        transitionTimingFunction: 'linear',
       }}
       onClick={onEdit}
       onMouseEnter={() => setIsCardHovered(true)}
@@ -1463,16 +1464,14 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [flickerPhase, setFlickerPhase] = useState<'on' | 'fading' | 'done'>('done');
+  const [flickerOn, setFlickerOn] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
   const daysLeft = getRetentionDaysLeft(row, bucket);
 
   useEffect(() => {
     if (!highlight) return;
-    setFlickerPhase('on');
-    const holdId = setTimeout(() => setFlickerPhase('fading'), 700);
-    const doneId = setTimeout(() => setFlickerPhase('done'), 700 + 600);
-    return () => { clearTimeout(holdId); clearTimeout(doneId); };
+    const steps = [true, false, true, false].map((on, i) => setTimeout(() => setFlickerOn(on), i * BLINK_STEP_MS));
+    return () => steps.forEach(clearTimeout);
   }, [highlight]);
 
   useEffect(() => {
@@ -1499,10 +1498,10 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
       className="bg-white rounded-[8px] border flex w-full cursor-pointer"
       style={{
         boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-        borderColor: isCardHovered || flickerPhase === 'on' ? bucketColor : '#e5e5e5',
+        borderColor: isCardHovered || flickerOn ? bucketColor : '#e5e5e5',
         transitionProperty: 'border-color',
-        transitionDuration: flickerPhase === 'fading' ? '600ms' : '100ms',
-        transitionTimingFunction: 'ease-out',
+        transitionDuration: '60ms',
+        transitionTimingFunction: 'linear',
       }}
       onClick={onView}
       onMouseEnter={() => setIsCardHovered(true)}
@@ -1797,32 +1796,48 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
   const [viewingDiscardedRow, setViewingDiscardedRow] = useState<{ row: BroadcastMessageRow; bucket: DiscardedBucket } | null>(null);
   const [highlightIds, setHighlightIds] = useState<Set<string>>(new Set());
 
-  // One-time diff, on mount, against what column/bucket each card was in the
-  // last time this screen was open — anything that moved (Draft → Pending,
-  // Pending → Approved, or into any discarded bucket) gets a one-shot border
-  // flicker the first time the user sees it in its new spot. A brand-new
-  // install (no stored snapshot yet) is treated as a baseline, not a wave of
-  // "new" cards.
+  // Diffs each card's current column/bucket against a baseline every time
+  // `messages` changes — whether that's a fresh mount (baseline = whatever
+  // was last persisted to localStorage from a previous visit) or a live
+  // in-session move (baseline = the map from just before this update, held
+  // in the ref). Either way, anything that moved — Draft → Pending, Pending
+  // → Approved, into a discarded bucket, or a brand-new card appearing (send
+  // for approval, approve, reject, discontinue, copy to drafts, save as
+  // draft, new message) — gets flagged to flicker right away, live or not.
+  // A truly first-ever install (no persisted snapshot at all yet) is treated
+  // as a clean baseline rather than a wave of "new" cards.
+  const lastColumnsRef = useRef<Record<string, string> | null>(null);
   useEffect(() => {
-    let stored: Record<string, string> | null = null;
-    try {
-      const raw = localStorage.getItem(SEEN_COLUMNS_KEY);
-      stored = raw ? JSON.parse(raw) : null;
-    } catch {
-      stored = null;
+    const current: Record<string, string> = {};
+    messages.forEach((m) => { current[m.id] = getColumnKey(m); });
+
+    let baseline = lastColumnsRef.current;
+    if (baseline === null) {
+      try {
+        const raw = localStorage.getItem(SEEN_COLUMNS_KEY);
+        baseline = raw ? JSON.parse(raw) : null;
+      } catch {
+        baseline = null;
+      }
     }
-    const isFirstEverLoad = stored === null;
-    const next: Record<string, string> = {};
-    const moved = new Set<string>();
-    messages.forEach((m) => {
-      const key = getColumnKey(m);
-      next[m.id] = key;
-      if (!isFirstEverLoad && stored![m.id] !== key) moved.add(m.id);
-    });
-    localStorage.setItem(SEEN_COLUMNS_KEY, JSON.stringify(next));
-    if (moved.size > 0) setHighlightIds(moved);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    if (baseline !== null) {
+      const moved = new Set<string>();
+      messages.forEach((m) => {
+        if (baseline![m.id] !== current[m.id]) moved.add(m.id);
+      });
+      if (moved.size > 0) {
+        setHighlightIds((prev) => {
+          const next = new Set(prev);
+          moved.forEach((id) => next.add(id));
+          return next;
+        });
+      }
+    }
+
+    localStorage.setItem(SEEN_COLUMNS_KEY, JSON.stringify(current));
+    lastColumnsRef.current = current;
+  }, [messages]);
 
   // Prune anything past its 30-day retention window in the discarded buckets.
   useEffect(() => {
