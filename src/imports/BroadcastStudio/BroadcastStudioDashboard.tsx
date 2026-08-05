@@ -980,10 +980,10 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
 
 function getActionTooltip(status: MessageStatus, role: UserRole): string {
   const isSuperAdmin = role === 'super-admin';
-  if (status === 'Draft') return 'Messages you’re still working on before sending them for approval';
+  if (status === 'Draft') return 'Messages you’re still working on before sending them for approval. These are private to you.';
   if (status === 'Pending') {
     return isSuperAdmin
-      ? 'Messages waiting on someone else’s approval — you can review but not edit them'
+      ? 'Messages waiting for approval. You can review but not edit them.'
       : 'Messages waiting for your approval or rejection';
   }
   return 'Messages that are live now or scheduled to go live';
@@ -1000,32 +1000,45 @@ function getBucketTooltip(bucket: DiscardedBucket): string {
 // covered the entire card and got in the way.
 function ColumnInfoTooltip({ label }: { label: string }) {
   const [hovered, setHovered] = useState(false);
-  // Defaults to opening rightward; flips to open leftward if it would run
-  // past the edge of the viewport (e.g. the last column in the row).
-  const [align, setAlign] = useState<'right' | 'left'>('right');
+  // Opens to the right of the icon by default, then nudges itself left by
+  // however many pixels it actually overflows the real viewport edge by —
+  // measured directly, rather than a binary left/right flip, so it can't
+  // still run off-screen under some fixed chrome docked at the edge.
+  const [shiftX, setShiftX] = useState(0);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     if (!hovered) return;
     const el = tooltipRef.current;
     if (!el) return;
+    // Wider than a bare "don't clip the viewport" margin — the host portal
+    // this widget is embedded in docks a persistent icon rail along the
+    // right edge that isn't part of this app's own DOM, so a tight margin
+    // still lets the tooltip render underneath it.
+    const margin = 100;
     const rect = el.getBoundingClientRect();
-    if (rect.right > window.innerWidth - 8) setAlign('left');
-    else if (rect.left < 8) setAlign('right');
+    let shift = 0;
+    if (rect.right > window.innerWidth - margin) {
+      shift = window.innerWidth - margin - rect.right; // negative: pull left
+    }
+    if (rect.left + shift < margin) {
+      shift = margin - rect.left; // don't overcorrect off the left edge either
+    }
+    if (shift !== 0) setShiftX(shift);
   }, [hovered]);
 
   return (
     <div
       className="relative inline-flex items-center shrink-0"
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setAlign('right'); }}
+      onMouseLeave={() => { setHovered(false); setShiftX(0); }}
     >
       <MdInfoOutline size={14} color="#27496D" className="cursor-help" />
       {hovered && (
         <div
           ref={tooltipRef}
-          className={`absolute top-1/2 -translate-y-1/2 z-30 whitespace-normal rounded-[6px] px-[12px] py-[8px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white ${align === 'right' ? 'left-full ml-[8px]' : 'right-full mr-[8px]'}`}
-          style={{ backgroundColor: '#3B5C79', width: 'max-content', maxWidth: '240px' }}
+          className="absolute left-full top-1/2 ml-[8px] z-30 whitespace-normal rounded-[6px] px-[12px] py-[8px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white"
+          style={{ backgroundColor: '#3B5C79', width: 'max-content', maxWidth: '240px', transform: `translate(${shiftX}px, -50%)` }}
         >
           {label}
         </div>
