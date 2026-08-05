@@ -153,9 +153,9 @@ function getColumnKey(row: BroadcastMessageRow): string {
 
 const SEEN_COLUMNS_KEY = 'bs-seen-columns-v1';
 
-// A newly-moved card's border blinks on/off/on/off at this cadence — a
-// quick "blink-blink" rather than a slow single fade.
-const BLINK_STEP_MS = 110;
+// A newly-moved card's border holds its highlight color for this long
+// before dropping back — a single flicker, not a repeating blink.
+const FLICKER_HOLD_MS = 200;
 
 function getRetentionDaysLeft(row: BroadcastMessageRow, bucket: DiscardedBucket): number {
   // Expired (Live past its window) and auto-rejected (Pending past its window)
@@ -1287,18 +1287,19 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isCardHovered, setIsCardHovered] = useState(false);
-  // A quick double-blink on the border for a card that just landed in this
-  // column: on/off/on/off, fast. `highlight` often flips true a tick after
-  // this component's first mount (the parent's own-mount diff effect runs
-  // after the initial commit), so this reacts to the prop rather than only
-  // seeding state from it at mount time.
+  // A single border flicker for a card that just landed in this column.
+  // `highlight` often flips true a tick after this component's first mount
+  // (the parent's own-mount diff effect runs after the initial commit), so
+  // this reacts to the prop rather than only seeding state from it at mount
+  // time.
   const [flickerOn, setFlickerOn] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!highlight) return;
-    const steps = [true, false, true, false].map((on, i) => setTimeout(() => setFlickerOn(on), i * BLINK_STEP_MS));
-    return () => steps.forEach(clearTimeout);
+    setFlickerOn(true);
+    const id = setTimeout(() => setFlickerOn(false), FLICKER_HOLD_MS);
+    return () => clearTimeout(id);
   }, [highlight]);
 
   useEffect(() => {
@@ -1470,8 +1471,9 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
 
   useEffect(() => {
     if (!highlight) return;
-    const steps = [true, false, true, false].map((on, i) => setTimeout(() => setFlickerOn(on), i * BLINK_STEP_MS));
-    return () => steps.forEach(clearTimeout);
+    setFlickerOn(true);
+    const id = setTimeout(() => setFlickerOn(false), FLICKER_HOLD_MS);
+    return () => clearTimeout(id);
   }, [highlight]);
 
   useEffect(() => {
