@@ -1000,12 +1000,27 @@ function getBucketTooltip(bucket: DiscardedBucket): string {
 // covered the entire card and got in the way.
 function ColumnInfoTooltip({ label }: { label: string }) {
   const [hovered, setHovered] = useState(false);
-  // Opens to the right of the icon by default, then nudges itself left by
-  // however many pixels it actually overflows the real viewport edge by —
-  // measured directly, rather than a binary left/right flip, so it can't
-  // still run off-screen under some fixed chrome docked at the edge.
+  // Fades in only after a short hover-intent delay, rather than snapping in
+  // instantly.
+  const [visible, setVisible] = useState(false);
+  // Opens below the icon by default, then nudges itself left by however many
+  // pixels it actually overflows the real viewport edge by — measured
+  // directly, rather than a binary left/right flip, so it can't still run
+  // off-screen under some fixed chrome docked at the edge.
   const [shiftX, setShiftX] = useState(0);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (hovered) {
+      showTimerRef.current = setTimeout(() => setVisible(true), 300);
+    } else if (showTimerRef.current) {
+      clearTimeout(showTimerRef.current);
+    }
+    return () => {
+      if (showTimerRef.current) clearTimeout(showTimerRef.current);
+    };
+  }, [hovered]);
 
   useLayoutEffect(() => {
     if (!hovered) return;
@@ -1031,14 +1046,14 @@ function ColumnInfoTooltip({ label }: { label: string }) {
     <div
       className="relative inline-flex items-center shrink-0"
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setShiftX(0); }}
+      onMouseLeave={() => { setHovered(false); setVisible(false); setShiftX(0); }}
     >
-      <MdInfoOutline size={14} color="#27496D" className="cursor-help" />
+      <MdInfoOutline size={14} color="#27496D" />
       {hovered && (
         <div
           ref={tooltipRef}
-          className="absolute left-full top-1/2 ml-[8px] z-30 whitespace-normal rounded-[6px] px-[12px] py-[8px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white"
-          style={{ backgroundColor: '#3B5C79', width: 'max-content', maxWidth: '240px', transform: `translate(${shiftX}px, -50%)` }}
+          className="absolute left-0 top-full mt-[8px] z-30 whitespace-normal rounded-[6px] px-[12px] py-[8px] font-['Montserrat',sans-serif] font-normal text-[12px] text-white transition-opacity duration-200 ease-out pointer-events-none"
+          style={{ backgroundColor: '#3B5C79', width: 'max-content', maxWidth: '240px', transform: `translateX(${shiftX}px)`, opacity: visible ? 1 : 0 }}
         >
           {label}
         </div>

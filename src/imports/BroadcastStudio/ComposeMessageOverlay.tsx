@@ -1530,7 +1530,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                   className="absolute bottom-full right-0 mb-[8px] w-max max-w-[220px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 rounded-[4px] px-[8px] py-[10px] z-50"
                   style={{ backgroundColor: '#3b5c79' }}
                 >
-                  <p className="font-['Montserrat',sans-serif] font-medium text-[12px] text-white leading-[17px]">
+                  <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-white leading-[17px]">
                     Please fill in all required fields to proceed
                   </p>
                 </div>
