@@ -155,7 +155,7 @@ const SEEN_COLUMNS_KEY = 'bs-seen-columns-v1';
 
 // A newly-moved card's border holds its highlight color for this long
 // before dropping back — a single flicker, not a repeating blink.
-const FLICKER_HOLD_MS = 200;
+const FLICKER_HOLD_MS = 400;
 
 function getRetentionDaysLeft(row: BroadcastMessageRow, bucket: DiscardedBucket): number {
   // Expired (Live past its window) and auto-rejected (Pending past its window)
