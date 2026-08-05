@@ -144,6 +144,15 @@ function getDiscardedBucket(row: BroadcastMessageRow): DiscardedBucket | null {
   return null;
 }
 
+// Identifies which column/bucket a row currently renders in, so we can tell
+// when a card has moved somewhere new since the user last saw the board.
+function getColumnKey(row: BroadcastMessageRow): string {
+  const bucket = getDiscardedBucket(row);
+  return bucket ? `discarded:${bucket}` : `kanban:${row.status}`;
+}
+
+const SEEN_COLUMNS_KEY = 'bs-seen-columns-v1';
+
 function getRetentionDaysLeft(row: BroadcastMessageRow, bucket: DiscardedBucket): number {
   // Expired (Live past its window) and auto-rejected (Pending past its window)
   // are both date-driven, not action-driven, so retention counts from the
@@ -1254,7 +1263,7 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete', is
   );
 }
 
-function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForApproval, onApprove, onReject }: {
+function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForApproval, onApprove, onReject, highlight }: {
   row: BroadcastMessageRow;
   role: UserRole;
   onEdit?: () => void;
@@ -1263,6 +1272,7 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
   onSendForApproval?: () => void;
   onApprove?: () => void;
   onReject?: () => void;
+  highlight?: boolean;
 }) {
   const color = STATUS_COLOR[row.status];
   const dateRange = row.startDate === '—' ? '—' : row.endDate === '—' ? `${row.startDate} – Until stopped` : `${row.startDate} – ${row.endDate}`;
@@ -1273,7 +1283,22 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isCardHovered, setIsCardHovered] = useState(false);
+  // One-shot border flicker for a card that just landed in this column: hold
+  // the highlight color briefly, ease it back out slowly, then return to the
+  // normal snappy hover transition. `highlight` often flips true a tick after
+  // this component's first mount (the parent's own-mount diff effect runs
+  // after the initial commit), so this reacts to the prop rather than only
+  // seeding state from it at mount time.
+  const [flickerPhase, setFlickerPhase] = useState<'on' | 'fading' | 'done'>('done');
   const kebabRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!highlight) return;
+    setFlickerPhase('on');
+    const holdId = setTimeout(() => setFlickerPhase('fading'), 700);
+    const doneId = setTimeout(() => setFlickerPhase('done'), 700 + 600);
+    return () => { clearTimeout(holdId); clearTimeout(doneId); };
+  }, [highlight]);
 
   useEffect(() => {
     if (!showKebab) return;
@@ -1302,8 +1327,14 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
     )}
     <Tooltip label={getActionTooltip(row.status, role)} className="relative flex w-full group">
     <div
-      className="bg-white rounded-[8px] border flex w-full cursor-pointer transition-colors duration-100"
-      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderColor: isCardHovered ? color : '#e5e5e5' }}
+      className="bg-white rounded-[8px] border flex w-full cursor-pointer"
+      style={{
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+        borderColor: isCardHovered || flickerPhase === 'on' ? color : '#e5e5e5',
+        transitionProperty: 'border-color',
+        transitionDuration: flickerPhase === 'fading' ? '600ms' : '100ms',
+        transitionTimingFunction: 'ease-out',
+      }}
       onClick={onEdit}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
@@ -1420,19 +1451,29 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
   );
 }
 
-function DiscardedCard({ row, bucket, onView, onDelete }: {
+function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
   row: BroadcastMessageRow;
   bucket: DiscardedBucket;
   onView: () => void;
   onDelete: () => void;
+  highlight?: boolean;
 }) {
   const dateRange = row.startDate === '—' ? '—' : row.endDate === '—' ? `${row.startDate} – Until stopped` : `${row.startDate} – ${row.endDate}`;
   const bucketColor = BUCKET_COLOR[bucket];
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [flickerPhase, setFlickerPhase] = useState<'on' | 'fading' | 'done'>('done');
   const kebabRef = useRef<HTMLDivElement>(null);
   const daysLeft = getRetentionDaysLeft(row, bucket);
+
+  useEffect(() => {
+    if (!highlight) return;
+    setFlickerPhase('on');
+    const holdId = setTimeout(() => setFlickerPhase('fading'), 700);
+    const doneId = setTimeout(() => setFlickerPhase('done'), 700 + 600);
+    return () => { clearTimeout(holdId); clearTimeout(doneId); };
+  }, [highlight]);
 
   useEffect(() => {
     if (!showKebab) return;
@@ -1455,8 +1496,14 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
       />
     )}
     <div
-      className="bg-white rounded-[8px] border flex w-full cursor-pointer transition-colors duration-100"
-      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderColor: isCardHovered ? bucketColor : '#e5e5e5' }}
+      className="bg-white rounded-[8px] border flex w-full cursor-pointer"
+      style={{
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+        borderColor: isCardHovered || flickerPhase === 'on' ? bucketColor : '#e5e5e5',
+        transitionProperty: 'border-color',
+        transitionDuration: flickerPhase === 'fading' ? '600ms' : '100ms',
+        transitionTimingFunction: 'ease-out',
+      }}
       onClick={onView}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
@@ -1519,10 +1566,11 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
 
 const DISCARDED_COLUMNS: DiscardedBucket[] = ['Rejected', 'Expired', 'Discontinued'];
 
-function DiscardedBoard({ rows, onView, onDelete }: {
+function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
   rows: BroadcastMessageRow[];
   onView: (row: BroadcastMessageRow, bucket: DiscardedBucket) => void;
   onDelete: (id: string) => void;
+  highlightIds: Set<string>;
 }) {
   const bucketed = rows
     .map((row) => ({ row, bucket: getDiscardedBucket(row) }))
@@ -1554,6 +1602,7 @@ function DiscardedBoard({ rows, onView, onDelete }: {
                     bucket={bucket}
                     onView={() => onView(row, bucket)}
                     onDelete={() => onDelete(row.id)}
+                    highlight={highlightIds.has(row.id)}
                   />
                 ))
               )}
@@ -1571,7 +1620,7 @@ const KANBAN_COLUMNS: Array<{ status: MessageStatus; label: string }> = [
   { status: 'Live', label: 'Approved' },
 ];
 
-function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApproval, onApprove, onReject }: {
+function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApproval, onApprove, onReject, highlightIds }: {
   rows: BroadcastMessageRow[];
   role: UserRole;
   onEdit: (row: BroadcastMessageRow) => void;
@@ -1580,6 +1629,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
   onSendForApproval: (id: string) => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
+  highlightIds: Set<string>;
 }) {
   return (
     <div className="flex gap-[16px] w-full items-start">
@@ -1611,6 +1661,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
                     onSendForApproval={() => onSendForApproval(row.id)}
                     onApprove={() => onApprove(row.id)}
                     onReject={() => onReject(row.id)}
+                    highlight={highlightIds.has(row.id)}
                   />
                 ))
               )}
@@ -1744,6 +1795,34 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
   const [rejectingRow, setRejectingRow] = useState<BroadcastMessageRow | null>(null);
   const [viewingRow, setViewingRow] = useState<BroadcastMessageRow | null>(null);
   const [viewingDiscardedRow, setViewingDiscardedRow] = useState<{ row: BroadcastMessageRow; bucket: DiscardedBucket } | null>(null);
+  const [highlightIds, setHighlightIds] = useState<Set<string>>(new Set());
+
+  // One-time diff, on mount, against what column/bucket each card was in the
+  // last time this screen was open — anything that moved (Draft → Pending,
+  // Pending → Approved, or into any discarded bucket) gets a one-shot border
+  // flicker the first time the user sees it in its new spot. A brand-new
+  // install (no stored snapshot yet) is treated as a baseline, not a wave of
+  // "new" cards.
+  useEffect(() => {
+    let stored: Record<string, string> | null = null;
+    try {
+      const raw = localStorage.getItem(SEEN_COLUMNS_KEY);
+      stored = raw ? JSON.parse(raw) : null;
+    } catch {
+      stored = null;
+    }
+    const isFirstEverLoad = stored === null;
+    const next: Record<string, string> = {};
+    const moved = new Set<string>();
+    messages.forEach((m) => {
+      const key = getColumnKey(m);
+      next[m.id] = key;
+      if (!isFirstEverLoad && stored![m.id] !== key) moved.add(m.id);
+    });
+    localStorage.setItem(SEEN_COLUMNS_KEY, JSON.stringify(next));
+    if (moved.size > 0) setHighlightIds(moved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Prune anything past its 30-day retention window in the discarded buckets.
   useEffect(() => {
@@ -1851,6 +1930,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           rows={searchFiltered}
           onView={(row, bucket) => setViewingDiscardedRow({ row, bucket })}
           onDelete={handleDelete}
+          highlightIds={highlightIds}
         />
       ) : viewMode === 'datagrid' ? (
         <MessageTable rows={filteredRows} />
@@ -1872,6 +1952,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           onSendForApproval={handleSendForApproval}
           onApprove={handleApprove}
           onReject={handleReject}
+          highlightIds={highlightIds}
         />
       )}
 
