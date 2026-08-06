@@ -139,8 +139,10 @@ function KebabMenu({
 function TopBar({ onHamburgerClick, sidebarCollapsed, identity }: { onHamburgerClick: () => void; sidebarCollapsed: boolean; identity: UserIdentity }) {
   return (
     <div className="absolute inset-x-0 top-0 h-[59px] bg-white border-b border-[#dfdfdf] z-10 flex items-center" data-name="Top Bar">
-      {/* Logo + Hamburger — same width as sidebar */}
-      <div className={`flex items-center px-[16px] shrink-0 transition-[width] duration-200 ${sidebarCollapsed ? 'w-[69px] justify-center' : 'w-[329px] justify-between'}`}>
+      {/* Logo + Hamburger — same width as the sidebar and grouped with it
+          (z-40) rather than the rest of the topbar, since it's conceptually
+          part of the sidebar nav, not an independent topbar segment. */}
+      <div className={`relative z-40 flex items-center px-[16px] shrink-0 transition-[width] duration-200 ${sidebarCollapsed ? 'w-[69px] justify-center' : 'w-[329px] justify-between'}`}>
         {!sidebarCollapsed && <Logo />}
         <button onClick={onHamburgerClick} className="p-0 bg-transparent border-0 cursor-pointer flex items-center justify-center">
           <svg fill="none" viewBox="0 0 14.2642 10.5" className="w-[14px] h-[11px]">
@@ -1398,6 +1400,17 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
   // Owned here so the chrome and the dashboard share one source of truth for who is viewing.
   const [role, setRole] = useRole();
   const identity = getUserIdentity(role);
+
+  // Re-apply the breakpoint default whenever the viewport crosses the 1024px
+  // line — not just on first load. Without this, resizing the window (or
+  // switching a device preset) live never updates sidebarCollapsed, since
+  // the useState initializer above only runs once at mount.
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 1023px)');
+    const handleChange = (e: MediaQueryListEvent) => setSidebarCollapsed(e.matches);
+    query.addEventListener('change', handleChange);
+    return () => query.removeEventListener('change', handleChange);
+  }, []);
 
   // Collapsed rail shows only the first word of each nav label (e.g. "Super
   // Administrator" -> "Super"); expanded restores the full label.
