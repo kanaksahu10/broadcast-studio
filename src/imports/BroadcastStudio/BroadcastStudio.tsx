@@ -137,12 +137,20 @@ function KebabMenu({
 }
 
 function TopBar({ onHamburgerClick, sidebarCollapsed, identity }: { onHamburgerClick: () => void; sidebarCollapsed: boolean; identity: UserIdentity }) {
+  // Split into three independently-stacked pieces instead of one flex row —
+  // a single shared z-index can't let part of a row sink below the scrim
+  // while another part stays above it, since z-index only resolves within
+  // the nearest stacking context (here, whatever container each piece is
+  // absolutely positioned against, not their old shared parent).
   return (
-    <div className="absolute inset-x-0 top-0 h-[59px] bg-white border-b border-[#dfdfdf] z-10 flex items-center" data-name="Top Bar">
-      {/* Logo + Hamburger — same width as the sidebar and grouped with it
-          (z-40) rather than the rest of the topbar, since it's conceptually
-          part of the sidebar nav, not an independent topbar segment. */}
-      <div className={`relative z-40 flex items-center px-[16px] shrink-0 transition-[width] duration-200 ${sidebarCollapsed ? 'w-[69px] justify-center' : 'w-[329px] justify-between'}`}>
+    <>
+      {/* Logo + Hamburger — same width as the sidebar, same z-40 tier, no
+          bottom border — grouped with the sidebar as one seamless panel
+          rather than a separate topbar segment sitting above it. */}
+      <div
+        data-name="Top Bar"
+        className={`absolute top-0 left-0 h-[59px] bg-white z-40 flex items-center px-[16px] shrink-0 transition-[width] duration-200 ${sidebarCollapsed ? 'w-[69px] justify-center' : 'w-[329px] justify-between'}`}
+      >
         {!sidebarCollapsed && <Logo />}
         <button onClick={onHamburgerClick} className="p-0 bg-transparent border-0 cursor-pointer flex items-center justify-center">
           <svg fill="none" viewBox="0 0 14.2642 10.5" className="w-[14px] h-[11px]">
@@ -150,12 +158,17 @@ function TopBar({ onHamburgerClick, sidebarCollapsed, identity }: { onHamburgerC
           </svg>
         </button>
       </div>
-      {/* Search */}
-      <div className="flex-1 flex items-center px-[16px]">
+      {/* Search — normal topbar tier (z-10), so on tablet/mobile it sinks
+          behind the sidebar's blurred scrim along with the rest of the
+          page, instead of floating above it. */}
+      <div
+        className={`absolute top-0 right-[60px] h-[59px] bg-white border-b border-[#dfdfdf] z-10 flex items-center px-[16px] transition-[left] duration-200 max-lg:!left-[69px] ${sidebarCollapsed ? 'lg:left-[69px]' : 'lg:left-[329px]'}`}
+      >
         <TopbarSearch />
       </div>
-      {/* User avatar */}
-      <div className="flex items-center justify-center w-[60px] h-[59px] border-l border-[#e5e5e5] shrink-0">
+      {/* User avatar — stays reachable above the scrim, like the sidebar's
+          own logo/hamburger corner. */}
+      <div className="absolute top-0 right-0 flex items-center justify-center w-[60px] h-[59px] bg-white border-l border-[#e5e5e5] border-b border-b-[#dfdfdf] z-40 shrink-0">
         <div className="relative rounded-full size-[32px] flex items-center justify-center" style={{ backgroundColor: identity.avatarColor }}>
           <span className="font-['Montserrat',sans-serif] font-medium text-[12px] text-white">{identity.initials}</span>
           <div className="absolute bg-white drop-shadow-[0px_2px_2px_rgba(0,0,0,0.08)] rounded-full size-[14px] -bottom-[3px] -right-[3px] flex items-center justify-center">
@@ -165,7 +178,7 @@ function TopBar({ onHamburgerClick, sidebarCollapsed, identity }: { onHamburgerC
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -1868,10 +1881,12 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
       {/* Below desktop, an expanded sidebar floats over the content instead of
           pushing it — this scrim dims/blurs what's behind it, matching the
           overlay pattern used elsewhere (e.g. DeleteConfirmOverlay), and
-          tapping it closes the sidebar back to the rail. */}
+          tapping it closes the sidebar back to the rail. Runs the full
+          height (top-0), so the search strip sinks behind it too — only the
+          sidebar's own logo/hamburger corner and the avatar sit above it. */}
       {!sidebarCollapsed && (
         <div
-          className="hidden max-lg:block absolute left-0 right-0 top-[59px] bottom-0 z-30"
+          className="hidden max-lg:block absolute left-0 right-0 top-0 bottom-0 z-30"
           style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
           onClick={() => setSidebarCollapsed(true)}
         />
