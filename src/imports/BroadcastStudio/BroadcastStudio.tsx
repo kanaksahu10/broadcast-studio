@@ -1391,7 +1391,10 @@ function Container({ goalTemplates }: { goalTemplates: GoalTemplate[] }) {
 
 export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioProps) {
   const [expandedSection, setExpandedSection] = useState<'clients' | 'agency' | 'superAdmin' | null>('superAdmin');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Below desktop (1024px), the sidebar starts collapsed to the icon rail —
+  // opening it via the hamburger overlays a flyout with a blurred scrim
+  // instead of pushing the toolbar/content over, per the tablet breakpoint.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
   // Owned here so the chrome and the dashboard share one source of truth for who is viewing.
   const [role, setRole] = useRole();
   const identity = getUserIdentity(role);
@@ -1432,7 +1435,7 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
       <div className="absolute right-0 top-[59px] bottom-0 w-[60px] border-l border-[#e5e5e5] z-50">
         <NotificationPanel identity={identity} />
       </div>
-      <div className={`absolute bg-[#eaeaea] bottom-0 left-0 top-[59px] overflow-hidden transition-[width] duration-200 ${sidebarCollapsed ? 'sidebar-collapsed w-[69px]' : 'w-[329px]'}`} data-name="Sidebar Menu">
+      <div className={`absolute bg-[#eaeaea] bottom-0 left-0 top-[59px] overflow-hidden transition-[width] duration-200 z-40 ${sidebarCollapsed ? 'sidebar-collapsed w-[69px]' : 'w-[329px] max-lg:shadow-[0_0_24px_rgba(0,0,0,0.25)]'}`} data-name="Sidebar Menu">
         <div className="content-stretch flex flex-col items-start overflow-y-auto relative rounded-[inherit] size-full">
           {!sidebarCollapsed && (
             <>
@@ -1849,15 +1852,26 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
         </div>
         <div aria-hidden="true" className="absolute border-[#e5e5e5] border-r border-solid inset-0 pointer-events-none" />
       </div>
+      {/* Below desktop, an expanded sidebar floats over the content instead of
+          pushing it — this scrim dims/blurs what's behind it, matching the
+          overlay pattern used elsewhere (e.g. DeleteConfirmOverlay), and
+          tapping it closes the sidebar back to the rail. */}
+      {!sidebarCollapsed && (
+        <div
+          className="hidden max-lg:block absolute left-0 right-0 top-[59px] bottom-0 z-30"
+          style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      )}
       {/* Main content area: fixed breadcrumb toolbar + its own independent scroll region,
           so content taller than the viewport scrolls instead of being clipped. */}
-      <div className={`absolute bg-[#f8f8f8] flex gap-[14px] h-[48px] items-center right-[60px] p-[16px] top-[59px] z-10 transition-[left] duration-200 ${sidebarCollapsed ? 'left-[69px]' : 'left-[329px]'}`} data-name="Toolbar">
+      <div className={`absolute bg-[#f8f8f8] flex gap-[14px] h-[48px] items-center right-[60px] p-[16px] top-[59px] z-10 transition-[left] duration-200 max-lg:!left-[69px] ${sidebarCollapsed ? 'lg:left-[69px]' : 'lg:left-[329px]'}`} data-name="Toolbar">
         <MdArrowBack size={21} color="#27496D" />
         <span className="font-['Montserrat',sans-serif] font-medium text-[15px] text-black leading-[15px]">
           {expandedSection === 'agency' ? 'View Goals' : 'Broadcast Studio'}
         </span>
       </div>
-      <div className={`absolute right-[60px] top-[107px] bottom-0 overflow-y-auto transition-[left] duration-200 ${sidebarCollapsed ? 'left-[69px]' : 'left-[329px]'}`}>
+      <div className={`absolute right-[60px] top-[107px] bottom-0 overflow-y-auto transition-[left] duration-200 max-lg:!left-[69px] ${sidebarCollapsed ? 'lg:left-[69px]' : 'lg:left-[329px]'}`}>
         <div className="p-[16px]">
           {expandedSection === 'agency' ? (
             <Container goalTemplates={goalTemplates} />
