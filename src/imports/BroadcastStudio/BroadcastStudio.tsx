@@ -17,6 +17,18 @@ import kebabSvgPaths from '../Menus/svg-duzgfqtilr';
 import BroadcastStudioDashboard from './BroadcastStudioDashboard';
 import { useRole, getUserIdentity, type UserIdentity } from './userIdentity';
 
+/**
+ * Desktop is >= 1024px; tablet and below is everything under it.
+ *
+ * Deliberately phrased as min-width and negated, rather than a
+ * `max-width: 1023px` query, so it matches Tailwind's `lg:` / `max-lg:`
+ * variants exactly at fractional viewport widths. Tailwind compiles
+ * `max-lg:` to "not (min-width: 64rem)", which still applies at 1023.5px —
+ * a `max-width: 1023px` query would not, leaving the CSS on tablet layout
+ * while this JS thought it was desktop.
+ */
+const DESKTOP_QUERY = '(min-width: 1024px)';
+
 interface GoalTemplate {
   id: string;
   goalName: string;
@@ -1408,21 +1420,21 @@ function Container({ goalTemplates }: { goalTemplates: GoalTemplate[] }) {
 
 export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioProps) {
   const [expandedSection, setExpandedSection] = useState<'clients' | 'agency' | 'superAdmin' | null>('superAdmin');
-  // Below desktop (1024px), the sidebar starts collapsed to the icon rail —
-  // opening it via the hamburger overlays a flyout with a blurred scrim
-  // instead of pushing the toolbar/content over, per the tablet breakpoint.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
+  // Below desktop, the sidebar starts collapsed to the icon rail — opening it
+  // via the hamburger overlays a flyout with a blurred scrim instead of
+  // pushing the toolbar/content over, per the tablet breakpoint.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => !window.matchMedia(DESKTOP_QUERY).matches);
   // Owned here so the chrome and the dashboard share one source of truth for who is viewing.
   const [role, setRole] = useRole();
   const identity = getUserIdentity(role);
 
-  // Re-apply the breakpoint default whenever the viewport crosses the 1024px
+  // Re-apply the breakpoint default whenever the viewport crosses the desktop
   // line — not just on first load. Without this, resizing the window (or
   // switching a device preset) live never updates sidebarCollapsed, since
   // the useState initializer above only runs once at mount.
   useEffect(() => {
-    const query = window.matchMedia('(max-width: 1023px)');
-    const handleChange = (e: MediaQueryListEvent) => setSidebarCollapsed(e.matches);
+    const query = window.matchMedia(DESKTOP_QUERY);
+    const handleChange = (e: MediaQueryListEvent) => setSidebarCollapsed(!e.matches);
     query.addEventListener('change', handleChange);
     return () => query.removeEventListener('change', handleChange);
   }, []);
