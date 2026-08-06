@@ -748,7 +748,12 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
   },
 ];
 
-const STORAGE_KEY = 'bs-messages-v8';
+// Bump this whenever INITIAL_MESSAGES changes shape or content. Seed data is
+// only written when storage is empty, so without a bump anyone carrying rows
+// from a previous version keeps them forever — and new fields (author,
+// department, authorRole, rejectionReason) read as undefined on those old
+// rows, which silently empties the Drafts and Pending columns.
+const STORAGE_KEY = 'bs-messages-v9';
 
 function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
