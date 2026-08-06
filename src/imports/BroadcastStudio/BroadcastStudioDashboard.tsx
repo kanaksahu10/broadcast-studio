@@ -1648,12 +1648,12 @@ function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
     .filter((x): x is { row: BroadcastMessageRow; bucket: DiscardedBucket } => x.bucket !== null);
 
   return (
-    <div className="flex gap-[16px] w-full items-start">
+    <div className="flex gap-[16px] w-full items-start overflow-x-auto pb-[4px]">
       {DISCARDED_COLUMNS.map((bucket) => {
         const colRows = bucketed.filter((x) => x.bucket === bucket).map((x) => x.row);
         const color = BUCKET_COLOR[bucket];
         return (
-          <div key={bucket} className="flex flex-col gap-[10px] flex-1 min-w-0 bg-[#fcfcfc] rounded-[10px] p-[12px]">
+          <div key={bucket} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
             <div className="flex items-center justify-between px-[2px]">
               <div className="flex items-center gap-[7px]">
                 <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{bucket}</span>
@@ -1704,12 +1704,12 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
   highlightIds: Set<string>;
 }) {
   return (
-    <div className="flex gap-[16px] w-full items-start">
+    <div className="flex gap-[16px] w-full items-start overflow-x-auto pb-[4px]">
       {KANBAN_COLUMNS.map(({ status, label }) => {
         const colRows = rows.filter((r) => r.status === status && getDiscardedBucket(r) === null && isDraftVisibleToRole(r, role));
         const color = STATUS_COLOR[status];
         return (
-          <div key={status} className="flex flex-col gap-[10px] flex-1 min-w-0 bg-[#fcfcfc] rounded-[10px] p-[12px]">
+          <div key={status} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
             <div className="flex items-center justify-between px-[2px]">
               <div className="flex items-center gap-[7px]">
                 <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{label}</span>
