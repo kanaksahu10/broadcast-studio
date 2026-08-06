@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose } from 'react-icons/io';
-import { MdAdd, MdApps, MdBlock, MdBusiness, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
+import { MdAdd, MdApps, MdBlock, MdBusiness, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
 import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField } from './ComposeMessageOverlay';
 import { getUserIdentity, type UserRole } from './userIdentity';
@@ -52,7 +52,7 @@ type MessageStatus = 'Live' | 'Pending' | 'Draft' | 'Rejected' | 'Discontinued';
 type MessageType = '' | 'Announcement' | 'Emergency';
 
 interface MessageFormData {
-  body?: string; reason?: string; department?: string; author?: string; noEndDate?: boolean; displayFormat?: string; placement?: string; featurePath?: string;
+  body?: string; reason?: string; department?: string; messageCategory?: string; customCategoryName?: string; author?: string; noEndDate?: boolean; displayFormat?: string; placement?: string; featurePath?: string;
   messageColor?: string; searchMode?: string; statesOrAgencies?: string[];
   packages?: string[]; roles?: string[]; dismissible?: string; hasCta?: boolean;
   ctaLabel?: string; ctaDestination?: string; pushNotification?: boolean;
@@ -144,6 +144,22 @@ function getDiscardedBucket(row: BroadcastMessageRow): DiscardedBucket | null {
   return null;
 }
 
+// Identifies which column/bucket a row currently renders in, so we can tell
+// when a card has moved somewhere new since the user last saw the board.
+function getColumnKey(row: BroadcastMessageRow): string {
+  const bucket = getDiscardedBucket(row);
+  return bucket ? `discarded:${bucket}` : `kanban:${row.status}`;
+}
+
+const SEEN_COLUMNS_KEY = 'bs-seen-columns-v1';
+
+// A newly-moved card's border holds its highlight color for this long
+// before dropping back — a single flicker, not a repeating blink. The color
+// change itself eases in and back out over FLICKER_FADE_MS, rather than
+// snapping instantly.
+const FLICKER_HOLD_MS = 600;
+const FLICKER_FADE_MS = 300;
+
 function getRetentionDaysLeft(row: BroadcastMessageRow, bucket: DiscardedBucket): number {
   // Expired (Live past its window) and auto-rejected (Pending past its window)
   // are both date-driven, not action-driven, so retention counts from the
@@ -171,6 +187,29 @@ function isMessageCurrentlyLive(row: BroadcastMessageRow): boolean {
   const start = new Date(row.startDate);
   const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
   return today >= start && today <= end;
+}
+
+// The optional "Message Category" tag: the chosen preset label, or the
+// author's own typed name when they picked "Custom". Empty/unset shows no tag.
+function getCategoryLabel(row: BroadcastMessageRow): string | null {
+  const category = row.formData?.messageCategory;
+  if (!category) return null;
+  if (category === 'Custom') {
+    const custom = row.formData?.customCategoryName?.trim();
+    return custom || null;
+  }
+  return category;
+}
+
+function CategoryTag({ label }: { label: string }) {
+  return (
+    <span
+      className="flex items-center self-start font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]"
+      style={{ backgroundColor: '#F2F2F2', color: '#585858' }}
+    >
+      {label}
+    </span>
+  );
 }
 
 function getRecipientCount(row: BroadcastMessageRow): number {
@@ -962,66 +1001,88 @@ const ACTION_LABEL: Record<MessageStatus, string> = {
   Discontinued: 'View',
 };
 
-function Tooltip({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
-  const [tooltipY, setTooltipY] = useState<number | null>(null);
-  const [suppressed, setSuppressed] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+function getActionTooltip(status: MessageStatus, role: UserRole): string {
+  const isSuperAdmin = role === 'super-admin';
+  if (status === 'Draft') return 'Messages you’re still working on before sending them for approval. These are private to you.';
+  if (status === 'Pending') {
+    return isSuperAdmin
+      ? 'Messages waiting for approval. You can review but not edit them.'
+      : 'Messages waiting for your approval or rejection';
+  }
+  return 'Messages that are live now or scheduled to go live';
+}
+
+function getBucketTooltip(bucket: DiscardedBucket): string {
+  if (bucket === 'Rejected') return 'Messages an approver rejected during review';
+  if (bucket === 'Expired') return 'Messages whose live window has already ended';
+  return 'Messages that were manually stopped while live';
+}
+
+// A small info icon next to a column/bucket header explaining what that
+// whole bucket holds. Replaces the old per-card hover tooltip, which
+// covered the entire card and got in the way.
+function ColumnInfoTooltip({ label }: { label: string }) {
+  const [hovered, setHovered] = useState(false);
+  // Fades in only after a short hover-intent delay, rather than snapping in
+  // instantly.
+  const [visible, setVisible] = useState(false);
+  // Opens below the icon by default, then nudges itself left by however many
+  // pixels it actually overflows the real viewport edge by — measured
+  // directly, rather than a binary left/right flip, so it can't still run
+  // off-screen under some fixed chrome docked at the edge.
+  const [shiftX, setShiftX] = useState(0);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isExcluded = (target: EventTarget | null) => (target as HTMLElement | null)?.closest?.('[data-no-tooltip]') != null;
-  const visible = tooltipY !== null && !suppressed;
+  useEffect(() => {
+    if (hovered) {
+      showTimerRef.current = setTimeout(() => setVisible(true), 300);
+    } else if (showTimerRef.current) {
+      clearTimeout(showTimerRef.current);
+    }
+    return () => {
+      if (showTimerRef.current) clearTimeout(showTimerRef.current);
+    };
+  }, [hovered]);
 
-  const clampY = (rawY: number) => {
-    const gap = 4;
-    const containerH = containerRef.current?.getBoundingClientRect().height ?? 0;
-    const tooltipH = tooltipRef.current?.getBoundingClientRect().height ?? 36;
-    const maxY = Math.max(gap, containerH - tooltipH - gap);
-    return Math.min(Math.max(rawY, gap), maxY);
-  };
+  useLayoutEffect(() => {
+    if (!hovered) return;
+    const el = tooltipRef.current;
+    if (!el) return;
+    // Wider than a bare "don't clip the viewport" margin — the host portal
+    // this widget is embedded in docks a persistent icon rail along the
+    // right edge that isn't part of this app's own DOM, so a tight margin
+    // still lets the tooltip render underneath it.
+    const margin = 100;
+    const rect = el.getBoundingClientRect();
+    let shift = 0;
+    if (rect.right > window.innerWidth - margin) {
+      shift = window.innerWidth - margin - rect.right; // negative: pull left
+    }
+    if (rect.left + shift < margin) {
+      shift = margin - rect.left; // don't overcorrect off the left edge either
+    }
+    if (shift !== 0) setShiftX(shift);
+  }, [hovered]);
 
   return (
     <div
-      ref={containerRef}
-      className={className ?? 'relative inline-flex group'}
-      onMouseMove={(e) => {
-        const excluded = isExcluded(e.target);
-        setSuppressed(excluded);
-        if (excluded) return;
-        setTooltipY((prev) => {
-          if (prev !== null) return prev; // captured once — stays put while hovering
-          const rect = containerRef.current?.getBoundingClientRect();
-          return rect ? clampY(e.clientY - rect.top + 8) : prev;
-        });
-      }}
-      onMouseOut={(e) => {
-        const related = e.relatedTarget as Node | null;
-        if (!related || !containerRef.current?.contains(related)) {
-          setTooltipY(null);
-          setSuppressed(false);
-        }
-      }}
+      className="relative inline-flex items-center shrink-0"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setVisible(false); setShiftX(0); }}
     >
-      {children}
-      <div
-        ref={tooltipRef}
-        className="pointer-events-none absolute right-0 transition-opacity duration-150 z-20 whitespace-nowrap"
-        style={{ top: tooltipY ?? 0, opacity: visible ? 1 : 0 }}
-      >
-        <div className="rounded-[6px] p-[12px] font-['Montserrat',sans-serif] font-medium text-[12px] text-white" style={{ backgroundColor: '#3B5C79' }}>
+      <MdInfoOutline size={14} color="#27496D" />
+      {hovered && (
+        <div
+          ref={tooltipRef}
+          className="absolute left-0 top-full mt-[8px] z-30 whitespace-normal rounded-[6px] px-[12px] py-[8px] font-['Montserrat',sans-serif] font-normal text-[12px] text-white transition-opacity duration-200 ease-out pointer-events-none"
+          style={{ backgroundColor: '#3B5C79', width: 'max-content', maxWidth: '240px', transform: `translateX(${shiftX}px)`, opacity: visible ? 1 : 0 }}
+        >
           {label}
         </div>
-      </div>
+      )}
     </div>
   );
-}
-
-function getActionTooltip(status: MessageStatus, role: UserRole): string {
-  const isSuperAdmin = role === 'super-admin';
-  if (status === 'Draft') return 'Edit this draft message';
-  if (status === 'Pending') {
-    return isSuperAdmin ? 'Review only, no editing' : 'Approve or reject this message';
-  }
-  return 'Preview this live message';
 }
 
 function AudienceChip({ label, variant }: { label: string; variant: 'agency' | 'package' | 'role' }) {
@@ -1254,7 +1315,7 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete', is
   );
 }
 
-function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForApproval, onApprove, onReject }: {
+function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForApproval, onApprove, onReject, highlight }: {
   row: BroadcastMessageRow;
   role: UserRole;
   onEdit?: () => void;
@@ -1263,6 +1324,7 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
   onSendForApproval?: () => void;
   onApprove?: () => void;
   onReject?: () => void;
+  highlight?: boolean;
 }) {
   const color = STATUS_COLOR[row.status];
   const dateRange = row.startDate === '—' ? '—' : row.endDate === '—' ? `${row.startDate} – Until stopped` : `${row.startDate} – ${row.endDate}`;
@@ -1273,7 +1335,23 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isCardHovered, setIsCardHovered] = useState(false);
+  // A single border flicker for a card that just landed in this column: eases
+  // in, holds, eases back out. `highlight` often flips true a tick after this
+  // component's first mount (the parent's own-mount diff effect runs after
+  // the initial commit), so this reacts to the prop rather than only seeding
+  // state from it at mount time.
+  const [flickerOn, setFlickerOn] = useState(false);
+  const [flickerActive, setFlickerActive] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!highlight) return;
+    setFlickerActive(true);
+    setFlickerOn(true);
+    const offId = setTimeout(() => setFlickerOn(false), FLICKER_HOLD_MS);
+    const doneId = setTimeout(() => setFlickerActive(false), FLICKER_HOLD_MS + FLICKER_FADE_MS);
+    return () => { clearTimeout(offId); clearTimeout(doneId); };
+  }, [highlight]);
 
   useEffect(() => {
     if (!showKebab) return;
@@ -1300,10 +1378,15 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
         onConfirm={() => { setShowDeleteConfirm(false); row.status === 'Live' ? onDiscontinue?.() : onDelete?.(); }}
       />
     )}
-    <Tooltip label={getActionTooltip(row.status, role)} className="relative flex w-full group">
     <div
-      className="bg-white rounded-[8px] border flex w-full cursor-pointer transition-colors duration-100"
-      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderColor: isCardHovered ? color : '#e5e5e5' }}
+      className="bg-white rounded-[8px] border flex w-full cursor-pointer"
+      style={{
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+        borderColor: isCardHovered || flickerOn ? color : '#e5e5e5',
+        transitionProperty: 'border-color',
+        transitionDuration: flickerActive ? `${FLICKER_FADE_MS}ms` : '100ms',
+        transitionTimingFunction: 'ease-in-out',
+      }}
       onClick={onEdit}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
@@ -1328,7 +1411,7 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
             )}
           </div>
           {(isDraft || (row.status === 'Live' && !isSuperAdmin)) && (
-            <div className="relative shrink-0" ref={kebabRef} data-no-tooltip onClick={(e) => e.stopPropagation()}>
+            <div className="relative shrink-0" ref={kebabRef} onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 className="flex items-center justify-center w-[24px] h-[24px] rounded-[4px] cursor-pointer hover:bg-[#f2f2f2]"
@@ -1367,26 +1450,39 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
             </div>
           )}
         </div>
-        {row.status === 'Live' && row.startDate !== '—' && (() => {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const start = new Date(row.startDate);
-          const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
-          const isLive = today >= start && today <= end;
-          const isScheduled = today < start;
-          if (isLive) return (
-            <span className="flex items-center gap-[5px] self-start font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]" style={{ backgroundColor: '#EEFFEE', color: '#00AA00' }}>
-              <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: '#00AA00' }} />
-              Live
-            </span>
+        {(() => {
+          const categoryLabel = getCategoryLabel(row);
+          let liveBadge: React.ReactNode = null;
+          if (row.status === 'Live' && row.startDate !== '—') {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const start = new Date(row.startDate);
+            const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
+            const isLive = today >= start && today <= end;
+            const isScheduled = today < start;
+            if (isLive) {
+              liveBadge = (
+                <span className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]" style={{ backgroundColor: '#EEFFEE', color: '#00AA00' }}>
+                  <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: '#00AA00' }} />
+                  Live
+                </span>
+              );
+            } else if (isScheduled) {
+              liveBadge = (
+                <span className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]" style={{ backgroundColor: '#E8F4FF', color: '#2699FB' }}>
+                  <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: '#2699FB' }} />
+                  Scheduled
+                </span>
+              );
+            }
+          }
+          if (!liveBadge && !categoryLabel) return null;
+          return (
+            <div className="flex items-center gap-[6px] flex-wrap self-start">
+              {liveBadge}
+              {categoryLabel && <CategoryTag label={categoryLabel} />}
+            </div>
           );
-          if (isScheduled) return (
-            <span className="flex items-center gap-[5px] self-start font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]" style={{ backgroundColor: '#E8F4FF', color: '#2699FB' }}>
-              <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: '#2699FB' }} />
-              Scheduled
-            </span>
-          );
-          return null;
         })()}
         <div className="flex items-center justify-between gap-[8px]">
           {(() => {
@@ -1403,7 +1499,6 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
               <button
                 type="button"
                 className={`flex items-center gap-[5px] ${hasDetail ? 'group/recipients' : ''}`}
-                data-no-tooltip
                 style={{ cursor: hasDetail ? 'pointer' : 'default' }}
                 onClick={(e) => { e.stopPropagation(); hasDetail && setShowAudience(true); }}
               >
@@ -1415,24 +1510,35 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
         </div>
       </div>
     </div>
-    </Tooltip>
     </>
   );
 }
 
-function DiscardedCard({ row, bucket, onView, onDelete }: {
+function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
   row: BroadcastMessageRow;
   bucket: DiscardedBucket;
   onView: () => void;
   onDelete: () => void;
+  highlight?: boolean;
 }) {
   const dateRange = row.startDate === '—' ? '—' : row.endDate === '—' ? `${row.startDate} – Until stopped` : `${row.startDate} – ${row.endDate}`;
   const bucketColor = BUCKET_COLOR[bucket];
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [flickerOn, setFlickerOn] = useState(false);
+  const [flickerActive, setFlickerActive] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
   const daysLeft = getRetentionDaysLeft(row, bucket);
+
+  useEffect(() => {
+    if (!highlight) return;
+    setFlickerActive(true);
+    setFlickerOn(true);
+    const offId = setTimeout(() => setFlickerOn(false), FLICKER_HOLD_MS);
+    const doneId = setTimeout(() => setFlickerActive(false), FLICKER_HOLD_MS + FLICKER_FADE_MS);
+    return () => { clearTimeout(offId); clearTimeout(doneId); };
+  }, [highlight]);
 
   useEffect(() => {
     if (!showKebab) return;
@@ -1455,8 +1561,14 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
       />
     )}
     <div
-      className="bg-white rounded-[8px] border flex w-full cursor-pointer transition-colors duration-100"
-      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderColor: isCardHovered ? bucketColor : '#e5e5e5' }}
+      className="bg-white rounded-[8px] border flex w-full cursor-pointer"
+      style={{
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+        borderColor: isCardHovered || flickerOn ? bucketColor : '#e5e5e5',
+        transitionProperty: 'border-color',
+        transitionDuration: flickerActive ? `${FLICKER_FADE_MS}ms` : '100ms',
+        transitionTimingFunction: 'ease-in-out',
+      }}
       onClick={onView}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
@@ -1505,6 +1617,7 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
             )}
           </div>
         </div>
+        {getCategoryLabel(row) && <CategoryTag label={getCategoryLabel(row)!} />}
         {/* Discarded messages aren't delivering, so the recipient count is dropped here. */}
         <div className="flex items-center justify-end gap-[8px]">
           <p className="font-['Montserrat',sans-serif] font-normal text-[11px] leading-[15px] text-[#b8b8b8] shrink-0">
@@ -1519,10 +1632,11 @@ function DiscardedCard({ row, bucket, onView, onDelete }: {
 
 const DISCARDED_COLUMNS: DiscardedBucket[] = ['Rejected', 'Expired', 'Discontinued'];
 
-function DiscardedBoard({ rows, onView, onDelete }: {
+function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
   rows: BroadcastMessageRow[];
   onView: (row: BroadcastMessageRow, bucket: DiscardedBucket) => void;
   onDelete: (id: string) => void;
+  highlightIds: Set<string>;
 }) {
   const bucketed = rows
     .map((row) => ({ row, bucket: getDiscardedBucket(row) }))
@@ -1538,6 +1652,7 @@ function DiscardedBoard({ rows, onView, onDelete }: {
             <div className="flex items-center justify-between px-[2px]">
               <div className="flex items-center gap-[7px]">
                 <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{bucket}</span>
+                <ColumnInfoTooltip label={getBucketTooltip(bucket)} />
               </div>
               <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
             </div>
@@ -1554,6 +1669,7 @@ function DiscardedBoard({ rows, onView, onDelete }: {
                     bucket={bucket}
                     onView={() => onView(row, bucket)}
                     onDelete={() => onDelete(row.id)}
+                    highlight={highlightIds.has(row.id)}
                   />
                 ))
               )}
@@ -1571,7 +1687,7 @@ const KANBAN_COLUMNS: Array<{ status: MessageStatus; label: string }> = [
   { status: 'Live', label: 'Approved' },
 ];
 
-function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApproval, onApprove, onReject }: {
+function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApproval, onApprove, onReject, highlightIds }: {
   rows: BroadcastMessageRow[];
   role: UserRole;
   onEdit: (row: BroadcastMessageRow) => void;
@@ -1580,6 +1696,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
   onSendForApproval: (id: string) => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
+  highlightIds: Set<string>;
 }) {
   return (
     <div className="flex gap-[16px] w-full items-start">
@@ -1591,6 +1708,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
             <div className="flex items-center justify-between px-[2px]">
               <div className="flex items-center gap-[7px]">
                 <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{label}</span>
+                <ColumnInfoTooltip label={getActionTooltip(status, role)} />
               </div>
               <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
             </div>
@@ -1611,6 +1729,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
                     onSendForApproval={() => onSendForApproval(row.id)}
                     onApprove={() => onApprove(row.id)}
                     onReject={() => onReject(row.id)}
+                    highlight={highlightIds.has(row.id)}
                   />
                 ))
               )}
@@ -1622,11 +1741,14 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
   );
 }
 
-function MessagePreviewModal({ row, onClose }: {
+function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
   row: BroadcastMessageRow;
+  role: UserRole;
   onClose: () => void;
+  onDiscontinue?: () => void;
 }) {
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
+  const [showDiscontinueConfirm, setShowDiscontinueConfirm] = useState(false);
 
   const isEmergency = row.type === 'Emergency';
   const effectiveFormat: 'Overlay' | 'Banner' = isEmergency ? 'Banner' : ((row.formData?.displayFormat as 'Overlay' | 'Banner') || 'Overlay');
@@ -1653,8 +1775,19 @@ function MessagePreviewModal({ row, onClose }: {
   const statusChipText = previewStatus ? `${previewStatus}: ${scheduleRange}` : null;
   const placementChips = isFeatureSpecific ? ['Feature Specific', ...(featurePath ? [featurePath] : [])] : ['App-wide'];
 
+  const canDiscontinue = role === 'executive-approver' && row.status === 'Live';
+
   return (
     <div className="fixed inset-0 z-50">
+      {showDiscontinueConfirm && (
+        <DeleteConfirmOverlay
+          subject={row.subject}
+          mode="discontinue"
+          isLive={isMessageCurrentlyLive(row)}
+          onClose={() => setShowDiscontinueConfirm(false)}
+          onConfirm={() => { setShowDiscontinueConfirm(false); onDiscontinue?.(); }}
+        />
+      )}
       <div className="absolute inset-0 bg-white flex flex-col overflow-hidden">
           {/* Header — the modal's own close is always the exit */}
           <div className="flex items-center justify-between px-[20px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', height: '56px' }}>
@@ -1722,6 +1855,22 @@ function MessagePreviewModal({ row, onClose }: {
               <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
             )}
           </div>
+
+          {/* Footer — Discontinue is the only action here, and only for the
+              Executive Approver, mirroring the kebab-menu flow on the card. */}
+          {canDiscontinue && (
+            <div className="shrink-0 border-t px-[24px] py-[16px] flex items-center justify-end" style={{ borderColor: '#E5E5E5', backgroundColor: 'white' }}>
+              <button
+                type="button"
+                className="flex items-center gap-[6px] font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+                style={{ color: '#DA4040' }}
+                onClick={() => setShowDiscontinueConfirm(true)}
+              >
+                <MdBlock size={17} color="#DA4040" />
+                Discontinue
+              </button>
+            </div>
+          )}
       </div>
     </div>
   );
@@ -1744,6 +1893,50 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
   const [rejectingRow, setRejectingRow] = useState<BroadcastMessageRow | null>(null);
   const [viewingRow, setViewingRow] = useState<BroadcastMessageRow | null>(null);
   const [viewingDiscardedRow, setViewingDiscardedRow] = useState<{ row: BroadcastMessageRow; bucket: DiscardedBucket } | null>(null);
+  const [highlightIds, setHighlightIds] = useState<Set<string>>(new Set());
+
+  // Diffs each card's current column/bucket against a baseline every time
+  // `messages` changes — whether that's a fresh mount (baseline = whatever
+  // was last persisted to localStorage from a previous visit) or a live
+  // in-session move (baseline = the map from just before this update, held
+  // in the ref). Either way, anything that moved — Draft → Pending, Pending
+  // → Approved, into a discarded bucket, or a brand-new card appearing (send
+  // for approval, approve, reject, discontinue, copy to drafts, save as
+  // draft, new message) — gets flagged to flicker right away, live or not.
+  // A truly first-ever install (no persisted snapshot at all yet) is treated
+  // as a clean baseline rather than a wave of "new" cards.
+  const lastColumnsRef = useRef<Record<string, string> | null>(null);
+  useEffect(() => {
+    const current: Record<string, string> = {};
+    messages.forEach((m) => { current[m.id] = getColumnKey(m); });
+
+    let baseline = lastColumnsRef.current;
+    if (baseline === null) {
+      try {
+        const raw = localStorage.getItem(SEEN_COLUMNS_KEY);
+        baseline = raw ? JSON.parse(raw) : null;
+      } catch {
+        baseline = null;
+      }
+    }
+
+    if (baseline !== null) {
+      const moved = new Set<string>();
+      messages.forEach((m) => {
+        if (baseline![m.id] !== current[m.id]) moved.add(m.id);
+      });
+      if (moved.size > 0) {
+        setHighlightIds((prev) => {
+          const next = new Set(prev);
+          moved.forEach((id) => next.add(id));
+          return next;
+        });
+      }
+    }
+
+    localStorage.setItem(SEEN_COLUMNS_KEY, JSON.stringify(current));
+    lastColumnsRef.current = current;
+  }, [messages]);
 
   // Prune anything past its 30-day retention window in the discarded buckets.
   useEffect(() => {
@@ -1851,6 +2044,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           rows={searchFiltered}
           onView={(row, bucket) => setViewingDiscardedRow({ row, bucket })}
           onDelete={handleDelete}
+          highlightIds={highlightIds}
         />
       ) : viewMode === 'datagrid' ? (
         <MessageTable rows={filteredRows} />
@@ -1872,6 +2066,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           onSendForApproval={handleSendForApproval}
           onApprove={handleApprove}
           onReject={handleReject}
+          highlightIds={highlightIds}
         />
       )}
 
@@ -1948,7 +2143,9 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       {viewingRow && (
         <MessagePreviewModal
           row={viewingRow}
+          role={role}
           onClose={() => setViewingRow(null)}
+          onDiscontinue={() => { handleDiscontinue(viewingRow.id); setViewingRow(null); }}
         />
       )}
 
