@@ -144,12 +144,13 @@ function TopBar({ onHamburgerClick, sidebarCollapsed, identity }: { onHamburgerC
   // absolutely positioned against, not their old shared parent).
   return (
     <>
-      {/* Logo + Hamburger — same width as the sidebar, same z-40 tier, no
-          bottom border — grouped with the sidebar as one seamless panel
-          rather than a separate topbar segment sitting above it. */}
+      {/* Logo + Hamburger — same width as the sidebar, same z-40 tier, so the
+          two read as one panel. Separated from the nav below by a flat
+          Border/Light rule rather than a shadow, which would blur over the
+          seam and break the "one sidebar" read. */}
       <div
         data-name="Top Bar"
-        className={`absolute top-0 left-0 h-[59px] bg-white z-40 flex items-center px-[16px] shrink-0 transition-[width] duration-200 ${sidebarCollapsed ? 'w-[69px] justify-center' : 'w-[329px] justify-between'}`}
+        className={`absolute top-0 left-0 h-[59px] bg-white z-40 flex items-center px-[16px] shrink-0 border-b border-[#E5E5E5] transition-[width] duration-200 ${sidebarCollapsed ? 'w-[69px] justify-center' : 'w-[329px] justify-between'}`}
       >
         {!sidebarCollapsed && <Logo />}
         <button onClick={onHamburgerClick} className="p-0 bg-transparent border-0 cursor-pointer flex items-center justify-center">
@@ -166,9 +167,10 @@ function TopBar({ onHamburgerClick, sidebarCollapsed, identity }: { onHamburgerC
       >
         <TopbarSearch />
       </div>
-      {/* User avatar — stays reachable above the scrim, like the sidebar's
-          own logo/hamburger corner. */}
-      <div className="absolute top-0 right-0 flex items-center justify-center w-[60px] h-[59px] bg-white border-l border-[#e5e5e5] border-b border-b-[#dfdfdf] z-40 shrink-0">
+      {/* User avatar — normal content tier (z-10) so it dims behind the
+          sidebar scrim too. Only the sidebar and its logo/hamburger corner
+          stay above it. */}
+      <div className="absolute top-0 right-0 flex items-center justify-center w-[60px] h-[59px] bg-white border-l border-[#e5e5e5] border-b border-b-[#dfdfdf] z-10 shrink-0">
         <div className="relative rounded-full size-[32px] flex items-center justify-center" style={{ backgroundColor: identity.avatarColor }}>
           <span className="font-['Montserrat',sans-serif] font-medium text-[12px] text-white">{identity.initials}</span>
           <div className="absolute bg-white drop-shadow-[0px_2px_2px_rgba(0,0,0,0.08)] rounded-full size-[14px] -bottom-[3px] -right-[3px] flex items-center justify-center">
@@ -1458,10 +1460,13 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
   return (
     <div className="bg-[#f8f8f8] relative size-full" data-name="Agency Management - Goal Templates">
       <TopBar onHamburgerClick={() => setSidebarCollapsed(s => !s)} sidebarCollapsed={sidebarCollapsed} identity={identity} />
-      <div className="absolute right-0 top-[59px] bottom-0 w-[60px] border-l border-[#e5e5e5] z-50">
+      {/* z-20 keeps this above page content but below the sidebar scrim
+          (z-30), so it dims with everything else when the sidebar is open
+          on tablet/mobile. */}
+      <div className="absolute right-0 top-[59px] bottom-0 w-[60px] border-l border-[#e5e5e5] z-20">
         <NotificationPanel identity={identity} />
       </div>
-      <div className={`absolute bg-[#eaeaea] bottom-0 left-0 top-[59px] overflow-hidden transition-[width] duration-200 z-40 ${sidebarCollapsed ? 'sidebar-collapsed w-[69px]' : 'w-[329px] max-lg:shadow-[0_0_24px_rgba(0,0,0,0.25)]'}`} data-name="Sidebar Menu">
+      <div className={`absolute bg-[#eaeaea] bottom-0 left-0 top-[59px] overflow-hidden transition-[width] duration-200 z-40 ${sidebarCollapsed ? 'sidebar-collapsed w-[69px]' : 'w-[329px]'}`} data-name="Sidebar Menu">
         <div className="content-stretch flex flex-col items-start overflow-y-auto relative rounded-[inherit] size-full">
           {!sidebarCollapsed && (
             <>
