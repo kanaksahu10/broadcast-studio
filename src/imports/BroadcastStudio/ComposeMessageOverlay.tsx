@@ -1195,7 +1195,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts, currentUserName, rejectionReason }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts, currentUserName, rejectionReason, rejected }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -1211,6 +1211,12 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   currentUserName?: string;
   /** Approver's note from rejecting this message — surfaced as a banner above Author Details. */
   rejectionReason?: string;
+  /**
+   * Whether this message was rejected. Separate from the reason itself, which
+   * is optional — a rejection with no reason still has to show the banner, and
+   * an Expired or Discontinued message must not show it at all.
+   */
+  rejected?: boolean;
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [title, setTitle] = useState(initialData?.title ?? '');
@@ -1383,7 +1389,11 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
         >
           {readOnly && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} />}
 
-          {rejectionReason && (
+          {/* Shown for every rejected message. The reason is optional, so when
+              the approver left it blank the banner says so rather than
+              vanishing — otherwise the absence of a note is indistinguishable
+              from the message never having been rejected. */}
+          {(rejected || rejectionReason) && (
             <div
               className="flex items-start gap-[8px] rounded-[4px] px-[12px] py-[10px]"
               style={{ backgroundColor: '#FFE9E9' }}
@@ -1391,7 +1401,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               <RiErrorWarningLine size={16} color="#DA4040" className="shrink-0 mt-[1px]" />
               <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: '#DA4040' }}>
                 <span className="font-semibold">Rejection Reason: </span>
-                {rejectionReason}
+                {rejectionReason || 'No reason was provided by the approver.'}
               </p>
             </div>
           )}

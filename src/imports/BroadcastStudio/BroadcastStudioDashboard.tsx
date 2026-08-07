@@ -2322,6 +2322,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           overlayTitle={`${viewingDiscardedRow.bucket} Message`}
           readOnly
           rejectionReason={viewingDiscardedRow.row.rejectionReason}
+          rejected={viewingDiscardedRow.bucket === 'Rejected'}
           initialData={{
             title: viewingDiscardedRow.row.subject,
             messageType: viewingDiscardedRow.row.type,
