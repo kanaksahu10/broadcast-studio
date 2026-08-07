@@ -19,7 +19,9 @@ function RoleToggle({ role, onChange }: { role: UserRole; onChange: (next: UserR
     { key: 'executive-approver', label: 'Executive Approver', activeBg: '#27496D' },
   ];
   return (
-    <div className="fixed top-[13px] right-[90px] z-[9999] flex flex-col items-end gap-[4px]">
+    // Docked bottom-centre on mobile: at phone widths the header has no spare
+    // room, and top-right would sit straight on top of the logo and search.
+    <div className="fixed z-[9999] flex flex-col gap-[4px] max-sm:bottom-[16px] max-sm:left-1/2 max-sm:-translate-x-1/2 max-sm:items-center sm:top-[13px] sm:right-[90px] sm:items-end">
       <div
         className="flex items-center rounded-[8px] overflow-hidden border"
         style={{ borderColor: '#E5E5E5', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.10)' }}
