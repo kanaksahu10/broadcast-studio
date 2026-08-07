@@ -861,7 +861,7 @@ function FilterTab({ label, active, onClick }: { label: string; active: boolean;
 
 function SearchInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <div className="bg-white content-stretch flex gap-[8px] items-center px-[13px] py-[10px] relative rounded-[4px] shrink-0 w-[285px]" data-name="Input">
+    <div className="bg-white content-stretch flex gap-[8px] items-center px-[13px] py-[10px] relative rounded-[4px] shrink-0 w-[285px] max-sm:w-full" data-name="Input">
       <div aria-hidden="true" className="absolute border border-[#e5e5e5] border-solid inset-0 pointer-events-none rounded-[4px]" />
       <BsSearch className="shrink-0" size={12} color="#c3c3c3" />
       <input
@@ -2038,7 +2038,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
 
       {/* {viewMode === 'kanban' && <AudienceMetrics rows={messages} />} */}
 
-      <div className="flex items-center gap-[12px] w-full">
+      <div className="flex items-center gap-[12px] w-full max-sm:flex-wrap">
         <SearchInput value={search} onChange={setSearch} />
         <ShowDiscardedToggle checked={showDiscarded} onChange={setShowDiscarded} />
         <NewMessageButton onClick={() => setIsComposeOpen(true)} />
