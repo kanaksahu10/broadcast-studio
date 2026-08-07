@@ -4,7 +4,8 @@ import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs
 import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { MdAdd, MdApps, MdBlock, MdBusiness, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
-import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField } from './ComposeMessageOverlay';
+import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
+import { useIsBelowDesktop } from './useIsPhone';
 import { getUserIdentity, type UserRole } from './userIdentity';
 
 // Prototype affordance: switch the viewer's role in one click (no URL editing).
@@ -1913,6 +1914,7 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
 }) {
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
   const [showDiscontinueConfirm, setShowDiscontinueConfirm] = useState(false);
+  const isBelowDesktop = useIsBelowDesktop();
 
   const isEmergency = row.type === 'Emergency';
   const effectiveFormat: 'Overlay' | 'Banner' = isEmergency ? 'Banner' : ((row.formData?.displayFormat as 'Overlay' | 'Banner') || 'Overlay');
@@ -1954,52 +1956,51 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
       )}
       <div className="absolute inset-0 bg-white flex flex-col overflow-hidden">
           {/* Header — the modal's own close is always the exit */}
-          {/* Min-height, not a fixed 56px: on a narrow screen the subtitle wraps
-              to two lines, which exactly filled the old box and left the text
-              pressed against the divider. */}
-          <div className="flex items-start justify-between gap-[16px] px-[20px] py-[12px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', minHeight: '56px' }}>
-            <div className="flex flex-col gap-[5px] min-w-0">
-              <p className="font-['Montserrat',sans-serif] font-semibold text-[15px] leading-[20px] text-black">Message Preview</p>
-              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[16px]" style={{ color: '#8b8b8b' }}>
-                {[row.subject, row.formData?.author, row.formData?.department].filter(Boolean).join(' · ')}
-              </p>
-            </div>
-            <button type="button" onClick={onClose} className="cursor-pointer flex items-center shrink-0 mt-[1px]">
+          <div className="flex items-center justify-between gap-[16px] px-[20px] py-[12px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', minHeight: '56px' }}>
+            <p className="font-['Montserrat',sans-serif] font-semibold text-[15px] leading-[20px] text-black">Message Preview</p>
+            <button type="button" onClick={onClose} className="cursor-pointer flex items-center shrink-0">
               <IoIosClose size={26} color="#27496D" />
             </button>
           </div>
 
           {/* Context bar — device toggle + "what recipients see" + push indicator */}
-          <div className="flex items-center justify-between gap-[12px] px-[20px] py-[10px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', backgroundColor: '#ffffff' }}>
-            <div className="flex items-center gap-[6px] min-w-0 flex-wrap">
-              {statusChipText && (
-                <span
-                  className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
-                  style={{ backgroundColor: chipBg, color: chipColor }}
-                >
-                  <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: chipColor }} />
-                  {statusChipText}
-                </span>
-              )}
-              {placementChips.map((chip) => (
-                <span
-                  key={chip}
-                  className="flex items-center font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
-                  style={{ backgroundColor: chipBg, color: chipColor }}
-                >
-                  {chip}
-                </span>
-              ))}
-              {effectiveFormat === 'Banner' && row.formData?.pushNotification && (
-                <span
-                  className="flex items-center gap-[4px] font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
-                  style={{ backgroundColor: chipBg, color: chipColor }}
-                >
-                  <MdOutlineNotificationsActive size={12} />
-                  Push Notification
-                </span>
-              )}
-            </div>
+          <div className="flex flex-col gap-[8px] px-[20px] py-[10px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', backgroundColor: '#ffffff' }}>
+            {/* Which message this is, on its own full-width line above the
+                chips — in the header it had to share the row with the close
+                button and wrapped into it on narrow screens. */}
+            <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[16px]" style={{ color: '#8b8b8b' }}>
+              {[row.subject, row.formData?.author, row.formData?.department].filter(Boolean).join(' · ')}
+            </p>
+            <div className="flex items-center justify-between gap-[12px]">
+              <div className="flex items-center gap-[6px] min-w-0 flex-wrap">
+                {statusChipText && (
+                  <span
+                    className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
+                    style={{ backgroundColor: chipBg, color: chipColor }}
+                  >
+                    <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: chipColor }} />
+                    {statusChipText}
+                  </span>
+                )}
+                {placementChips.map((chip) => (
+                  <span
+                    key={chip}
+                    className="flex items-center font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
+                    style={{ backgroundColor: chipBg, color: chipColor }}
+                  >
+                    {chip}
+                  </span>
+                ))}
+                {effectiveFormat === 'Banner' && row.formData?.pushNotification && (
+                  <span
+                    className="flex items-center gap-[4px] font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
+                    style={{ backgroundColor: chipBg, color: chipColor }}
+                  >
+                    <MdOutlineNotificationsActive size={12} />
+                    Push Notification
+                  </span>
+                )}
+              </div>
             <div className="flex items-center rounded-[6px] border border-[#e5e5e5] bg-white overflow-hidden shrink-0">
               <button type="button" onClick={() => setDeviceView('desktop')} className="flex items-center justify-center w-[32px] h-[32px] transition-colors duration-150" style={{ backgroundColor: deviceView === 'desktop' ? '#27496d' : 'white' }} title="Desktop view">
                 <MdDesktopWindows size={16} color={deviceView === 'desktop' ? 'white' : '#8a8a8a'} />
@@ -2008,18 +2009,31 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
                 <MdPhoneIphone size={16} color={deviceView === 'phone' ? 'white' : '#8a8a8a'} />
               </button>
             </div>
+            </div>
           </div>
 
           {/* Stage — faithful in-context render, always contained */}
           <div className="flex-1 min-h-0 p-[20px]" style={{ backgroundColor: '#f5f6f7' }}>
             {deviceView === 'desktop' ? (
-              <div className="w-full h-full flex justify-center">
-                <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
+              isBelowDesktop ? (
+                // Below desktop this box is narrow, and driving the mock off
+                // height lets max-width override the ratio — the "desktop"
+                // screen comes out portrait and its 320px message panel then
+                // covers the app behind it. Scale a real-size mock instead.
+                <ScaledMock baseWidth={MOCK_WIDTH} baseHeight={MOCK_WIDTH / 1.6}>
                   <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+                </ScaledMock>
+              ) : (
+                <div className="w-full h-full flex justify-center">
+                  <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
+                    <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+                  </div>
                 </div>
-              </div>
+              )
             ) : (
-              <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+              <ScaledMock baseWidth={PHONE_WIDTH} baseHeight={PHONE_HEIGHT}>
+                <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+              </ScaledMock>
             )}
           </div>
 

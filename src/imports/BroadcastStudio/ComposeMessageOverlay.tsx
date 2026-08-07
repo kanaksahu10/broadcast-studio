@@ -946,14 +946,14 @@ export function ScreenSkeleton({
  * desktop size and scale the result down: the miniature is then exactly what
  * a desktop viewer sees, just smaller.
  */
-const MOCK_WIDTH = 900;
+export const MOCK_WIDTH = 900;
 
 /**
  * Renders a mock at real device size and scales the whole thing down to fit.
  * Every proportion — type size, padding, chrome — stays exactly as the real
  * device shows it, instead of each element being re-tuned for a small box.
  */
-function ScaledMock({ baseWidth, baseHeight, children }: { baseWidth: number; baseHeight: number; children: ReactNode }) {
+export function ScaledMock({ baseWidth, baseHeight, children }: { baseWidth: number; baseHeight: number; children: ReactNode }) {
   const frameRef = useRef<HTMLDivElement>(null);
   // 0 until measured, so the full-size mock never flashes before it shrinks.
   const [scale, setScale] = useState(0);
@@ -1021,8 +1021,8 @@ function PhoneDataCard() {
 
 // A real handset in CSS points, so a 13px banner in the mock covers the same
 // share of the screen it would on the actual device.
-const PHONE_WIDTH = 390;
-const PHONE_HEIGHT = 844;
+export const PHONE_WIDTH = 390;
+export const PHONE_HEIGHT = 844;
 const PHONE_BEZEL = 10;
 const PHONE_SCREEN_WIDTH = PHONE_WIDTH - PHONE_BEZEL * 2;
 const PHONE_SCREEN_HEIGHT = PHONE_HEIGHT - PHONE_BEZEL * 2;
