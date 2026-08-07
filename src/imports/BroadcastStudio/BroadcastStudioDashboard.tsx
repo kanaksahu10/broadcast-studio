@@ -1726,9 +1726,10 @@ function MobileBoardColumns({ columns }: { columns: Array<{ key: string; label: 
                 put and every column is the same height — which in turn keeps
                 the dots below at one fixed position instead of drifting with
                 the number of cards. */}
-            {/* The right padding keeps the scrollbar clear of the cards, so it
-                runs down the column's own gutter instead of over the card edge. */}
-            <div className="flex-1 min-h-0 overflow-y-auto pr-[8px] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#d0d0d0]">
+            {/* The list reaches into the column's 12px right padding so the 6px
+                scrollbar sits centred in that gutter — 3px either side — while
+                the cards keep the width they have everywhere else. */}
+            <div className="flex-1 min-h-0 overflow-y-auto -mr-[9px] pr-[3px] [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#d0d0d0]">
               {c.body}
             </div>
           </div>
