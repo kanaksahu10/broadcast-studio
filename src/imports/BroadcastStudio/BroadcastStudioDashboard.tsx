@@ -1248,7 +1248,7 @@ function RejectConfirmOverlay({ subject, onConfirm, onClose }: { subject: string
         onClick={handleClose}
       />
       <div
-        className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
+        className="absolute right-0 top-0 bottom-0 w-[305px] min-w-[305px] max-w-[305px] bg-white flex flex-col transition-transform duration-300 ease-out"
         style={{ transform: mounted && !closing ? 'translateX(0)' : 'translateX(100%)' }}
       >
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
@@ -1320,7 +1320,7 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete', is
         onClick={handleClose}
       />
       <div
-        className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
+        className="absolute right-0 top-0 bottom-0 w-[305px] min-w-[305px] max-w-[305px] bg-white flex flex-col transition-transform duration-300 ease-out"
         style={{ transform: mounted && !closing ? 'translateX(0)' : 'translateX(100%)' }}
       >
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
@@ -1717,7 +1717,7 @@ function MobileBoardColumns({ columns }: { columns: Array<{ key: string; label: 
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="flex gap-[16px] w-full items-stretch overflow-x-auto snap-x snap-mandatory scroll-smooth h-[calc(100dvh-290px)] min-h-[300px]"
+        className="flex gap-[16px] w-full items-stretch overflow-x-auto snap-x snap-mandatory scroll-smooth h-[calc(100dvh-290px)] min-h-[300px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
       >
         {columns.map((c) => (
           <div key={c.key} className="snap-start shrink-0 w-[88%] h-full flex flex-col gap-[10px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
@@ -1726,7 +1726,9 @@ function MobileBoardColumns({ columns }: { columns: Array<{ key: string; label: 
                 put and every column is the same height — which in turn keeps
                 the dots below at one fixed position instead of drifting with
                 the number of cards. */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            {/* The right padding keeps the scrollbar clear of the cards, so it
+                runs down the column's own gutter instead of over the card edge. */}
+            <div className="flex-1 min-h-0 overflow-y-auto pr-[8px] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#d0d0d0]">
               {c.body}
             </div>
           </div>
