@@ -1954,14 +1954,17 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
       )}
       <div className="absolute inset-0 bg-white flex flex-col overflow-hidden">
           {/* Header — the modal's own close is always the exit */}
-          <div className="flex items-center justify-between px-[20px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', height: '56px' }}>
-            <div className="flex flex-col gap-[4px]">
+          {/* Min-height, not a fixed 56px: on a narrow screen the subtitle wraps
+              to two lines, which exactly filled the old box and left the text
+              pressed against the divider. */}
+          <div className="flex items-start justify-between gap-[16px] px-[20px] py-[12px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', minHeight: '56px' }}>
+            <div className="flex flex-col gap-[5px] min-w-0">
               <p className="font-['Montserrat',sans-serif] font-semibold text-[15px] leading-[20px] text-black">Message Preview</p>
               <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[16px]" style={{ color: '#8b8b8b' }}>
                 {[row.subject, row.formData?.author, row.formData?.department].filter(Boolean).join(' · ')}
               </p>
             </div>
-            <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
+            <button type="button" onClick={onClose} className="cursor-pointer flex items-center shrink-0 mt-[1px]">
               <IoIosClose size={26} color="#27496D" />
             </button>
           </div>

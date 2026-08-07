@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { useIsPhone } from './useIsPhone';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useIsBelowDesktop } from './useIsPhone';
 import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
@@ -690,7 +690,6 @@ function BannerPreview({
   hasCta,
   ctaLabel,
   rounded = true,
-  compact = false,
 }: {
   body: string;
   color: string;
@@ -698,16 +697,14 @@ function BannerPreview({
   hasCta: boolean;
   ctaLabel: string;
   rounded?: boolean;
-  /** Same role as OverlayPreview's: sized for the phone mock's 248px screen. */
-  compact?: boolean;
 }) {
   return (
     <div
-      className={`flex items-center ${compact ? 'gap-[10px] px-[10px] py-[8px]' : 'gap-[16px] px-[16px] py-[12px]'} w-full ${rounded ? 'rounded-[6px]' : ''}`}
+      className={`flex items-center gap-[16px] px-[16px] py-[12px] w-full ${rounded ? 'rounded-[6px]' : ''}`}
       style={{ backgroundColor: color }}
     >
-      {dismissible && <div className="shrink-0" style={{ width: compact ? 14 : 18 }} />}
-      <p className={`font-['Montserrat',sans-serif] font-normal ${compact ? 'text-[12px] leading-[16px]' : 'text-[13px]'} text-white flex-1 text-center`}>
+      {dismissible && <div className="shrink-0" style={{ width: 18 }} />}
+      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-white flex-1 text-center">
         {body || 'Your message body will appear here.'}
         {hasCta && ctaLabel && (
           <>
@@ -716,7 +713,7 @@ function BannerPreview({
           </>
         )}
       </p>
-      {dismissible && <MdClose size={compact ? 14 : 18} color="white" className="shrink-0 cursor-pointer" />}
+      {dismissible && <MdClose size={18} color="white" className="shrink-0 cursor-pointer" />}
     </div>
   );
 }
@@ -951,7 +948,12 @@ export function ScreenSkeleton({
  */
 const MOCK_WIDTH = 900;
 
-function ScaledScreenSkeleton(props: Parameters<typeof ScreenSkeleton>[0]) {
+/**
+ * Renders a mock at real device size and scales the whole thing down to fit.
+ * Every proportion — type size, padding, chrome — stays exactly as the real
+ * device shows it, instead of each element being re-tuned for a small box.
+ */
+function ScaledMock({ baseWidth, baseHeight, children }: { baseWidth: number; baseHeight: number; children: ReactNode }) {
   const frameRef = useRef<HTMLDivElement>(null);
   // 0 until measured, so the full-size mock never flashes before it shrinks.
   const [scale, setScale] = useState(0);
@@ -959,15 +961,21 @@ function ScaledScreenSkeleton(props: Parameters<typeof ScreenSkeleton>[0]) {
   useEffect(() => {
     const frame = frameRef.current;
     if (!frame) return;
-    const observer = new ResizeObserver(([entry]) => setScale(entry.contentRect.width / MOCK_WIDTH));
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      // Never magnify past life size — nobody sees a bigger-than-real device.
+      setScale(Math.min(width / baseWidth, height / baseHeight, 1));
+    });
     observer.observe(frame);
     return () => observer.disconnect();
-  }, []);
+  }, [baseWidth, baseHeight]);
 
   return (
-    <div ref={frameRef} className="w-full overflow-hidden" style={{ aspectRatio: '16 / 10' }}>
-      <div style={{ width: MOCK_WIDTH, height: MOCK_WIDTH / 1.6, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-        <ScreenSkeleton {...props} />
+    <div ref={frameRef} className="w-full h-full flex items-center justify-center overflow-hidden">
+      <div style={{ width: baseWidth * scale, height: baseHeight * scale }}>
+        <div style={{ width: baseWidth, height: baseHeight, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -1011,6 +1019,17 @@ function PhoneDataCard() {
   );
 }
 
+// A real handset in CSS points, so a 13px banner in the mock covers the same
+// share of the screen it would on the actual device.
+const PHONE_WIDTH = 390;
+const PHONE_HEIGHT = 844;
+const PHONE_BEZEL = 10;
+const PHONE_SCREEN_WIDTH = PHONE_WIDTH - PHONE_BEZEL * 2;
+const PHONE_SCREEN_HEIGHT = PHONE_HEIGHT - PHONE_BEZEL * 2;
+/** The width the skeleton chrome below was originally drawn against. */
+const CHROME_WIDTH = 248;
+const CHROME_SCALE = PHONE_SCREEN_WIDTH / CHROME_WIDTH;
+
 export function PhoneSkeleton({
   effectiveFormat,
   title,
@@ -1029,10 +1048,23 @@ export function PhoneSkeleton({
   ctaLabel: string;
 }) {
   return (
-    <div className="w-full h-full flex items-center justify-center">
+    <div
+      className="relative bg-white overflow-hidden shadow-lg"
+      style={{ width: PHONE_WIDTH, height: PHONE_HEIGHT, borderRadius: 46, border: `${PHONE_BEZEL}px solid #2b2b2b` }}
+    >
+      {/* The skeleton chrome is decorative and was drawn for a 248px box, so it
+          is scaled up to fill a real screen rather than re-tuned element by
+          element. The message itself is NOT in here — it renders below at its
+          true size, which is the whole point: on a real phone a 13px banner
+          occupies this much of the screen, and now the mock shows that. */}
       <div
-        className="relative bg-white rounded-[28px] overflow-hidden flex flex-col shadow-lg shrink-0"
-        style={{ width: 260, height: '100%', maxHeight: 520, border: '6px solid #2b2b2b', borderColor: '#2b2b2b' }}
+        className="absolute top-0 left-0 flex flex-col"
+        style={{
+          width: CHROME_WIDTH,
+          height: PHONE_SCREEN_HEIGHT / CHROME_SCALE,
+          transform: `scale(${CHROME_SCALE})`,
+          transformOrigin: 'top left',
+        }}
       >
         {/* Topbar: hamburger, logo, search, notifications w/ badge, avatar */}
         <div className="h-[34px] border-b flex items-center gap-[10px] px-[10px] shrink-0" style={{ borderColor: BORDER }}>
@@ -1078,28 +1110,29 @@ export function PhoneSkeleton({
           <PhoneDataCard />
           <PhoneDataCard />
         </div>
-
-        {effectiveFormat === 'Overlay' && (
-          <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
-            <OverlayPreview
-              title={title}
-              body={body}
-              dismissible={dismissible}
-              hasCta={hasCta}
-              ctaLabel={ctaLabel}
-              rounded={false}
-              widthClass="w-[80%]"
-              compact
-            />
-          </div>
-        )}
-
-        {effectiveFormat === 'Banner' && (
-          <div className="absolute left-0 right-0 bottom-0">
-            <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} compact />
-          </div>
-        )}
       </div>
+
+      {/* Outside the scaled chrome, so the message keeps its real type size and
+          padding against a real screen width — exactly what a recipient sees. */}
+      {effectiveFormat === 'Overlay' && (
+        <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
+          <OverlayPreview
+            title={title}
+            body={body}
+            dismissible={dismissible}
+            hasCta={hasCta}
+            ctaLabel={ctaLabel}
+            rounded={false}
+            widthClass="w-[85%]"
+          />
+        </div>
+      )}
+
+      {effectiveFormat === 'Banner' && (
+        <div className="absolute left-0 right-0 bottom-0">
+          <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1251,12 +1284,14 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // Phone cannot show the form and the preview side by side, so it shows one
   // at a time behind a tab strip. Someone who can only read the message opened
   // it to look at the message, not the metadata — so they land on Preview.
-  const isPhone = useIsPhone();
+  // Phone and tablet are both too narrow for the form and the preview side by
+  // side, so both stack them behind the tab strip.
+  const isBelowDesktop = useIsBelowDesktop();
   // Reviewing or just looking means you came for the message itself, not the
   // metadata. An approver can still edit here, so readOnly alone misses them —
   // the approve/reject pair is what marks a review.
   const opensOnPreview = readOnly || (!!onApprove && !!onReject);
-  const [phoneTab, setPhoneTab] = useState<'details' | 'preview'>(opensOnPreview ? 'preview' : 'details');
+  const [stackedTab, setStackedTab] = useState<'details' | 'preview'>(opensOnPreview ? 'preview' : 'details');
   // While you are on Details the preview keeps updating out of sight, so the
   // tab carries a dot until you next look at it.
   const [previewSeen, setPreviewSeen] = useState(true);
@@ -1266,13 +1301,13 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const previewSignature = [displayFormat, title, body, messageColor, dismissible, hasCta, ctaLabel].join(' ');
   const lastSeenSignature = useRef(previewSignature);
   useEffect(() => {
-    if (phoneTab === 'preview') {
+    if (stackedTab === 'preview') {
       lastSeenSignature.current = previewSignature;
       setPreviewSeen(true);
     } else if (previewSignature !== lastSeenSignature.current) {
       setPreviewSeen(false);
     }
-  }, [previewSignature, phoneTab]);
+  }, [previewSignature, stackedTab]);
 
   const isEmergency = displayFormat === 'Banner' && messageColor === '#DA4040';
 
@@ -1337,18 +1372,18 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
       {/* Phone: the form and the preview cannot share a 375px screen, so they
           share a tab strip instead. Tablet and up show both side by side. */}
-      {isPhone && (
+      {isBelowDesktop && (
         <div className="flex shrink-0 border-b" style={{ borderColor: BORDER }}>
           {([
             { key: 'details', label: 'Details' },
             { key: 'preview', label: 'Preview' },
           ] as const).map((t) => {
-            const tabActive = phoneTab === t.key;
+            const tabActive = stackedTab === t.key;
             return (
               <button
                 key={t.key}
                 type="button"
-                onClick={() => setPhoneTab(t.key)}
+                onClick={() => setStackedTab(t.key)}
                 className="flex-1 h-[44px] flex items-center justify-center gap-[6px] cursor-pointer font-['Montserrat',sans-serif] text-[13px] transition-colors duration-150"
                 style={{
                   color: tabActive ? '#2699FB' : '#585858',
@@ -1376,14 +1411,14 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           style={{
             // Fixed 399px only where there is a preview beside it to divide
             // from; on phone it owns the whole screen.
-            width: isPhone ? '100%' : '399px',
-            minWidth: isPhone ? 0 : '399px',
-            maxWidth: isPhone ? '100%' : '399px',
+            width: isBelowDesktop ? '100%' : '399px',
+            minWidth: isBelowDesktop ? 0 : '399px',
+            maxWidth: isBelowDesktop ? '100%' : '399px',
             overflowY: 'auto',
-            ...(isPhone ? {} : { [PREVIEW_ON_LEFT ? 'borderLeft' : 'borderRight']: `1px solid ${BORDER}` }),
+            ...(isBelowDesktop ? {} : { [PREVIEW_ON_LEFT ? 'borderLeft' : 'borderRight']: `1px solid ${BORDER}` }),
             position: 'relative',
             order: PREVIEW_ON_LEFT ? 2 : 1,
-            display: isPhone && phoneTab !== 'details' ? 'none' : 'flex',
+            display: isBelowDesktop && stackedTab !== 'details' ? 'none' : 'flex',
           }}
           className="p-[24px] max-sm:p-[16px] flex flex-col gap-[16px]"
         >
@@ -1504,7 +1539,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             minWidth: 0,
             backgroundColor: '#f8f8f8',
             order: PREVIEW_ON_LEFT ? 1 : 2,
-            display: isPhone && phoneTab !== 'preview' ? 'none' : 'flex',
+            display: isBelowDesktop && stackedTab !== 'preview' ? 'none' : 'flex',
           }}
           className="flex flex-col p-[24px] max-sm:p-[16px] gap-[16px]"
         >
@@ -1537,11 +1572,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               {hasPreview ? (
                 <div className="flex-1 min-h-0">
                   {deviceView === 'desktop' ? (
-                    isPhone ? (
-                      // The scaled mock is short and width-driven, so centre it
-                      // rather than leaving all the slack below it.
-                      <div className="h-full flex items-center">
-                        <ScaledScreenSkeleton
+                    isBelowDesktop ? (
+                      <ScaledMock baseWidth={MOCK_WIDTH} baseHeight={MOCK_WIDTH / 1.6}>
+                        <ScreenSkeleton
                           effectiveFormat={effectiveFormat}
                           title={title}
                           body={body}
@@ -1550,8 +1583,10 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                           hasCta={hasCta}
                           ctaLabel={ctaLabel}
                         />
-                      </div>
+                      </ScaledMock>
                     ) : (
+                      // Desktop has room to draw the mock at native size, which
+                      // beats scaling a smaller one up.
                       <div className="w-full h-full flex justify-center">
                         <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
                           <ScreenSkeleton
@@ -1567,15 +1602,19 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                       </div>
                     )
                   ) : (
-                    <PhoneSkeleton
-                      effectiveFormat={effectiveFormat}
-                      title={title}
-                      body={body}
-                      color={effectiveBannerColor}
-                      dismissible={effectiveDismissible}
-                      hasCta={hasCta}
-                      ctaLabel={ctaLabel}
-                    />
+                    // A real handset is 844pt tall, taller than the pane at any
+                    // breakpoint, so the phone mock always scales to fit.
+                    <ScaledMock baseWidth={PHONE_WIDTH} baseHeight={PHONE_HEIGHT}>
+                      <PhoneSkeleton
+                        effectiveFormat={effectiveFormat}
+                        title={title}
+                        body={body}
+                        color={effectiveBannerColor}
+                        dismissible={effectiveDismissible}
+                        hasCta={hasCta}
+                        ctaLabel={ctaLabel}
+                      />
+                    </ScaledMock>
                   )}
                 </div>
               ) : (
