@@ -1181,7 +1181,7 @@ function AudienceOverlay({ formData, recipientCount, onClose }: { formData: NonN
         onClick={handleClose}
       />
       <div
-        className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
+        className="absolute right-0 top-0 bottom-0 w-[305px] min-w-[305px] max-w-[305px] bg-white flex flex-col transition-transform duration-300 ease-out"
         style={{ transform: mounted && !closing ? 'translateX(0)' : 'translateX(100%)' }}
       >
         {/* Header */}
@@ -2059,6 +2059,9 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
   const [viewingDiscardedRow, setViewingDiscardedRow] = useState<{ row: BroadcastMessageRow; bucket: DiscardedBucket } | null>(null);
   const [highlightIds, setHighlightIds] = useState<Set<string>>(new Set());
 
+  const anyOverlayOpen =
+    isComposeOpen || !!editingRow || !!reviewingRow || !!rejectingRow || !!viewingRow || !!viewingDiscardedRow;
+
   // Diffs each card's current column/bucket against a baseline every time
   // `messages` changes — whether that's a fresh mount (baseline = whatever
   // was last persisted to localStorage from a previous visit) or a live
@@ -2331,7 +2334,10 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
         />
       )}
 
-      <RoleToggle role={role} onChange={onRoleChange} />
+      {/* The switcher floats bottom-left, which on a phone is exactly where the
+          overlay's left-hand action now sits. It is a demo control and the
+          overlay is modal, so it stands down while one is open. */}
+      {!anyOverlayOpen && <RoleToggle role={role} onChange={onRoleChange} />}
 
       {isComposeOpen && (
         <ComposeMessageOverlay

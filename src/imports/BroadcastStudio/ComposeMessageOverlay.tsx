@@ -1608,52 +1608,52 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             )}
           </div>
         ) : onApprove && onReject ? (
-            <div className="flex items-center gap-[8px]">
+            /* Pushed to opposite ends of the footer: the destructive action sits
+               well away from the one people mean to hit. */
+            <div className="flex items-center gap-[8px] w-full justify-between">
               <button
                 type="button"
                 onClick={onReject}
-                className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#fdeaea] border-[#DA4040] text-[#DA4040] hover:bg-[#DA4040] hover:text-white"
+                className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#fdeaea] border-[#DA4040] text-[#DA4040] hover:bg-[#DA4040] hover:text-white"
               >
                 <FaRegTimesCircle size={15} />
-                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase">
+                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
                   Reject
                 </span>
               </button>
               <button
                 type="button"
                 onClick={onApprove}
-                className="rounded-[8px] px-[16px] h-[32px] flex items-center gap-[8px] cursor-pointer"
+                className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[8px] max-sm:gap-[6px] cursor-pointer"
                 style={{ backgroundColor: '#00AA00' }}
               >
                 <FaRegCheckCircle size={15} color="white" />
-                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: 'white' }}>
+                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap" style={{ color: 'white' }}>
                   Approve
                 </span>
               </button>
             </div>
         ) : !readOnly ? (
-          /* Side by side these two need ~365px, more than a phone has, and
-             shrinking them only wraps or clips the labels. Stacking puts the
-             primary action nearest the thumb. */
-          <div className="flex items-center gap-[8px] max-sm:w-full max-sm:flex-col max-sm:items-stretch">
+          /* Pushed to opposite ends of the footer, same as the review actions. */
+          <div className="flex items-center gap-[8px] w-full justify-between">
             <button
               type="button"
               onClick={handleSaveAsDraft}
-              className="rounded-[8px] px-[12px] h-[32px] shrink-0 flex items-center justify-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
+              className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center justify-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
             >
               <MdOutlineSaveAlt size={15} />
-              <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase whitespace-nowrap">
+              <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
                 Save as Draft
               </span>
             </button>
-            <div className="relative group max-sm:w-full">
+            <div className="relative group shrink-0">
               <button
                 type="button"
                 onClick={isFormValid ? handleSubmit : undefined}
                 onMouseEnter={() => setIsSubmitHovered(true)}
                 onMouseLeave={() => setIsSubmitHovered(false)}
                 disabled={!isFormValid}
-                className="rounded-[8px] px-[16px] h-[32px] w-full flex items-center justify-center gap-[8px] transition-colors duration-150"
+                className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] flex items-center justify-center gap-[8px] max-sm:gap-[6px] transition-colors duration-150"
                 style={{
                   backgroundColor: isFormValid ? (isSubmitHovered ? '#2C9FFF' : PRIMARY) : '#e1e3e4',
                   cursor: isFormValid ? 'pointer' : 'not-allowed',
@@ -1661,7 +1661,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               >
                 <MdSend size={17} color={isFormValid ? 'white' : '#a1a3a4'} />
                 <span
-                  className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase whitespace-nowrap"
+                  className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap"
                   style={{ color: isFormValid ? 'white' : '#a1a3a4' }}
                 >
                   {submitLabel ?? 'Send for Approval'}
