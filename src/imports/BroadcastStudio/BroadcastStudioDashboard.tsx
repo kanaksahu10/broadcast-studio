@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
-import { IoIosClose } from 'react-icons/io';
+import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { MdAdd, MdApps, MdBlock, MdBusiness, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
 import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField } from './ComposeMessageOverlay';
@@ -10,6 +10,11 @@ import { getUserIdentity, type UserRole } from './userIdentity';
 // Prototype affordance: switch the viewer's role in one click (no URL editing).
 // Visible in the deployed build too, so PM/QA can self-serve both perspectives.
 function RoleToggle({ role, onChange }: { role: UserRole; onChange: (next: UserRole) => void }) {
+  // Phone only: the switch rides off the left edge, leaving a thin tab behind.
+  // A permanently-visible switch costs screen the phone can't spare, and this
+  // is a prototype affordance rather than product UI, so it shouldn't hold
+  // space it isn't actively using.
+  const [peekOpen, setPeekOpen] = useState(false);
   const switchRole = (next: UserRole) => {
     if (next === role) return;
     onChange(next);
@@ -18,30 +23,63 @@ function RoleToggle({ role, onChange }: { role: UserRole; onChange: (next: UserR
     { key: 'super-admin', label: 'Super Admin', activeBg: '#2699fb' },
     { key: 'executive-approver', label: 'Executive Approver', activeBg: '#27496D' },
   ];
-  return (
-    // Docked bottom-centre on mobile: at phone widths the header has no spare
-    // room, and top-right would sit straight on top of the logo and search.
-    <div className="fixed z-[9999] flex flex-col gap-[4px] max-sm:bottom-[16px] max-sm:left-1/2 max-sm:-translate-x-1/2 max-sm:items-center sm:top-[13px] sm:right-[90px] sm:items-end">
-      <div
-        className="flex items-center rounded-[8px] overflow-hidden border"
-        style={{ borderColor: '#E5E5E5', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.10)' }}
-      >
-        {options.map((o) => {
-          const active = role === o.key;
-          return (
-            <button
-              key={o.key}
-              type="button"
-              onClick={() => switchRole(o.key)}
-              className="font-['Montserrat',sans-serif] font-medium text-[11px] px-[10px] py-[5px] transition-colors duration-100 cursor-pointer whitespace-nowrap"
-              style={{ backgroundColor: active ? o.activeBg : 'white', color: active ? 'white' : '#585858' }}
-            >
-              {o.label}
-            </button>
-          );
-        })}
-      </div>
+
+  const switchButtons = (
+    <div className="flex items-center overflow-hidden" style={{ backgroundColor: 'white' }}>
+      {options.map((o) => {
+        const active = role === o.key;
+        return (
+          <button
+            key={o.key}
+            type="button"
+            onClick={() => switchRole(o.key)}
+            className="font-['Montserrat',sans-serif] font-medium text-[11px] px-[10px] py-[5px] transition-colors duration-100 cursor-pointer whitespace-nowrap"
+            style={{ backgroundColor: active ? o.activeBg : 'white', color: active ? 'white' : '#585858' }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
     </div>
+  );
+
+  return (
+    <>
+      {/* Desktop / tablet: parked top-right, always open — there's room. */}
+      <div className="hidden sm:flex fixed top-[13px] right-[90px] z-[9999] flex-col items-end gap-[4px]">
+        <div
+          className="flex items-center rounded-[8px] overflow-hidden border"
+          style={{ borderColor: '#E5E5E5', boxShadow: '0 1px 3px rgba(0,0,0,0.10)' }}
+        >
+          {switchButtons}
+        </div>
+      </div>
+
+      {/* Phone: slides in from the left, collapsing to a tab. Animating
+          max-width keeps the tab pinned to the panel's edge without having to
+          measure the panel first. */}
+      <div className="sm:hidden fixed left-0 bottom-[16px] z-[9999] flex items-stretch">
+        <div
+          className="overflow-hidden transition-[max-width] duration-200 ease-out border-y border-r rounded-r-[8px]"
+          style={{
+            maxWidth: peekOpen ? 280 : 0,
+            borderColor: '#E5E5E5',
+            boxShadow: peekOpen ? '0 1px 6px rgba(0,0,0,0.12)' : 'none',
+          }}
+        >
+          {switchButtons}
+        </div>
+        <button
+          type="button"
+          aria-label={peekOpen ? 'Hide role switcher' : 'Show role switcher'}
+          onClick={() => setPeekOpen((o) => !o)}
+          className="flex items-center justify-center w-[18px] h-[44px] shrink-0 cursor-pointer border-y border-r rounded-r-[8px]"
+          style={{ backgroundColor: 'white', borderColor: '#E5E5E5', boxShadow: '1px 1px 4px rgba(0,0,0,0.10)' }}
+        >
+          {peekOpen ? <IoIosArrowBack size={14} color="#585858" /> : <IoIosArrowForward size={14} color="#585858" />}
+        </button>
+      </div>
+    </>
   );
 }
 
