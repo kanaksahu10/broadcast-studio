@@ -1585,11 +1585,11 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
       {showFooter && (
       <div className="shrink-0 border-t px-[24px] max-sm:px-[16px] py-[16px] flex items-center justify-end" style={{ borderColor: BORDER, backgroundColor: 'white' }}>
         {onDeleteRow || onCopyToDrafts ? (
-          <div className="flex items-center gap-[16px]">
+          <div className={`flex items-center gap-[16px] ${onDeleteRow && onCopyToDrafts ? 'w-full justify-between' : ''}`}>
             {onDeleteRow && (
               <button
                 type="button"
-                className="flex items-center gap-[6px] font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+                className="flex items-center gap-[6px] shrink-0 font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
                 style={{ color: '#DA4040' }}
                 onClick={() => setShowDeleteConfirm(true)}
               >
@@ -1600,11 +1600,11 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             {onCopyToDrafts && (
               <button
                 type="button"
-                className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
+                className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
                 onClick={onCopyToDrafts}
               >
                 <MdOutlineContentCopy size={15} />
-                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase">
+                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
                   Copy to Drafts
                 </span>
               </button>
