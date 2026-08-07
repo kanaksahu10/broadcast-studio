@@ -17,6 +17,7 @@ import { useState, useRef, useEffect } from 'react';
 import kebabSvgPaths from '../Menus/svg-duzgfqtilr';
 import BroadcastStudioDashboard from './BroadcastStudioDashboard';
 import { useRole, getUserIdentity, type UserIdentity } from './userIdentity';
+import { TABLET_UP_QUERY } from './useIsPhone';
 
 /**
  * Desktop is >= 1024px; tablet and below is everything under it.
@@ -30,11 +31,8 @@ import { useRole, getUserIdentity, type UserIdentity } from './userIdentity';
  */
 const DESKTOP_QUERY = '(min-width: 1024px)';
 
-/**
- * Mobile is < 640px. Same min-width-and-negate form as DESKTOP_QUERY so it
- * lines up with Tailwind's `sm:` / `max-sm:` at fractional widths.
- */
-const TABLET_UP_QUERY = '(min-width: 640px)';
+// Mobile is < 640px. Shared with the overlays so the phone boundary is
+// defined once; see useIsPhone.ts for why it is written as min-width.
 
 interface GoalTemplate {
   id: string;
