@@ -1637,6 +1637,107 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
   );
 }
 
+/**
+ * Phone layout for any board: a fixed tab strip over a snap-scrolling row of
+ * columns, with pagination dots underneath.
+ *
+ * Tabs and swipe stay in sync both ways — tapping a tab scrolls the row, and
+ * swiping the row updates the active tab. Columns are 88% wide rather than
+ * 100% so the next one peeks in, which is what signals there's more to swipe
+ * to before the dots are even noticed.
+ *
+ * Tab styling follows the Navigation Tabs "Fixed / Label Only" component:
+ * 50px tall, equal-width tabs, Core/Primary/Main for the active label and its
+ * underline, over a Border/Light baseline.
+ */
+function MobileBoardColumns({ columns }: { columns: Array<{ key: string; label: string; count: number; color: string; content: React.ReactNode }> }) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(0);
+
+  const goTo = (i: number) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const child = el.children[i] as HTMLElement | undefined;
+    if (child) el.scrollTo({ left: child.offsetLeft - el.offsetLeft, behavior: 'smooth' });
+  };
+
+  // Derive the active column from scroll position so a swipe drives the tabs
+  // and dots, not just an explicit tab tap.
+  const handleScroll = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const kids = [...el.children] as HTMLElement[];
+    let best = 0;
+    let bestDist = Infinity;
+    kids.forEach((c, i) => {
+      const dist = Math.abs((c.offsetLeft - el.offsetLeft) - el.scrollLeft);
+      if (dist < bestDist) { bestDist = dist; best = i; }
+    });
+    setActive(best);
+  };
+
+  return (
+    <div className="flex flex-col gap-[10px] w-full">
+      <div className="flex h-[50px] shrink-0 border-b" style={{ borderColor: '#E5E5E5' }}>
+        {columns.map((c, i) => {
+          const isActive = i === active;
+          return (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => goTo(i)}
+              className="relative flex-1 flex items-center justify-center gap-[6px] cursor-pointer"
+            >
+              <span
+                className="font-['Montserrat',sans-serif] font-medium text-[14px] whitespace-nowrap"
+                style={{ color: isActive ? '#2699FB' : '#27496D' }}
+              >
+                {c.label}
+              </span>
+              <span
+                className="font-['Montserrat',sans-serif] font-medium text-[11px] rounded-full px-[6px] py-[1px]"
+                style={{ backgroundColor: isActive ? '#E8F4FF' : '#efefef', color: isActive ? '#2699FB' : '#9a9a9a' }}
+              >
+                {c.count}
+              </span>
+              {isActive && <span className="absolute left-0 right-0 bottom-[-1px] h-[3px]" style={{ backgroundColor: '#2699FB' }} />}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        ref={scrollerRef}
+        onScroll={handleScroll}
+        className="flex gap-[16px] w-full items-start overflow-x-auto snap-x snap-mandatory scroll-smooth"
+      >
+        {columns.map((c) => (
+          <div key={c.key} className="snap-start shrink-0 w-[88%] flex flex-col gap-[10px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
+            {c.content}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-center gap-[6px] shrink-0 pt-[2px]">
+        {columns.map((c, i) => (
+          <button
+            key={c.key}
+            type="button"
+            aria-label={`Go to ${c.label}`}
+            onClick={() => goTo(i)}
+            className="rounded-full transition-all duration-150 cursor-pointer"
+            style={{
+              width: i === active ? 18 : 6,
+              height: 6,
+              backgroundColor: i === active ? '#2699FB' : '#d0d0d0',
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const DISCARDED_COLUMNS: DiscardedBucket[] = ['Rejected', 'Expired', 'Discontinued'];
 
 function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
@@ -1649,42 +1750,61 @@ function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
     .map((row) => ({ row, bucket: getDiscardedBucket(row) }))
     .filter((x): x is { row: BroadcastMessageRow; bucket: DiscardedBucket } => x.bucket !== null);
 
-  return (
-    <div className="flex gap-[16px] w-full items-start overflow-x-auto pb-[4px]">
-      {DISCARDED_COLUMNS.map((bucket) => {
-        const colRows = bucketed.filter((x) => x.bucket === bucket).map((x) => x.row);
-        const color = BUCKET_COLOR[bucket];
-        return (
-          <div key={bucket} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
-            <div className="flex items-center justify-between px-[2px]">
-              <div className="flex items-center gap-[7px]">
-                <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{bucket}</span>
-                <ColumnInfoTooltip label={getBucketTooltip(bucket)} />
-              </div>
-              <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
+  // One definition of a bucket's header + cards, reused by the desktop row
+  // and the phone tab/swipe view so they can't drift apart.
+  const built = DISCARDED_COLUMNS.map((bucket) => {
+    const colRows = bucketed.filter((x) => x.bucket === bucket).map((x) => x.row);
+    const color = BUCKET_COLOR[bucket];
+    return {
+      key: bucket,
+      label: bucket,
+      count: colRows.length,
+      color,
+      content: (
+        <>
+          <div className="flex items-center justify-between px-[2px]">
+            <div className="flex items-center gap-[7px]">
+              <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{bucket}</span>
+              <ColumnInfoTooltip label={getBucketTooltip(bucket)} />
             </div>
-            <div className="flex flex-col gap-[8px]">
-              {colRows.length === 0 ? (
-                <div className="border border-dashed border-[#e5e5e5] rounded-[8px] py-[28px] flex items-center justify-center bg-white">
-                  <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8]">No messages</p>
-                </div>
-              ) : (
-                colRows.map((row) => (
-                  <DiscardedCard
-                    key={row.id}
-                    row={row}
-                    bucket={bucket}
-                    onView={() => onView(row, bucket)}
-                    onDelete={() => onDelete(row.id)}
-                    highlight={highlightIds.has(row.id)}
-                  />
-                ))
-              )}
-            </div>
+            <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
           </div>
-        );
-      })}
-    </div>
+          <div className="flex flex-col gap-[8px]">
+            {colRows.length === 0 ? (
+              <div className="border border-dashed border-[#e5e5e5] rounded-[8px] py-[28px] flex items-center justify-center bg-white">
+                <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8]">No messages</p>
+              </div>
+            ) : (
+              colRows.map((row) => (
+                <DiscardedCard
+                  key={row.id}
+                  row={row}
+                  bucket={bucket}
+                  onView={() => onView(row, bucket)}
+                  onDelete={() => onDelete(row.id)}
+                  highlight={highlightIds.has(row.id)}
+                />
+              ))
+            )}
+          </div>
+        </>
+      ),
+    };
+  });
+
+  return (
+    <>
+      <div className="hidden sm:flex gap-[16px] w-full items-start overflow-x-auto pb-[4px]">
+        {built.map((c) => (
+          <div key={c.key} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
+            {c.content}
+          </div>
+        ))}
+      </div>
+      <div className="sm:hidden w-full">
+        <MobileBoardColumns columns={built} />
+      </div>
+    </>
   );
 }
 
@@ -1705,46 +1825,63 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
   onReject: (id: string) => void;
   highlightIds: Set<string>;
 }) {
-  return (
-    <div className="flex gap-[16px] w-full items-start overflow-x-auto pb-[4px]">
-      {KANBAN_COLUMNS.map(({ status, label }) => {
-        const colRows = rows.filter((r) => r.status === status && getDiscardedBucket(r) === null && isDraftVisibleToRole(r, role));
-        const color = STATUS_COLOR[status];
-        return (
-          <div key={status} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
-            <div className="flex items-center justify-between px-[2px]">
-              <div className="flex items-center gap-[7px]">
-                <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{label}</span>
-                <ColumnInfoTooltip label={getActionTooltip(status, role)} />
-              </div>
-              <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
+  const built = KANBAN_COLUMNS.map(({ status, label }) => {
+    const colRows = rows.filter((r) => r.status === status && getDiscardedBucket(r) === null && isDraftVisibleToRole(r, role));
+    const color = STATUS_COLOR[status];
+    return {
+      key: status,
+      label,
+      count: colRows.length,
+      color,
+      content: (
+        <>
+          <div className="flex items-center justify-between px-[2px]">
+            <div className="flex items-center gap-[7px]">
+              <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{label}</span>
+              <ColumnInfoTooltip label={getActionTooltip(status, role)} />
             </div>
-            <div className="flex flex-col gap-[8px]">
-              {colRows.length === 0 ? (
-                <div className="border border-dashed border-[#e5e5e5] rounded-[8px] py-[28px] flex items-center justify-center bg-white">
-                  <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8]">No messages</p>
-                </div>
-              ) : (
-                colRows.map((row) => (
-                  <KanbanCard
-                    key={row.id}
-                    row={row}
-                    role={role}
-                    onEdit={() => onEdit(row)}
-                    onDelete={() => onDelete(row.id)}
-                    onDiscontinue={() => onDiscontinue(row.id)}
-                    onSendForApproval={() => onSendForApproval(row.id)}
-                    onApprove={() => onApprove(row.id)}
-                    onReject={() => onReject(row.id)}
-                    highlight={highlightIds.has(row.id)}
-                  />
-                ))
-              )}
-            </div>
+            <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
           </div>
-        );
-      })}
-    </div>
+          <div className="flex flex-col gap-[8px]">
+            {colRows.length === 0 ? (
+              <div className="border border-dashed border-[#e5e5e5] rounded-[8px] py-[28px] flex items-center justify-center bg-white">
+                <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8]">No messages</p>
+              </div>
+            ) : (
+              colRows.map((row) => (
+                <KanbanCard
+                  key={row.id}
+                  row={row}
+                  role={role}
+                  onEdit={() => onEdit(row)}
+                  onDelete={() => onDelete(row.id)}
+                  onDiscontinue={() => onDiscontinue(row.id)}
+                  onSendForApproval={() => onSendForApproval(row.id)}
+                  onApprove={() => onApprove(row.id)}
+                  onReject={() => onReject(row.id)}
+                  highlight={highlightIds.has(row.id)}
+                />
+              ))
+            )}
+          </div>
+        </>
+      ),
+    };
+  });
+
+  return (
+    <>
+      <div className="hidden sm:flex gap-[16px] w-full items-start overflow-x-auto pb-[4px]">
+        {built.map((c) => (
+          <div key={c.key} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
+            {c.content}
+          </div>
+        ))}
+      </div>
+      <div className="sm:hidden w-full">
+        <MobileBoardColumns columns={built} />
+      </div>
+    </>
   );
 }
 
