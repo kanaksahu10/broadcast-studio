@@ -1686,7 +1686,7 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
  * screen with little room to spare. The dots stay tappable as a way to jump
  * between columns without swiping.
  */
-function MobileBoardColumns({ columns }: { columns: Array<{ key: string; label: string; count: number; color: string; content: React.ReactNode }> }) {
+function MobileBoardColumns({ columns }: { columns: Array<{ key: string; label: string; count: number; color: string; header: React.ReactNode; body: React.ReactNode }> }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
 
@@ -1717,11 +1717,18 @@ function MobileBoardColumns({ columns }: { columns: Array<{ key: string; label: 
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="flex gap-[16px] w-full items-start overflow-x-auto snap-x snap-mandatory scroll-smooth"
+        className="flex gap-[16px] w-full items-stretch overflow-x-auto snap-x snap-mandatory scroll-smooth h-[calc(100dvh-290px)] min-h-[300px]"
       >
         {columns.map((c) => (
-          <div key={c.key} className="snap-start shrink-0 w-[88%] flex flex-col gap-[10px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
-            {c.content}
+          <div key={c.key} className="snap-start shrink-0 w-[88%] h-full flex flex-col gap-[10px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
+            {c.header}
+            {/* Only the card list scrolls, so the bucket name and count stay
+                put and every column is the same height — which in turn keeps
+                the dots below at one fixed position instead of drifting with
+                the number of cards. */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {c.body}
+            </div>
           </div>
         ))}
       </div>
@@ -1768,8 +1775,7 @@ function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
       label: bucket,
       count: colRows.length,
       color,
-      content: (
-        <>
+      header: (
           <div className="flex items-center justify-between px-[2px]">
             <div className="flex items-center gap-[7px]">
               <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{bucket}</span>
@@ -1777,6 +1783,8 @@ function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
             </div>
             <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-[4px] size-[17px] flex items-center justify-center shrink-0">{colRows.length}</span>
           </div>
+      ),
+      body: (
           <div className="flex flex-col gap-[8px]">
             {colRows.length === 0 ? (
               <div className="border border-dashed border-[#e5e5e5] rounded-[8px] py-[28px] flex items-center justify-center bg-white">
@@ -1795,7 +1803,6 @@ function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
               ))
             )}
           </div>
-        </>
       ),
     };
   });
@@ -1805,7 +1812,8 @@ function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
       <div className="hidden sm:flex gap-[16px] w-full items-start overflow-x-auto pb-[4px]">
         {built.map((c) => (
           <div key={c.key} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
-            {c.content}
+            {c.header}
+            {c.body}
           </div>
         ))}
       </div>
@@ -1841,8 +1849,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
       label,
       count: colRows.length,
       color,
-      content: (
-        <>
+      header: (
           <div className="flex items-center justify-between px-[2px]">
             <div className="flex items-center gap-[7px]">
               <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{label}</span>
@@ -1850,6 +1857,8 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
             </div>
             <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-[4px] size-[17px] flex items-center justify-center shrink-0">{colRows.length}</span>
           </div>
+      ),
+      body: (
           <div className="flex flex-col gap-[8px]">
             {colRows.length === 0 ? (
               <div className="border border-dashed border-[#e5e5e5] rounded-[8px] py-[28px] flex items-center justify-center bg-white">
@@ -1872,7 +1881,6 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
               ))
             )}
           </div>
-        </>
       ),
     };
   });
@@ -1882,7 +1890,8 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
       <div className="hidden sm:flex gap-[16px] w-full items-start overflow-x-auto pb-[4px]">
         {built.map((c) => (
           <div key={c.key} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
-            {c.content}
+            {c.header}
+            {c.body}
           </div>
         ))}
       </div>
