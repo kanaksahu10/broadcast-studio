@@ -690,6 +690,7 @@ function BannerPreview({
   hasCta,
   ctaLabel,
   rounded = true,
+  compact = false,
 }: {
   body: string;
   color: string;
@@ -697,14 +698,16 @@ function BannerPreview({
   hasCta: boolean;
   ctaLabel: string;
   rounded?: boolean;
+  /** Same role as OverlayPreview's: sized for the phone mock's 248px screen. */
+  compact?: boolean;
 }) {
   return (
     <div
-      className={`flex items-center gap-[16px] px-[16px] py-[12px] w-full ${rounded ? 'rounded-[6px]' : ''}`}
+      className={`flex items-center ${compact ? 'gap-[10px] px-[10px] py-[8px]' : 'gap-[16px] px-[16px] py-[12px]'} w-full ${rounded ? 'rounded-[6px]' : ''}`}
       style={{ backgroundColor: color }}
     >
-      {dismissible && <div className="shrink-0" style={{ width: 18 }} />}
-      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-white flex-1 text-center">
+      {dismissible && <div className="shrink-0" style={{ width: compact ? 14 : 18 }} />}
+      <p className={`font-['Montserrat',sans-serif] font-normal ${compact ? 'text-[12px] leading-[16px]' : 'text-[13px]'} text-white flex-1 text-center`}>
         {body || 'Your message body will appear here.'}
         {hasCta && ctaLabel && (
           <>
@@ -713,7 +716,7 @@ function BannerPreview({
           </>
         )}
       </p>
-      {dismissible && <MdClose size={18} color="white" className="shrink-0 cursor-pointer" />}
+      {dismissible && <MdClose size={compact ? 14 : 18} color="white" className="shrink-0 cursor-pointer" />}
     </div>
   );
 }
@@ -1093,7 +1096,7 @@ export function PhoneSkeleton({
 
         {effectiveFormat === 'Banner' && (
           <div className="absolute left-0 right-0 bottom-0">
-            <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+            <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} compact />
           </div>
         )}
       </div>
