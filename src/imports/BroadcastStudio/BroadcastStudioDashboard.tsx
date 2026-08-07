@@ -1638,17 +1638,15 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
 }
 
 /**
- * Phone layout for any board: a fixed tab strip over a snap-scrolling row of
- * columns, with pagination dots underneath.
+ * Phone layout for any board: a snap-scrolling row of columns with pagination
+ * dots underneath.
  *
- * Tabs and swipe stay in sync both ways — tapping a tab scrolls the row, and
- * swiping the row updates the active tab. Columns are 88% wide rather than
- * 100% so the next one peeks in, which is what signals there's more to swipe
- * to before the dots are even noticed.
- *
- * Tab styling follows the Navigation Tabs "Fixed / Label Only" component:
- * 50px tall, equal-width tabs, Core/Primary/Main for the active label and its
- * underline, over a Border/Light baseline.
+ * Columns are 88% wide rather than 100% so the next one peeks in, which
+ * signals there's more to swipe to before the dots are even noticed. Each
+ * column already carries its own name and count in its header, so no tab
+ * strip sits above them — that would repeat the same information twice on a
+ * screen with little room to spare. The dots stay tappable as a way to jump
+ * between columns without swiping.
  */
 function MobileBoardColumns({ columns }: { columns: Array<{ key: string; label: string; count: number; color: string; content: React.ReactNode }> }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -1678,34 +1676,6 @@ function MobileBoardColumns({ columns }: { columns: Array<{ key: string; label: 
 
   return (
     <div className="flex flex-col gap-[10px] w-full">
-      <div className="flex h-[50px] shrink-0 border-b" style={{ borderColor: '#E5E5E5' }}>
-        {columns.map((c, i) => {
-          const isActive = i === active;
-          return (
-            <button
-              key={c.key}
-              type="button"
-              onClick={() => goTo(i)}
-              className="relative flex-1 flex items-center justify-center gap-[6px] cursor-pointer"
-            >
-              <span
-                className="font-['Montserrat',sans-serif] font-medium text-[14px] whitespace-nowrap"
-                style={{ color: isActive ? '#2699FB' : '#27496D' }}
-              >
-                {c.label}
-              </span>
-              <span
-                className="font-['Montserrat',sans-serif] font-medium text-[11px] rounded-full px-[6px] py-[1px]"
-                style={{ backgroundColor: isActive ? '#E8F4FF' : '#efefef', color: isActive ? '#2699FB' : '#9a9a9a' }}
-              >
-                {c.count}
-              </span>
-              {isActive && <span className="absolute left-0 right-0 bottom-[-1px] h-[3px]" style={{ backgroundColor: '#2699FB' }} />}
-            </button>
-          );
-        })}
-      </div>
-
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
@@ -1767,7 +1737,7 @@ function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
               <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{bucket}</span>
               <ColumnInfoTooltip label={getBucketTooltip(bucket)} />
             </div>
-            <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
+            <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-[4px] size-[17px] flex items-center justify-center shrink-0">{colRows.length}</span>
           </div>
           <div className="flex flex-col gap-[8px]">
             {colRows.length === 0 ? (
@@ -1840,7 +1810,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
               <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{label}</span>
               <ColumnInfoTooltip label={getActionTooltip(status, role)} />
             </div>
-            <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
+            <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-[4px] size-[17px] flex items-center justify-center shrink-0">{colRows.length}</span>
           </div>
           <div className="flex flex-col gap-[8px]">
             {colRows.length === 0 ? (
