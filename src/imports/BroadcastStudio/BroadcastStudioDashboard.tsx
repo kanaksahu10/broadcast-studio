@@ -5,7 +5,7 @@ import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { MdAdd, MdApps, MdBlock, MdBusiness, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
 import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
-import { useIsBelowDesktop } from './useIsPhone';
+import { useIsBelowDesktop, useIsPhone } from './useIsPhone';
 import { getUserIdentity, type UserRole } from './userIdentity';
 
 // Prototype affordance: switch the viewer's role in one click (no URL editing).
@@ -1698,72 +1698,27 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
  */
 type BoardColumn = { key: string; label: string; count: number; color: string; header: React.ReactNode; body: React.ReactNode };
 
-/** Narrowest a column can be and still hold a card comfortably. */
-const CARD_COLUMN_MIN = 300;
-const COLUMN_GAP = 16;
-/** How much of the next column stays in view in the swipe layout. */
-const COLUMN_PEEK = 56;
-
 /**
- * Which layout the board uses is a device-class decision, not a space one:
- * pagination belongs to tablet and phone. A narrow desktop window simply
- * scrolls instead — with the sidebar open a 1024px window leaves the board only
- * ~603px, nowhere near the ~932px three full-size columns need, and squeezing
- * them into it would crunch the cards.
+ * Pagination is for phones only. Tablet and desktop both keep the columns at
+ * full width and scroll sideways instead — a tablet cannot fit three 300px
+ * columns either (1023px of viewport leaves the board about 862px against the
+ * ~932px needed), but scrolling shows that honestly without swapping to a
+ * different interaction partway up the size range.
  */
 function ResponsiveBoard({ columns }: { columns: BoardColumn[] }) {
-  const isBelowDesktop = useIsBelowDesktop();
-  return isBelowDesktop ? <MobileBoardColumns columns={columns} /> : <ScrollingBoardColumns columns={columns} />;
+  const isPhone = useIsPhone();
+  return isPhone ? <MobileBoardColumns columns={columns} /> : <ScrollingBoardColumns columns={columns} />;
 }
 
-/** Background the fade dissolves into — the content area behind the board. */
-const BOARD_BACKDROP = '#f8f8f8';
-
 function ScrollingBoardColumns({ columns }: { columns: BoardColumn[] }) {
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const [moreToTheRight, setMoreToTheRight] = useState(false);
-
-  // Columns keep their full width and the board scrolls, so the edge can land
-  // anywhere — including exactly in the gap between two columns, which hides
-  // the next one completely. A fade at the edge says "there is more" without
-  // depending on a sliver of column being visible.
-  const syncFade = useCallback(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    setMoreToTheRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
-  }, []);
-
-  useLayoutEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    syncFade();
-    const observer = new ResizeObserver(syncFade);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [syncFade, columns.length]);
-
   return (
-    <div className="relative w-full">
-      <div
-        ref={scrollerRef}
-        onScroll={syncFade}
-        className="flex gap-[16px] w-full items-start overflow-x-auto pb-[4px]"
-      >
-        {columns.map((c) => (
-          <div key={c.key} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
-            {c.header}
-            {c.body}
-          </div>
-        ))}
-      </div>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute top-0 bottom-0 right-0 w-[56px] transition-opacity duration-200"
-        style={{
-          opacity: moreToTheRight ? 1 : 0,
-          background: `linear-gradient(to right, rgba(248,248,248,0), ${BOARD_BACKDROP})`,
-        }}
-      />
+    <div className="flex gap-[16px] w-full items-start overflow-x-auto pb-[4px]">
+      {columns.map((c) => (
+        <div key={c.key} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
+          {c.header}
+          {c.body}
+        </div>
+      ))}
     </div>
   );
 }
@@ -1771,7 +1726,6 @@ function ScrollingBoardColumns({ columns }: { columns: BoardColumn[] }) {
 function MobileBoardColumns({ columns }: { columns: BoardColumn[] }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
-  const [columnWidth, setColumnWidth] = useState<number | null>(null);
 
   const goTo = (i: number) => {
     const el = scrollerRef.current;
@@ -1801,23 +1755,6 @@ function MobileBoardColumns({ columns }: { columns: BoardColumn[] }) {
     setActive(best);
   };
 
-  // Show as many columns as can hold a full-size card, and size them so the
-  // next one always peeks. A single 88%-wide column wasted the extra room on
-  // wider screens: at 839px of board it gave one 738px column for a card that
-  // needs about 370px, so a whole bucket sat off-screen for no reason.
-  useLayoutEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const measure = (width: number) => {
-      if (!width) return;
-      const visible = Math.max(1, Math.floor((width - COLUMN_PEEK) / (CARD_COLUMN_MIN + COLUMN_GAP)));
-      setColumnWidth((width - COLUMN_GAP * visible - COLUMN_PEEK) / visible);
-    };
-    measure(el.getBoundingClientRect().width);
-    const observer = new ResizeObserver(([entry]) => measure(entry.contentRect.width));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
 
   return (
     <div className="flex flex-col gap-[10px] w-full">
@@ -1827,7 +1764,7 @@ function MobileBoardColumns({ columns }: { columns: BoardColumn[] }) {
         className="flex gap-[16px] w-full items-stretch overflow-x-auto snap-x snap-mandatory scroll-smooth h-[calc(100dvh-290px)] min-h-[300px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
       >
         {columns.map((c) => (
-          <div key={c.key} className="snap-start shrink-0 h-full flex flex-col gap-[10px] bg-[#fcfcfc] rounded-[10px] p-[12px]" style={{ width: columnWidth ?? '88%' }}>
+          <div key={c.key} className="snap-start shrink-0 w-[88%] h-full flex flex-col gap-[10px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
             {c.header}
             {/* Only the card list scrolls, so the bucket name and count stay
                 put and every column is the same height — which in turn keeps
