@@ -89,6 +89,7 @@ type ViewMode = 'datagrid' | 'kanban';
 // FEATURE FLAG: set to true to restore the datagrid/kanban toggle button
 const SHOW_VIEW_TOGGLE = false;
 
+
 type MessageStatus = 'Live' | 'Pending' | 'Draft' | 'Rejected' | 'Discontinued';
 type MessageType = '' | 'Announcement' | 'Emergency';
 
@@ -1441,12 +1442,10 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
         <div className="flex items-start justify-between gap-[6px]">
           <div className="flex flex-col flex-1 min-w-0">
             <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px] text-[#000000]">{row.subject}</p>
-            {(row.formData?.author || row.formData?.department) && (
+            {row.formData?.author && (
               <p className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
                 <MdPersonOutline size={13} color="#8b8b8b" />
-                {row.formData?.author}
-                {row.formData?.author && row.formData?.department && <span> · </span>}
-                {row.formData?.department}
+                {row.formData.author}
               </p>
             )}
             {dateRange !== '—' && (
@@ -1623,12 +1622,10 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
         <div className="flex items-start justify-between gap-[6px]">
           <div className="flex flex-col flex-1 min-w-0">
             <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px] text-[#000000]">{row.subject}</p>
-            {(row.formData?.author || row.formData?.department) && (
+            {row.formData?.author && (
               <p className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
                 <MdPersonOutline size={13} color="#8b8b8b" />
-                {row.formData?.author}
-                {row.formData?.author && row.formData?.department && <span> · </span>}
-                {row.formData?.department}
+                {row.formData.author}
               </p>
             )}
             {dateRange !== '—' && (
@@ -1687,7 +1684,53 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
  * screen with little room to spare. The dots stay tappable as a way to jump
  * between columns without swiping.
  */
-function MobileBoardColumns({ columns }: { columns: Array<{ key: string; label: string; count: number; color: string; header: React.ReactNode; body: React.ReactNode }> }) {
+type BoardColumn = { key: string; label: string; count: number; color: string; header: React.ReactNode; body: React.ReactNode };
+
+/**
+ * Room for three 300px columns and their gaps. Below this the board cannot show
+ * three columns without either crunching the cards or letting the visible edge
+ * land in a gap and hide the next column completely — so it swipes instead, one
+ * roomy column at a time with the next clearly peeking.
+ *
+ * Measured against the board's own width, not the viewport: the sidebar and the
+ * notification rail take a share that changes as they collapse.
+ */
+const MULTI_COLUMN_MIN_WIDTH = 3 * 300 + 2 * 16;
+
+function ResponsiveBoard({ columns }: { columns: BoardColumn[] }) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [multiColumn, setMultiColumn] = useState(true);
+
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const measure = (width: number) => setMultiColumn(width >= MULTI_COLUMN_MIN_WIDTH);
+    measure(host.getBoundingClientRect().width); // before paint, so it never flashes the wrong layout
+    const observer = new ResizeObserver(([entry]) => measure(entry.contentRect.width));
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={hostRef} className="w-full">
+      {multiColumn ? (
+        // Only rendered when all three fit, so this never scrolls sideways.
+        <div className="flex gap-[16px] w-full items-start">
+          {columns.map((c) => (
+            <div key={c.key} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
+              {c.header}
+              {c.body}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <MobileBoardColumns columns={columns} />
+      )}
+    </div>
+  );
+}
+
+function MobileBoardColumns({ columns }: { columns: BoardColumn[] }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
 
@@ -1812,19 +1855,7 @@ function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
   });
 
   return (
-    <>
-      <div className="hidden sm:flex gap-[16px] w-full items-start overflow-x-auto pb-[4px]">
-        {built.map((c) => (
-          <div key={c.key} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
-            {c.header}
-            {c.body}
-          </div>
-        ))}
-      </div>
-      <div className="sm:hidden w-full">
-        <MobileBoardColumns columns={built} />
-      </div>
-    </>
+    <ResponsiveBoard columns={built} />
   );
 }
 
@@ -1890,19 +1921,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
   });
 
   return (
-    <>
-      <div className="hidden sm:flex gap-[16px] w-full items-start overflow-x-auto pb-[4px]">
-        {built.map((c) => (
-          <div key={c.key} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
-            {c.header}
-            {c.body}
-          </div>
-        ))}
-      </div>
-      <div className="sm:hidden w-full">
-        <MobileBoardColumns columns={built} />
-      </div>
-    </>
+    <ResponsiveBoard columns={built} />
   );
 }
 
@@ -2215,12 +2234,23 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
 
       {/* {viewMode === 'kanban' && <AudienceMetrics rows={messages} />} */}
 
-      <div className="flex items-center gap-[12px] w-full max-sm:flex-wrap">
+      {/* Wraps at any width, not just on phones: the toolbar runs out of room
+          well before 640px once the sidebar and notification rail take their
+          share, and the controls are fixed-width, so without this they overflow
+          rather than reflow. */}
+      <div className="flex items-center gap-[12px] w-full flex-wrap">
         <SearchInput value={search} onChange={setSearch} />
         <ShowDiscardedToggle checked={showDiscarded} onChange={setShowDiscarded} />
         <NewMessageButton onClick={() => setIsComposeOpen(true)} />
-        <div className="flex-1" />
-        {SHOW_VIEW_TOGGLE && <ViewToggle view={viewMode} onChange={setViewMode} />}
+        {/* The spacer only exists to push the view toggle right, so it is tied
+            to it — left on its own in a wrapping row it would swallow the free
+            space and shove the controls onto a line of their own. */}
+        {SHOW_VIEW_TOGGLE && (
+          <>
+            <div className="flex-1" />
+            <ViewToggle view={viewMode} onChange={setViewMode} />
+          </>
+        )}
       </div>
 
       {showDiscarded ? (
