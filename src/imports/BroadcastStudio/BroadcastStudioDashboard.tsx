@@ -345,6 +345,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Product',
+      messageCategory: 'Emergency',
       noEndDate: true,
       body: 'We are currently investigating reports of a service disruption. Updates will follow as more information becomes available.',
       reason: 'Incident response',
@@ -373,6 +374,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'Jennifer James',
       department: 'Admin Services',
+      messageCategory: 'Upsell',
       body: 'We are excited to announce a new partnership that expands your benefits options starting next quarter.',
       displayFormat: 'Overlay',
       placement: 'Global',
@@ -426,6 +428,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Product',
+      messageCategory: 'Emergency',
       body: 'The client portal will undergo emergency maintenance tonight from 11 PM to 2 AM. Access will be intermittent during this window.',
       reason: 'Emergency maintenance',
       displayFormat: 'Banner',
@@ -452,6 +455,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Product',
+      messageCategory: 'New Release',
       body: 'Our redesigned mobile app is rolling out next week with faster scheduling and a new messaging inbox.',
       reason: 'Product launch',
       displayFormat: 'Overlay',
@@ -479,6 +483,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Billing',
+      messageCategory: 'Emergency',
       body: 'Payroll systems will be offline for scheduled maintenance. Time-off requests submitted during this window may be delayed.',
       reason: 'Planned maintenance',
       displayFormat: 'Banner',
@@ -505,6 +510,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Marketing',
+      messageCategory: 'Upsell',
       body: 'Open enrollment kicks off next month — remind your team to complete their benefits selections before the deadline.',
       reason: 'Enrollment campaign',
       displayFormat: 'Overlay',
@@ -558,6 +564,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Admin Services',
+      messageCategory: 'Custom', customCategoryName: 'Compliance',
       body: 'Our data retention policy has been updated to align with new state requirements. Review the changes before they take effect.',
       reason: 'Policy update',
       displayFormat: 'Overlay',
@@ -587,6 +594,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Support',
+      messageCategory: 'New Release',
       body: 'Summer hours are now in effect. Review the updated shift schedule to see how your availability windows have changed.',
       displayFormat: 'Banner',
       placement: 'Feature Specific',
@@ -640,6 +648,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Customer Success',
+      messageCategory: 'Billing Notice',
       body: 'Benefits open enrollment begins August 1st. Take a few minutes to review your options and make any changes for the coming year.',
       displayFormat: 'Overlay',
       placement: 'Global',
@@ -666,6 +675,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Admin Services',
+      messageCategory: 'Emergency',
       body: "A severe weather advisory is in effect for your area. Please review your agency's emergency procedures.",
       reason: 'Safety notice',
       displayFormat: 'Banner',
@@ -722,6 +732,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Billing',
+      messageCategory: 'Billing Notice',
       body: 'Placeholder rejected message for prototyping the Rejected bucket.',
       reason: 'Needs budget sign-off',
       displayFormat: 'Overlay',
@@ -776,6 +787,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Product',
+      messageCategory: 'New Release',
       body: 'The legacy client portal has been discontinued. Please use the new portal for all requests going forward.',
       reason: 'Superseded by new portal',
       displayFormat: 'Overlay',
@@ -795,7 +807,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
 // from a previous version keeps them forever — and new fields (author,
 // department, authorRole, rejectionReason) read as undefined on those old
 // rows, which silently empties the Drafts and Pending columns.
-const STORAGE_KEY = 'bs-messages-v9';
+const STORAGE_KEY = 'bs-messages-v10';
 
 function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
