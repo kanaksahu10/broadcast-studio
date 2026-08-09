@@ -5,7 +5,8 @@ import { BsThreeDotsVertical, BsPlus } from 'react-icons/bs';
 import { RiTeamLine, RiFileListLine } from 'react-icons/ri';
 import { BiBuildings } from 'react-icons/bi';
 import { GrAnnounce } from 'react-icons/gr';
-import { MdInsights, MdArrowBack } from 'react-icons/md';
+import { MdInsights, MdArrowBack, MdSearch } from 'react-icons/md';
+import { BiChevronsLeft } from 'react-icons/bi';
 import { TbZoomCode } from 'react-icons/tb';
 import { AiOutlineForm } from 'react-icons/ai';
 import { PiPlugs } from 'react-icons/pi';
@@ -16,6 +17,22 @@ import { useState, useRef, useEffect } from 'react';
 import kebabSvgPaths from '../Menus/svg-duzgfqtilr';
 import BroadcastStudioDashboard from './BroadcastStudioDashboard';
 import { useRole, getUserIdentity, type UserIdentity } from './userIdentity';
+import { TABLET_UP_QUERY } from './useIsPhone';
+
+/**
+ * Desktop is >= 1024px; tablet and below is everything under it.
+ *
+ * Deliberately phrased as min-width and negated, rather than a
+ * `max-width: 1023px` query, so it matches Tailwind's `lg:` / `max-lg:`
+ * variants exactly at fractional viewport widths. Tailwind compiles
+ * `max-lg:` to "not (min-width: 64rem)", which still applies at 1023.5px —
+ * a `max-width: 1023px` query would not, leaving the CSS on tablet layout
+ * while this JS thought it was desktop.
+ */
+const DESKTOP_QUERY = '(min-width: 1024px)';
+
+// Mobile is < 640px. Shared with the overlays so the phone boundary is
+// defined once; see useIsPhone.ts for why it is written as min-width.
 
 interface GoalTemplate {
   id: string;
@@ -136,11 +153,76 @@ function KebabMenu({
   );
 }
 
-function TopBar({ onHamburgerClick, sidebarCollapsed, identity }: { onHamburgerClick: () => void; sidebarCollapsed: boolean; identity: UserIdentity }) {
+/** Square 60px header cell with a left divider — the mobile header's
+ *  search / notifications / avatar slots all share this shape. */
+function HeaderCell({ onClick, children, className = '' }: { onClick?: () => void; children: React.ReactNode; className?: string }) {
   return (
-    <div className="absolute inset-x-0 top-0 h-[59px] bg-white border-b border-[#dfdfdf] z-10 flex items-center" data-name="Top Bar">
-      {/* Logo + Hamburger — same width as sidebar */}
-      <div className={`flex items-center px-[16px] shrink-0 transition-[width] duration-200 ${sidebarCollapsed ? 'w-[69px] justify-center' : 'w-[329px] justify-between'}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center justify-center w-[60px] h-[59px] shrink-0 bg-white border-l border-[#e5e5e5] ${onClick ? 'cursor-pointer' : 'cursor-default'} ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TopBar({ onHamburgerClick, sidebarCollapsed, identity, isMobile, onNotificationsClick }: { onHamburgerClick: () => void; sidebarCollapsed: boolean; identity: UserIdentity; isMobile: boolean; onNotificationsClick: () => void }) {
+  const avatar = (
+    <div className="relative rounded-full size-[32px] flex items-center justify-center" style={{ backgroundColor: identity.avatarColor }}>
+      <span className="font-['Montserrat',sans-serif] font-medium text-[12px] text-white">{identity.initials}</span>
+      <div className="absolute bg-white drop-shadow-[0px_2px_2px_rgba(0,0,0,0.08)] rounded-full size-[14px] -bottom-[3px] -right-[3px] flex items-center justify-center">
+        <svg viewBox="0 0 6 3" className="w-[6px] h-[3px]">
+          <path d="M0 0L3 3L6 0H0Z" fill="black" />
+        </svg>
+      </div>
+    </div>
+  );
+
+  // Mobile: one flat row — hamburger + logo hugging the left, then square
+  // search / notifications / avatar cells. The full-width search field and
+  // the docked notification rail both collapse into icons here.
+  if (isMobile) {
+    return (
+      <div data-name="Top Bar" className="absolute top-0 inset-x-0 h-[59px] bg-white border-b border-[#E5E5E5] z-40 flex items-center">
+        <div className="flex items-center gap-[16px] px-[16px] flex-1 min-w-0">
+          <button onClick={onHamburgerClick} className="p-0 bg-transparent border-0 cursor-pointer flex items-center justify-center shrink-0">
+            <svg fill="none" viewBox="0 0 14.2642 10.5" className="w-[18px] h-[14px]">
+              <path d={svgPaths.p15f65700} fill="#334D6E" />
+            </svg>
+          </button>
+          <Logo />
+        </div>
+        <HeaderCell onClick={() => {}}>
+          <MdSearch size={22} color="#334D6E" />
+        </HeaderCell>
+        <HeaderCell onClick={onNotificationsClick}>
+          <BiChevronsLeft size={24} color="#4A4A4A" />
+        </HeaderCell>
+        <HeaderCell>{avatar}</HeaderCell>
+      </div>
+    );
+  }
+
+  return <DesktopTopBar onHamburgerClick={onHamburgerClick} sidebarCollapsed={sidebarCollapsed} avatar={avatar} />;
+}
+
+function DesktopTopBar({ onHamburgerClick, sidebarCollapsed, avatar }: { onHamburgerClick: () => void; sidebarCollapsed: boolean; avatar: React.ReactNode }) {
+  // Split into three independently-stacked pieces instead of one flex row —
+  // a single shared z-index can't let part of a row sink below the scrim
+  // while another part stays above it, since z-index only resolves within
+  // the nearest stacking context (here, whatever container each piece is
+  // absolutely positioned against, not their old shared parent).
+  return (
+    <>
+      {/* Logo + Hamburger — same width as the sidebar, same z-40 tier, so the
+          two read as one panel. Separated from the nav below by a flat
+          Border/Light rule rather than a shadow, which would blur over the
+          seam and break the "one sidebar" read. */}
+      <div
+        data-name="Top Bar"
+        className={`absolute top-0 left-0 h-[59px] bg-white z-40 flex items-center px-[16px] shrink-0 border-b border-[#E5E5E5] transition-[width] duration-200 ${sidebarCollapsed ? 'w-[69px] justify-center' : 'w-[329px] justify-between'}`}
+      >
         {!sidebarCollapsed && <Logo />}
         <button onClick={onHamburgerClick} className="p-0 bg-transparent border-0 cursor-pointer flex items-center justify-center">
           <svg fill="none" viewBox="0 0 14.2642 10.5" className="w-[14px] h-[11px]">
@@ -148,22 +230,21 @@ function TopBar({ onHamburgerClick, sidebarCollapsed, identity }: { onHamburgerC
           </svg>
         </button>
       </div>
-      {/* Search */}
-      <div className="flex-1 flex items-center px-[16px]">
+      {/* Search — normal topbar tier (z-10), so on tablet/mobile it sinks
+          behind the sidebar's blurred scrim along with the rest of the
+          page, instead of floating above it. */}
+      <div
+        className={`absolute top-0 right-[60px] h-[59px] bg-white border-b border-[#dfdfdf] z-10 flex items-center px-[16px] transition-[left] duration-200 max-lg:!left-[69px] ${sidebarCollapsed ? 'lg:left-[69px]' : 'lg:left-[329px]'}`}
+      >
         <TopbarSearch />
       </div>
-      {/* User avatar */}
-      <div className="flex items-center justify-center w-[60px] h-[59px] border-l border-[#e5e5e5] shrink-0">
-        <div className="relative rounded-full size-[32px] flex items-center justify-center" style={{ backgroundColor: identity.avatarColor }}>
-          <span className="font-['Montserrat',sans-serif] font-medium text-[12px] text-white">{identity.initials}</span>
-          <div className="absolute bg-white drop-shadow-[0px_2px_2px_rgba(0,0,0,0.08)] rounded-full size-[14px] -bottom-[3px] -right-[3px] flex items-center justify-center">
-            <svg viewBox="0 0 6 3" className="w-[6px] h-[3px]">
-              <path d="M0 0L3 3L6 0H0Z" fill="black" />
-            </svg>
-          </div>
-        </div>
+      {/* User avatar — normal content tier (z-10) so it dims behind the
+          sidebar scrim too. Only the sidebar and its logo/hamburger corner
+          stay above it. */}
+      <div className="absolute top-0 right-0 flex items-center justify-center w-[60px] h-[59px] bg-white border-l border-[#e5e5e5] border-b border-b-[#dfdfdf] z-10 shrink-0">
+        {avatar}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -1391,10 +1472,39 @@ function Container({ goalTemplates }: { goalTemplates: GoalTemplate[] }) {
 
 export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioProps) {
   const [expandedSection, setExpandedSection] = useState<'clients' | 'agency' | 'superAdmin' | null>('superAdmin');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Below desktop, the sidebar starts collapsed to the icon rail — opening it
+  // via the hamburger overlays a flyout with a blurred scrim instead of
+  // pushing the toolbar/content over, per the tablet breakpoint.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => !window.matchMedia(DESKTOP_QUERY).matches);
   // Owned here so the chrome and the dashboard share one source of truth for who is viewing.
   const [role, setRole] = useRole();
   const identity = getUserIdentity(role);
+
+  // Re-apply the breakpoint default whenever the viewport crosses the desktop
+  // line — not just on first load. Without this, resizing the window (or
+  // switching a device preset) live never updates sidebarCollapsed, since
+  // the useState initializer above only runs once at mount.
+  useEffect(() => {
+    const query = window.matchMedia(DESKTOP_QUERY);
+    const handleChange = (e: MediaQueryListEvent) => setSidebarCollapsed(!e.matches);
+    query.addEventListener('change', handleChange);
+    return () => query.removeEventListener('change', handleChange);
+  }, []);
+
+  // Mobile (<640px) drops the icon rails entirely: the sidebar is reachable
+  // only via the hamburger, and the notification panel only via the header's
+  // double-chevron, so the content gets the full width.
+  const [isMobile, setIsMobile] = useState(() => !window.matchMedia(TABLET_UP_QUERY).matches);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia(TABLET_UP_QUERY);
+    const handleChange = (e: MediaQueryListEvent) => {
+      setIsMobile(!e.matches);
+      if (e.matches) setNotificationsOpen(false); // leaving mobile: drop the overlay
+    };
+    query.addEventListener('change', handleChange);
+    return () => query.removeEventListener('change', handleChange);
+  }, []);
 
   // Collapsed rail shows only the first word of each nav label (e.g. "Super
   // Administrator" -> "Super"); expanded restores the full label.
@@ -1428,11 +1538,32 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
 
   return (
     <div className="bg-[#f8f8f8] relative size-full" data-name="Agency Management - Goal Templates">
-      <TopBar onHamburgerClick={() => setSidebarCollapsed(s => !s)} sidebarCollapsed={sidebarCollapsed} identity={identity} />
-      <div className="absolute right-0 top-[59px] bottom-0 w-[60px] border-l border-[#e5e5e5] z-50">
-        <NotificationPanel identity={identity} />
-      </div>
-      <div className={`absolute bg-[#eaeaea] bottom-0 left-0 top-[59px] overflow-hidden transition-[width] duration-200 ${sidebarCollapsed ? 'sidebar-collapsed w-[69px]' : 'w-[329px]'}`} data-name="Sidebar Menu">
+      <TopBar
+        onHamburgerClick={() => setSidebarCollapsed(s => !s)}
+        sidebarCollapsed={sidebarCollapsed}
+        identity={identity}
+        isMobile={isMobile}
+        onNotificationsClick={() => setNotificationsOpen(o => !o)}
+      />
+      {/* z-20 keeps this above page content but below the sidebar scrim
+          (z-30), so it dims with everything else when the sidebar is open
+          on tablet/mobile. On mobile the rail isn't docked at all — it
+          slides in from the right only when the header chevron opens it. */}
+      {(!isMobile || notificationsOpen) && (
+        <div
+          className={`absolute right-0 top-[59px] bottom-0 w-[60px] border-l border-[#e5e5e5] ${notificationsOpen ? 'z-40' : 'z-20'}`}
+        >
+          <NotificationPanel identity={identity} />
+        </div>
+      )}
+      {isMobile && notificationsOpen && (
+        <div
+          className="absolute left-0 right-0 top-[59px] bottom-0 z-30"
+          style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
+          onClick={() => setNotificationsOpen(false)}
+        />
+      )}
+      <div className={`absolute bg-[#eaeaea] bottom-0 left-0 top-[59px] overflow-hidden transition-[width] duration-200 z-40 ${sidebarCollapsed ? `sidebar-collapsed ${isMobile ? 'w-0' : 'w-[69px]'}` : 'w-[329px]'}`} data-name="Sidebar Menu">
         <div className="content-stretch flex flex-col items-start overflow-y-auto relative rounded-[inherit] size-full">
           {!sidebarCollapsed && (
             <>
@@ -1849,15 +1980,28 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
         </div>
         <div aria-hidden="true" className="absolute border-[#e5e5e5] border-r border-solid inset-0 pointer-events-none" />
       </div>
+      {/* Below desktop, an expanded sidebar floats over the content instead of
+          pushing it — this scrim dims/blurs what's behind it, matching the
+          overlay pattern used elsewhere (e.g. DeleteConfirmOverlay), and
+          tapping it closes the sidebar back to the rail. Runs the full
+          height (top-0), so the search strip sinks behind it too — only the
+          sidebar's own logo/hamburger corner and the avatar sit above it. */}
+      {!sidebarCollapsed && (
+        <div
+          className="hidden max-lg:block absolute left-0 right-0 top-0 bottom-0 z-30"
+          style={{ backgroundColor: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      )}
       {/* Main content area: fixed breadcrumb toolbar + its own independent scroll region,
           so content taller than the viewport scrolls instead of being clipped. */}
-      <div className={`absolute bg-[#f8f8f8] flex gap-[14px] h-[48px] items-center right-[60px] p-[16px] top-[59px] z-10 transition-[left] duration-200 ${sidebarCollapsed ? 'left-[69px]' : 'left-[329px]'}`} data-name="Toolbar">
+      <div className={`absolute bg-[#f8f8f8] flex gap-[14px] h-[48px] items-center p-[16px] top-[59px] z-10 transition-[left] duration-200 max-sm:!left-0 max-sm:!right-0 sm:right-[60px] sm:max-lg:!left-[69px] ${sidebarCollapsed ? 'lg:left-[69px]' : 'lg:left-[329px]'}`} data-name="Toolbar">
         <MdArrowBack size={21} color="#27496D" />
         <span className="font-['Montserrat',sans-serif] font-medium text-[15px] text-black leading-[15px]">
           {expandedSection === 'agency' ? 'View Goals' : 'Broadcast Studio'}
         </span>
       </div>
-      <div className={`absolute right-[60px] top-[107px] bottom-0 overflow-y-auto transition-[left] duration-200 ${sidebarCollapsed ? 'left-[69px]' : 'left-[329px]'}`}>
+      <div className={`absolute top-[107px] bottom-0 overflow-y-auto transition-[left] duration-200 max-sm:!left-0 max-sm:!right-0 sm:right-[60px] sm:max-lg:!left-[69px] ${sidebarCollapsed ? 'lg:left-[69px]' : 'lg:left-[329px]'}`}>
         <div className="p-[16px]">
           {expandedSection === 'agency' ? (
             <Container goalTemplates={goalTemplates} />

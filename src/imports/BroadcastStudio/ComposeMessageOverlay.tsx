@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useIsBelowDesktop } from './useIsPhone';
 import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
@@ -938,6 +939,48 @@ export function ScreenSkeleton({
   );
 }
 
+/**
+ * The desktop mock only reads as a desktop if it keeps desktop proportions —
+ * its overlay panel is a fixed 320px, which at phone width would cover the
+ * whole screen and hide the app behind it. So render the mock at a real
+ * desktop size and scale the result down: the miniature is then exactly what
+ * a desktop viewer sees, just smaller.
+ */
+export const MOCK_WIDTH = 900;
+
+/**
+ * Renders a mock at real device size and scales the whole thing down to fit.
+ * Every proportion — type size, padding, chrome — stays exactly as the real
+ * device shows it, instead of each element being re-tuned for a small box.
+ */
+export function ScaledMock({ baseWidth, baseHeight, children }: { baseWidth: number; baseHeight: number; children: ReactNode }) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  // 0 until measured, so the full-size mock never flashes before it shrinks.
+  const [scale, setScale] = useState(0);
+
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      // Never magnify past life size — nobody sees a bigger-than-real device.
+      setScale(Math.min(width / baseWidth, height / baseHeight, 1));
+    });
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [baseWidth, baseHeight]);
+
+  return (
+    <div ref={frameRef} className="w-full h-full flex items-center justify-center overflow-hidden">
+      <div style={{ width: baseWidth * scale, height: baseHeight * scale }}>
+        <div style={{ width: baseWidth, height: baseHeight, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PhoneDataCard() {
   const rows: Array<{ label: string; kind: 'checkbox' | 'badge' | 'icon' | 'text' | 'two-line' | 'empty'; value?: string }> = [
     { label: '20%', kind: 'checkbox' },
@@ -976,6 +1019,17 @@ function PhoneDataCard() {
   );
 }
 
+// A real handset in CSS points, so a 13px banner in the mock covers the same
+// share of the screen it would on the actual device.
+export const PHONE_WIDTH = 390;
+export const PHONE_HEIGHT = 844;
+const PHONE_BEZEL = 10;
+const PHONE_SCREEN_WIDTH = PHONE_WIDTH - PHONE_BEZEL * 2;
+const PHONE_SCREEN_HEIGHT = PHONE_HEIGHT - PHONE_BEZEL * 2;
+/** The width the skeleton chrome below was originally drawn against. */
+const CHROME_WIDTH = 248;
+const CHROME_SCALE = PHONE_SCREEN_WIDTH / CHROME_WIDTH;
+
 export function PhoneSkeleton({
   effectiveFormat,
   title,
@@ -994,10 +1048,23 @@ export function PhoneSkeleton({
   ctaLabel: string;
 }) {
   return (
-    <div className="w-full h-full flex items-center justify-center">
+    <div
+      className="relative bg-white overflow-hidden shadow-lg"
+      style={{ width: PHONE_WIDTH, height: PHONE_HEIGHT, borderRadius: 46, border: `${PHONE_BEZEL}px solid #2b2b2b` }}
+    >
+      {/* The skeleton chrome is decorative and was drawn for a 248px box, so it
+          is scaled up to fill a real screen rather than re-tuned element by
+          element. The message itself is NOT in here — it renders below at its
+          true size, which is the whole point: on a real phone a 13px banner
+          occupies this much of the screen, and now the mock shows that. */}
       <div
-        className="relative bg-white rounded-[28px] overflow-hidden flex flex-col shadow-lg shrink-0"
-        style={{ width: 260, height: '100%', maxHeight: 520, border: '6px solid #2b2b2b', borderColor: '#2b2b2b' }}
+        className="absolute top-0 left-0 flex flex-col"
+        style={{
+          width: CHROME_WIDTH,
+          height: PHONE_SCREEN_HEIGHT / CHROME_SCALE,
+          transform: `scale(${CHROME_SCALE})`,
+          transformOrigin: 'top left',
+        }}
       >
         {/* Topbar: hamburger, logo, search, notifications w/ badge, avatar */}
         <div className="h-[34px] border-b flex items-center gap-[10px] px-[10px] shrink-0" style={{ borderColor: BORDER }}>
@@ -1043,28 +1110,29 @@ export function PhoneSkeleton({
           <PhoneDataCard />
           <PhoneDataCard />
         </div>
-
-        {effectiveFormat === 'Overlay' && (
-          <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
-            <OverlayPreview
-              title={title}
-              body={body}
-              dismissible={dismissible}
-              hasCta={hasCta}
-              ctaLabel={ctaLabel}
-              rounded={false}
-              widthClass="w-[80%]"
-              compact
-            />
-          </div>
-        )}
-
-        {effectiveFormat === 'Banner' && (
-          <div className="absolute left-0 right-0 bottom-0">
-            <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
-          </div>
-        )}
       </div>
+
+      {/* Outside the scaled chrome, so the message keeps its real type size and
+          padding against a real screen width — exactly what a recipient sees. */}
+      {effectiveFormat === 'Overlay' && (
+        <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
+          <OverlayPreview
+            title={title}
+            body={body}
+            dismissible={dismissible}
+            hasCta={hasCta}
+            ctaLabel={ctaLabel}
+            rounded={false}
+            widthClass="w-[85%]"
+          />
+        </div>
+      )}
+
+      {effectiveFormat === 'Banner' && (
+        <div className="absolute left-0 right-0 bottom-0">
+          <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1122,7 +1190,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
         onClick={handleClose}
       />
       <div
-        className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
+        className="absolute right-0 top-0 bottom-0 w-[305px] min-w-[305px] max-w-[305px] bg-white flex flex-col transition-transform duration-300 ease-out"
         style={{ transform: mounted && !closing ? 'translateX(0)' : 'translateX(100%)' }}
       >
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
@@ -1160,7 +1228,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts, currentUserName, rejectionReason }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts, currentUserName, rejectionReason, rejected }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -1176,6 +1244,12 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   currentUserName?: string;
   /** Approver's note from rejecting this message — surfaced as a banner above Author Details. */
   rejectionReason?: string;
+  /**
+   * Whether this message was rejected. Separate from the reason itself, which
+   * is optional — a rejection with no reason still has to show the banner, and
+   * an Expired or Discontinued message must not show it at all.
+   */
+  rejected?: boolean;
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [title, setTitle] = useState(initialData?.title ?? '');
@@ -1206,6 +1280,34 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [pushNotification, setPushNotification] = useState(initialData?.pushNotification ?? false);
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
   const [isSubmitHovered, setIsSubmitHovered] = useState(false);
+
+  // Phone cannot show the form and the preview side by side, so it shows one
+  // at a time behind a tab strip. Someone who can only read the message opened
+  // it to look at the message, not the metadata — so they land on Preview.
+  // Phone and tablet are both too narrow for the form and the preview side by
+  // side, so both stack them behind the tab strip.
+  const isBelowDesktop = useIsBelowDesktop();
+  // Reviewing or just looking means you came for the message itself, not the
+  // metadata. An approver can still edit here, so readOnly alone misses them —
+  // the approve/reject pair is what marks a review.
+  const opensOnPreview = readOnly || (!!onApprove && !!onReject);
+  const [stackedTab, setStackedTab] = useState<'details' | 'preview'>(opensOnPreview ? 'preview' : 'details');
+  // While you are on Details the preview keeps updating out of sight, so the
+  // tab carries a dot until you next look at it.
+  const [previewSeen, setPreviewSeen] = useState(true);
+
+  // Only the fields the preview actually draws count as a change worth a dot —
+  // editing the department or the audience leaves the preview identical.
+  const previewSignature = [displayFormat, title, body, messageColor, dismissible, hasCta, ctaLabel].join(' ');
+  const lastSeenSignature = useRef(previewSignature);
+  useEffect(() => {
+    if (stackedTab === 'preview') {
+      lastSeenSignature.current = previewSignature;
+      setPreviewSeen(true);
+    } else if (previewSignature !== lastSeenSignature.current) {
+      setPreviewSeen(false);
+    }
+  }, [previewSignature, stackedTab]);
 
   const isEmergency = displayFormat === 'Banner' && messageColor === '#DA4040';
 
@@ -1268,14 +1370,65 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
         </button>
       </div>
 
+      {/* Phone: the form and the preview cannot share a 375px screen, so they
+          share a tab strip instead. Tablet and up show both side by side. */}
+      {isBelowDesktop && (
+        <div className="flex shrink-0 border-b" style={{ borderColor: BORDER }}>
+          {([
+            { key: 'details', label: 'Details' },
+            { key: 'preview', label: 'Preview' },
+          ] as const).map((t) => {
+            const tabActive = stackedTab === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setStackedTab(t.key)}
+                className="flex-1 h-[44px] flex items-center justify-center gap-[6px] cursor-pointer font-['Montserrat',sans-serif] text-[13px] transition-colors duration-150"
+                style={{
+                  color: tabActive ? '#2699FB' : '#585858',
+                  fontWeight: tabActive ? 600 : 500,
+                  // Inset shadow rather than a border, so switching tabs does
+                  // not shift the strip's height by the underline's 2px.
+                  boxShadow: tabActive ? 'inset 0 -2px 0 #2699FB' : 'none',
+                }}
+              >
+                {t.label}
+                {t.key === 'preview' && !previewSeen && (
+                  <span className="rounded-full size-[6px] shrink-0" style={{ backgroundColor: '#FF8800' }} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Body: left form + right preview */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
         {/* Scrollable form, fixed 399px — left by default, right if PREVIEW_ON_LEFT */}
-        <div style={{ width: '399px', minWidth: '399px', maxWidth: '399px', overflowY: 'auto', [PREVIEW_ON_LEFT ? 'borderLeft' : 'borderRight']: `1px solid ${BORDER}`, position: 'relative', order: PREVIEW_ON_LEFT ? 2 : 1 }} className="p-[24px] flex flex-col gap-[16px]">
+        <div
+          style={{
+            // Fixed 399px only where there is a preview beside it to divide
+            // from; on phone it owns the whole screen.
+            width: isBelowDesktop ? '100%' : '399px',
+            minWidth: isBelowDesktop ? 0 : '399px',
+            maxWidth: isBelowDesktop ? '100%' : '399px',
+            overflowY: 'auto',
+            ...(isBelowDesktop ? {} : { [PREVIEW_ON_LEFT ? 'borderLeft' : 'borderRight']: `1px solid ${BORDER}` }),
+            position: 'relative',
+            order: PREVIEW_ON_LEFT ? 2 : 1,
+            display: isBelowDesktop && stackedTab !== 'details' ? 'none' : 'flex',
+          }}
+          className="p-[24px] max-sm:p-[16px] flex flex-col gap-[16px]"
+        >
           {readOnly && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} />}
 
-          {rejectionReason && (
+          {/* Shown for every rejected message. The reason is optional, so when
+              the approver left it blank the banner says so rather than
+              vanishing — otherwise the absence of a note is indistinguishable
+              from the message never having been rejected. */}
+          {(rejected || rejectionReason) && (
             <div
               className="flex items-start gap-[8px] rounded-[4px] px-[12px] py-[10px]"
               style={{ backgroundColor: '#FFE9E9' }}
@@ -1283,7 +1436,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               <RiErrorWarningLine size={16} color="#DA4040" className="shrink-0 mt-[1px]" />
               <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: '#DA4040' }}>
                 <span className="font-semibold">Rejection Reason: </span>
-                {rejectionReason}
+                {rejectionReason || 'No reason was provided by the approver.'}
               </p>
             </div>
           )}
@@ -1380,7 +1533,16 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
         </div>
 
         {/* Preview + device toggle — right by default, left if PREVIEW_ON_LEFT */}
-        <div style={{ flex: 1, minWidth: 0, backgroundColor: '#f8f8f8', order: PREVIEW_ON_LEFT ? 1 : 2 }} className="flex flex-col p-[24px] gap-[16px]">
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            backgroundColor: '#f8f8f8',
+            order: PREVIEW_ON_LEFT ? 1 : 2,
+            display: isBelowDesktop && stackedTab !== 'preview' ? 'none' : 'flex',
+          }}
+          className="flex flex-col p-[24px] max-sm:p-[16px] gap-[16px]"
+        >
           {/* Preview card */}
           <div className="bg-white rounded-[8px] border flex flex-col flex-1 overflow-hidden" style={{ borderColor: BORDER }}>
             <div className="px-[16px] py-[12px] border-b flex items-center justify-between gap-[12px] shrink-0" style={{ borderColor: BORDER }}>
@@ -1410,8 +1572,8 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               {hasPreview ? (
                 <div className="flex-1 min-h-0">
                   {deviceView === 'desktop' ? (
-                    <div className="w-full h-full flex justify-center">
-                      <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
+                    isBelowDesktop ? (
+                      <ScaledMock baseWidth={MOCK_WIDTH} baseHeight={MOCK_WIDTH / 1.6}>
                         <ScreenSkeleton
                           effectiveFormat={effectiveFormat}
                           title={title}
@@ -1421,18 +1583,38 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                           hasCta={hasCta}
                           ctaLabel={ctaLabel}
                         />
+                      </ScaledMock>
+                    ) : (
+                      // Desktop has room to draw the mock at native size, which
+                      // beats scaling a smaller one up.
+                      <div className="w-full h-full flex justify-center">
+                        <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
+                          <ScreenSkeleton
+                            effectiveFormat={effectiveFormat}
+                            title={title}
+                            body={body}
+                            color={effectiveBannerColor}
+                            dismissible={effectiveDismissible}
+                            hasCta={hasCta}
+                            ctaLabel={ctaLabel}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )
                   ) : (
-                    <PhoneSkeleton
-                      effectiveFormat={effectiveFormat}
-                      title={title}
-                      body={body}
-                      color={effectiveBannerColor}
-                      dismissible={effectiveDismissible}
-                      hasCta={hasCta}
-                      ctaLabel={ctaLabel}
-                    />
+                    // A real handset is 844pt tall, taller than the pane at any
+                    // breakpoint, so the phone mock always scales to fit.
+                    <ScaledMock baseWidth={PHONE_WIDTH} baseHeight={PHONE_HEIGHT}>
+                      <PhoneSkeleton
+                        effectiveFormat={effectiveFormat}
+                        title={title}
+                        body={body}
+                        color={effectiveBannerColor}
+                        dismissible={effectiveDismissible}
+                        hasCta={hasCta}
+                        ctaLabel={ctaLabel}
+                      />
+                    </ScaledMock>
                   )}
                 </div>
               ) : (
@@ -1450,13 +1632,13 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
       {/* Action buttons — full-width footer bar across the whole overlay */}
       {showFooter && (
-      <div className="shrink-0 border-t px-[24px] py-[16px] flex items-center justify-end" style={{ borderColor: BORDER, backgroundColor: 'white' }}>
+      <div className="shrink-0 border-t px-[24px] max-sm:px-[16px] py-[16px] flex items-center justify-end" style={{ borderColor: BORDER, backgroundColor: 'white' }}>
         {onDeleteRow || onCopyToDrafts ? (
-          <div className="flex items-center gap-[16px]">
+          <div className={`flex items-center gap-[16px] ${onDeleteRow && onCopyToDrafts ? 'w-full justify-between' : ''}`}>
             {onDeleteRow && (
               <button
                 type="button"
-                className="flex items-center gap-[6px] font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+                className="flex items-center gap-[6px] shrink-0 font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
                 style={{ color: '#DA4040' }}
                 onClick={() => setShowDeleteConfirm(true)}
               >
@@ -1467,60 +1649,63 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             {onCopyToDrafts && (
               <button
                 type="button"
-                className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
+                className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
                 onClick={onCopyToDrafts}
               >
                 <MdOutlineContentCopy size={15} />
-                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase">
+                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
                   Copy to Drafts
                 </span>
               </button>
             )}
           </div>
         ) : onApprove && onReject ? (
-            <div className="flex items-center gap-[8px]">
+            /* Pushed to opposite ends of the footer: the destructive action sits
+               well away from the one people mean to hit. */
+            <div className="flex items-center gap-[8px] w-full justify-between">
               <button
                 type="button"
                 onClick={onReject}
-                className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#fdeaea] border-[#DA4040] text-[#DA4040] hover:bg-[#DA4040] hover:text-white"
+                className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#fdeaea] border-[#DA4040] text-[#DA4040] hover:bg-[#DA4040] hover:text-white"
               >
                 <FaRegTimesCircle size={15} />
-                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase">
+                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
                   Reject
                 </span>
               </button>
               <button
                 type="button"
                 onClick={onApprove}
-                className="rounded-[8px] px-[16px] h-[32px] flex items-center gap-[8px] cursor-pointer"
+                className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[8px] max-sm:gap-[6px] cursor-pointer"
                 style={{ backgroundColor: '#00AA00' }}
               >
                 <FaRegCheckCircle size={15} color="white" />
-                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase" style={{ color: 'white' }}>
+                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap" style={{ color: 'white' }}>
                   Approve
                 </span>
               </button>
             </div>
         ) : !readOnly ? (
-          <div className="flex items-center gap-[8px]">
+          /* Pushed to opposite ends of the footer, same as the review actions. */
+          <div className="flex items-center gap-[8px] w-full justify-between">
             <button
               type="button"
               onClick={handleSaveAsDraft}
-              className="rounded-[8px] px-[12px] h-[32px] flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
+              className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center justify-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
             >
               <MdOutlineSaveAlt size={15} />
-              <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase">
+              <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
                 Save as Draft
               </span>
             </button>
-            <div className="relative group">
+            <div className="relative group shrink-0">
               <button
                 type="button"
                 onClick={isFormValid ? handleSubmit : undefined}
                 onMouseEnter={() => setIsSubmitHovered(true)}
                 onMouseLeave={() => setIsSubmitHovered(false)}
                 disabled={!isFormValid}
-                className="rounded-[8px] px-[16px] h-[32px] flex items-center gap-[8px] transition-colors duration-150"
+                className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] flex items-center justify-center gap-[8px] max-sm:gap-[6px] transition-colors duration-150"
                 style={{
                   backgroundColor: isFormValid ? (isSubmitHovered ? '#2C9FFF' : PRIMARY) : '#e1e3e4',
                   cursor: isFormValid ? 'pointer' : 'not-allowed',
@@ -1528,7 +1713,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               >
                 <MdSend size={17} color={isFormValid ? 'white' : '#a1a3a4'} />
                 <span
-                  className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase"
+                  className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap"
                   style={{ color: isFormValid ? 'white' : '#a1a3a4' }}
                 >
                   {submitLabel ?? 'Send for Approval'}

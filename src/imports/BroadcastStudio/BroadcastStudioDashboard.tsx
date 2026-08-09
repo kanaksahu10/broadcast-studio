@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
-import { IoIosClose } from 'react-icons/io';
+import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { MdAdd, MdApps, MdBlock, MdBusiness, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
-import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField } from './ComposeMessageOverlay';
+import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
+import { useIsBelowDesktop, useIsPhone } from './useIsPhone';
 import { getUserIdentity, type UserRole } from './userIdentity';
 
 // Prototype affordance: switch the viewer's role in one click (no URL editing).
 // Visible in the deployed build too, so PM/QA can self-serve both perspectives.
 function RoleToggle({ role, onChange }: { role: UserRole; onChange: (next: UserRole) => void }) {
+  // Phone only: the switch rides off the left edge, leaving a thin tab behind.
+  // A permanently-visible switch costs screen the phone can't spare, and this
+  // is a prototype affordance rather than product UI, so it shouldn't hold
+  // space it isn't actively using.
+  const [peekOpen, setPeekOpen] = useState(false);
   const switchRole = (next: UserRole) => {
     if (next === role) return;
     onChange(next);
@@ -18,28 +24,63 @@ function RoleToggle({ role, onChange }: { role: UserRole; onChange: (next: UserR
     { key: 'super-admin', label: 'Super Admin', activeBg: '#2699fb' },
     { key: 'executive-approver', label: 'Executive Approver', activeBg: '#27496D' },
   ];
-  return (
-    <div className="fixed top-[13px] right-[90px] z-[9999] flex flex-col items-end gap-[4px]">
-      <div
-        className="flex items-center rounded-[8px] overflow-hidden border"
-        style={{ borderColor: '#E5E5E5', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.10)' }}
-      >
-        {options.map((o) => {
-          const active = role === o.key;
-          return (
-            <button
-              key={o.key}
-              type="button"
-              onClick={() => switchRole(o.key)}
-              className="font-['Montserrat',sans-serif] font-medium text-[11px] px-[10px] py-[5px] transition-colors duration-100 cursor-pointer whitespace-nowrap"
-              style={{ backgroundColor: active ? o.activeBg : 'white', color: active ? 'white' : '#585858' }}
-            >
-              {o.label}
-            </button>
-          );
-        })}
-      </div>
+
+  const switchButtons = (
+    <div className="flex items-center overflow-hidden" style={{ backgroundColor: 'white' }}>
+      {options.map((o) => {
+        const active = role === o.key;
+        return (
+          <button
+            key={o.key}
+            type="button"
+            onClick={() => switchRole(o.key)}
+            className="font-['Montserrat',sans-serif] font-medium text-[11px] px-[10px] py-[5px] transition-colors duration-100 cursor-pointer whitespace-nowrap"
+            style={{ backgroundColor: active ? o.activeBg : 'white', color: active ? 'white' : '#585858' }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
     </div>
+  );
+
+  return (
+    <>
+      {/* Desktop / tablet: parked top-right, always open — there's room. */}
+      <div className="hidden sm:flex fixed top-[13px] right-[90px] z-[9999] flex-col items-end gap-[4px]">
+        <div
+          className="flex items-center rounded-[8px] overflow-hidden border"
+          style={{ borderColor: '#E5E5E5', boxShadow: '0 1px 3px rgba(0,0,0,0.10)' }}
+        >
+          {switchButtons}
+        </div>
+      </div>
+
+      {/* Phone: slides in from the left, collapsing to a tab. Animating
+          max-width keeps the tab pinned to the panel's edge without having to
+          measure the panel first. */}
+      <div className="sm:hidden fixed left-0 bottom-[16px] z-[9999] flex items-stretch">
+        <div
+          className="overflow-hidden transition-[max-width] duration-200 ease-out border-y border-r rounded-r-[8px]"
+          style={{
+            maxWidth: peekOpen ? 280 : 0,
+            borderColor: '#E5E5E5',
+            boxShadow: peekOpen ? '0 1px 6px rgba(0,0,0,0.12)' : 'none',
+          }}
+        >
+          {switchButtons}
+        </div>
+        <button
+          type="button"
+          aria-label={peekOpen ? 'Hide role switcher' : 'Show role switcher'}
+          onClick={() => setPeekOpen((o) => !o)}
+          className="flex items-center justify-center w-[18px] h-[44px] shrink-0 cursor-pointer border-y border-r rounded-r-[8px]"
+          style={{ backgroundColor: 'white', borderColor: '#E5E5E5', boxShadow: '1px 1px 4px rgba(0,0,0,0.10)' }}
+        >
+          {peekOpen ? <IoIosArrowBack size={14} color="#585858" /> : <IoIosArrowForward size={14} color="#585858" />}
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -47,6 +88,7 @@ type ViewMode = 'datagrid' | 'kanban';
 
 // FEATURE FLAG: set to true to restore the datagrid/kanban toggle button
 const SHOW_VIEW_TOGGLE = false;
+
 
 type MessageStatus = 'Live' | 'Pending' | 'Draft' | 'Rejected' | 'Discontinued';
 type MessageType = '' | 'Announcement' | 'Emergency';
@@ -303,6 +345,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Product',
+      messageCategory: 'Emergency',
       noEndDate: true,
       body: 'We are currently investigating reports of a service disruption. Updates will follow as more information becomes available.',
       reason: 'Incident response',
@@ -331,6 +374,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'Jennifer James',
       department: 'Admin Services',
+      messageCategory: 'Upsell',
       body: 'We are excited to announce a new partnership that expands your benefits options starting next quarter.',
       displayFormat: 'Overlay',
       placement: 'Global',
@@ -384,6 +428,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Product',
+      messageCategory: 'Emergency',
       body: 'The client portal will undergo emergency maintenance tonight from 11 PM to 2 AM. Access will be intermittent during this window.',
       reason: 'Emergency maintenance',
       displayFormat: 'Banner',
@@ -410,6 +455,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Product',
+      messageCategory: 'New Release',
       body: 'Our redesigned mobile app is rolling out next week with faster scheduling and a new messaging inbox.',
       reason: 'Product launch',
       displayFormat: 'Overlay',
@@ -437,6 +483,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Billing',
+      messageCategory: 'Emergency',
       body: 'Payroll systems will be offline for scheduled maintenance. Time-off requests submitted during this window may be delayed.',
       reason: 'Planned maintenance',
       displayFormat: 'Banner',
@@ -463,6 +510,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Marketing',
+      messageCategory: 'Upsell',
       body: 'Open enrollment kicks off next month — remind your team to complete their benefits selections before the deadline.',
       reason: 'Enrollment campaign',
       displayFormat: 'Overlay',
@@ -516,6 +564,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Admin Services',
+      messageCategory: 'Custom', customCategoryName: 'Compliance',
       body: 'Our data retention policy has been updated to align with new state requirements. Review the changes before they take effect.',
       reason: 'Policy update',
       displayFormat: 'Overlay',
@@ -545,6 +594,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Support',
+      messageCategory: 'New Release',
       body: 'Summer hours are now in effect. Review the updated shift schedule to see how your availability windows have changed.',
       displayFormat: 'Banner',
       placement: 'Feature Specific',
@@ -598,6 +648,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Customer Success',
+      messageCategory: 'Billing Notice',
       body: 'Benefits open enrollment begins August 1st. Take a few minutes to review your options and make any changes for the coming year.',
       displayFormat: 'Overlay',
       placement: 'Global',
@@ -624,6 +675,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Admin Services',
+      messageCategory: 'Emergency',
       body: "A severe weather advisory is in effect for your area. Please review your agency's emergency procedures.",
       reason: 'Safety notice',
       displayFormat: 'Banner',
@@ -680,6 +732,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Billing',
+      messageCategory: 'Billing Notice',
       body: 'Placeholder rejected message for prototyping the Rejected bucket.',
       reason: 'Needs budget sign-off',
       displayFormat: 'Overlay',
@@ -734,6 +787,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     formData: {
       author: 'John Doe',
       department: 'Product',
+      messageCategory: 'New Release',
       body: 'The legacy client portal has been discontinued. Please use the new portal for all requests going forward.',
       reason: 'Superseded by new portal',
       displayFormat: 'Overlay',
@@ -748,7 +802,12 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
   },
 ];
 
-const STORAGE_KEY = 'bs-messages-v8';
+// Bump this whenever INITIAL_MESSAGES changes shape or content. Seed data is
+// only written when storage is empty, so without a bump anyone carrying rows
+// from a previous version keeps them forever — and new fields (author,
+// department, authorRole, rejectionReason) read as undefined on those old
+// rows, which silently empties the Drafts and Pending columns.
+const STORAGE_KEY = 'bs-messages-v10';
 
 function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
@@ -854,7 +913,7 @@ function FilterTab({ label, active, onClick }: { label: string; active: boolean;
 
 function SearchInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <div className="bg-white content-stretch flex gap-[8px] items-center px-[13px] py-[10px] relative rounded-[4px] shrink-0 w-[285px]" data-name="Input">
+    <div className="bg-white content-stretch flex gap-[8px] items-center px-[13px] py-[10px] relative rounded-[4px] shrink-0 w-[285px] max-sm:w-full" data-name="Input">
       <div aria-hidden="true" className="absolute border border-[#e5e5e5] border-solid inset-0 pointer-events-none rounded-[4px]" />
       <BsSearch className="shrink-0" size={12} color="#c3c3c3" />
       <input
@@ -1136,7 +1195,7 @@ function AudienceOverlay({ formData, recipientCount, onClose }: { formData: NonN
         onClick={handleClose}
       />
       <div
-        className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
+        className="absolute right-0 top-0 bottom-0 w-[305px] min-w-[305px] max-w-[305px] sm:w-[399px] sm:min-w-[399px] sm:max-w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
         style={{ transform: mounted && !closing ? 'translateX(0)' : 'translateX(100%)' }}
       >
         {/* Header */}
@@ -1203,7 +1262,7 @@ function RejectConfirmOverlay({ subject, onConfirm, onClose }: { subject: string
         onClick={handleClose}
       />
       <div
-        className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
+        className="absolute right-0 top-0 bottom-0 w-[305px] min-w-[305px] max-w-[305px] sm:w-[399px] sm:min-w-[399px] sm:max-w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
         style={{ transform: mounted && !closing ? 'translateX(0)' : 'translateX(100%)' }}
       >
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
@@ -1275,7 +1334,7 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete', is
         onClick={handleClose}
       />
       <div
-        className="absolute right-0 top-0 bottom-0 w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
+        className="absolute right-0 top-0 bottom-0 w-[305px] min-w-[305px] max-w-[305px] sm:w-[399px] sm:min-w-[399px] sm:max-w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
         style={{ transform: mounted && !closing ? 'translateX(0)' : 'translateX(100%)' }}
       >
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
@@ -1395,12 +1454,10 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
         <div className="flex items-start justify-between gap-[6px]">
           <div className="flex flex-col flex-1 min-w-0">
             <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px] text-[#000000]">{row.subject}</p>
-            {(row.formData?.author || row.formData?.department) && (
+            {row.formData?.author && (
               <p className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
                 <MdPersonOutline size={13} color="#8b8b8b" />
-                {row.formData?.author}
-                {row.formData?.author && row.formData?.department && <span> · </span>}
-                {row.formData?.department}
+                {row.formData.author}
               </p>
             )}
             {dateRange !== '—' && (
@@ -1577,12 +1634,10 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
         <div className="flex items-start justify-between gap-[6px]">
           <div className="flex flex-col flex-1 min-w-0">
             <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px] text-[#000000]">{row.subject}</p>
-            {(row.formData?.author || row.formData?.department) && (
+            {row.formData?.author && (
               <p className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
                 <MdPersonOutline size={13} color="#8b8b8b" />
-                {row.formData?.author}
-                {row.formData?.author && row.formData?.department && <span> · </span>}
-                {row.formData?.department}
+                {row.formData.author}
               </p>
             )}
             {dateRange !== '—' && (
@@ -1630,6 +1685,121 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
   );
 }
 
+/**
+ * Phone layout for any board: a snap-scrolling row of columns with pagination
+ * dots underneath.
+ *
+ * Columns are 88% wide rather than 100% so the next one peeks in, which
+ * signals there's more to swipe to before the dots are even noticed. Each
+ * column already carries its own name and count in its header, so no tab
+ * strip sits above them — that would repeat the same information twice on a
+ * screen with little room to spare. The dots stay tappable as a way to jump
+ * between columns without swiping.
+ */
+type BoardColumn = { key: string; label: string; count: number; color: string; header: React.ReactNode; body: React.ReactNode };
+
+/**
+ * Pagination is for phones only. Tablet and desktop both keep the columns at
+ * full width and scroll sideways instead — a tablet cannot fit three 300px
+ * columns either (1023px of viewport leaves the board about 862px against the
+ * ~932px needed), but scrolling shows that honestly without swapping to a
+ * different interaction partway up the size range.
+ */
+function ResponsiveBoard({ columns }: { columns: BoardColumn[] }) {
+  const isPhone = useIsPhone();
+  return isPhone ? <MobileBoardColumns columns={columns} /> : <ScrollingBoardColumns columns={columns} />;
+}
+
+function ScrollingBoardColumns({ columns }: { columns: BoardColumn[] }) {
+  return (
+    <div className="flex gap-[16px] w-full items-start overflow-x-auto pb-[4px]">
+      {columns.map((c) => (
+        <div key={c.key} className="flex flex-col gap-[10px] flex-1 min-w-[300px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
+          {c.header}
+          {c.body}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MobileBoardColumns({ columns }: { columns: BoardColumn[] }) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(0);
+
+  const goTo = (i: number) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const child = el.children[i] as HTMLElement | undefined;
+    if (child) el.scrollTo({ left: child.offsetLeft - el.offsetLeft, behavior: 'smooth' });
+  };
+
+  // Derive the active column from scroll position so a swipe drives the dots,
+  // not just an explicit dot tap.
+  const handleScroll = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    // At the far right the last columns share the view, so the leftmost one is
+    // no longer the answer — without this the final dot could never light up.
+    if (el.scrollLeft >= el.scrollWidth - el.clientWidth - 2) {
+      setActive(columns.length - 1);
+      return;
+    }
+    const kids = [...el.children] as HTMLElement[];
+    let best = 0;
+    let bestDist = Infinity;
+    kids.forEach((c, i) => {
+      const dist = Math.abs((c.offsetLeft - el.offsetLeft) - el.scrollLeft);
+      if (dist < bestDist) { bestDist = dist; best = i; }
+    });
+    setActive(best);
+  };
+
+
+  return (
+    <div className="flex flex-col gap-[10px] w-full">
+      <div
+        ref={scrollerRef}
+        onScroll={handleScroll}
+        className="flex gap-[16px] w-full items-stretch overflow-x-auto snap-x snap-mandatory scroll-smooth h-[calc(100dvh-290px)] min-h-[300px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {columns.map((c) => (
+          <div key={c.key} className="snap-start shrink-0 w-[88%] h-full flex flex-col gap-[10px] bg-[#fcfcfc] rounded-[10px] p-[12px]">
+            {c.header}
+            {/* Only the card list scrolls, so the bucket name and count stay
+                put and every column is the same height — which in turn keeps
+                the dots below at one fixed position instead of drifting with
+                the number of cards. */}
+            {/* The list reaches into the column's 12px right padding so the 6px
+                scrollbar sits centred in that gutter — 3px either side — while
+                the cards keep the width they have everywhere else. */}
+            <div className="flex-1 min-h-0 overflow-y-auto -mr-[9px] pr-[3px] [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#d0d0d0]">
+              {c.body}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-center gap-[6px] shrink-0 pt-[2px]">
+        {columns.map((c, i) => (
+          <button
+            key={c.key}
+            type="button"
+            aria-label={`Go to ${c.label}`}
+            onClick={() => goTo(i)}
+            className="rounded-full transition-all duration-150 cursor-pointer"
+            style={{
+              width: i === active ? 18 : 6,
+              height: 6,
+              backgroundColor: i === active ? '#2699FB' : '#d0d0d0',
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const DISCARDED_COLUMNS: DiscardedBucket[] = ['Rejected', 'Expired', 'Discontinued'];
 
 function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
@@ -1642,42 +1812,50 @@ function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
     .map((row) => ({ row, bucket: getDiscardedBucket(row) }))
     .filter((x): x is { row: BroadcastMessageRow; bucket: DiscardedBucket } => x.bucket !== null);
 
-  return (
-    <div className="flex gap-[16px] w-full items-start">
-      {DISCARDED_COLUMNS.map((bucket) => {
-        const colRows = bucketed.filter((x) => x.bucket === bucket).map((x) => x.row);
-        const color = BUCKET_COLOR[bucket];
-        return (
-          <div key={bucket} className="flex flex-col gap-[10px] flex-1 min-w-0 bg-[#fcfcfc] rounded-[10px] p-[12px]">
-            <div className="flex items-center justify-between px-[2px]">
-              <div className="flex items-center gap-[7px]">
-                <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{bucket}</span>
-                <ColumnInfoTooltip label={getBucketTooltip(bucket)} />
-              </div>
-              <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
+  // One definition of a bucket's header + cards, reused by the desktop row
+  // and the phone tab/swipe view so they can't drift apart.
+  const built = DISCARDED_COLUMNS.map((bucket) => {
+    const colRows = bucketed.filter((x) => x.bucket === bucket).map((x) => x.row);
+    const color = BUCKET_COLOR[bucket];
+    return {
+      key: bucket,
+      label: bucket,
+      count: colRows.length,
+      color,
+      header: (
+          <div className="flex items-center justify-between px-[2px]">
+            <div className="flex items-center gap-[7px]">
+              <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{bucket}</span>
+              <ColumnInfoTooltip label={getBucketTooltip(bucket)} />
             </div>
-            <div className="flex flex-col gap-[8px]">
-              {colRows.length === 0 ? (
-                <div className="border border-dashed border-[#e5e5e5] rounded-[8px] py-[28px] flex items-center justify-center bg-white">
-                  <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8]">No messages</p>
-                </div>
-              ) : (
-                colRows.map((row) => (
-                  <DiscardedCard
-                    key={row.id}
-                    row={row}
-                    bucket={bucket}
-                    onView={() => onView(row, bucket)}
-                    onDelete={() => onDelete(row.id)}
-                    highlight={highlightIds.has(row.id)}
-                  />
-                ))
-              )}
-            </div>
+            <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-[4px] size-[17px] flex items-center justify-center shrink-0">{colRows.length}</span>
           </div>
-        );
-      })}
-    </div>
+      ),
+      body: (
+          <div className="flex flex-col gap-[8px]">
+            {colRows.length === 0 ? (
+              <div className="border border-dashed border-[#e5e5e5] rounded-[8px] py-[28px] flex items-center justify-center bg-white">
+                <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8]">No messages</p>
+              </div>
+            ) : (
+              colRows.map((row) => (
+                <DiscardedCard
+                  key={row.id}
+                  row={row}
+                  bucket={bucket}
+                  onView={() => onView(row, bucket)}
+                  onDelete={() => onDelete(row.id)}
+                  highlight={highlightIds.has(row.id)}
+                />
+              ))
+            )}
+          </div>
+      ),
+    };
+  });
+
+  return (
+    <ResponsiveBoard columns={built} />
   );
 }
 
@@ -1698,46 +1876,52 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
   onReject: (id: string) => void;
   highlightIds: Set<string>;
 }) {
-  return (
-    <div className="flex gap-[16px] w-full items-start">
-      {KANBAN_COLUMNS.map(({ status, label }) => {
-        const colRows = rows.filter((r) => r.status === status && getDiscardedBucket(r) === null && isDraftVisibleToRole(r, role));
-        const color = STATUS_COLOR[status];
-        return (
-          <div key={status} className="flex flex-col gap-[10px] flex-1 min-w-0 bg-[#fcfcfc] rounded-[10px] p-[12px]">
-            <div className="flex items-center justify-between px-[2px]">
-              <div className="flex items-center gap-[7px]">
-                <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{label}</span>
-                <ColumnInfoTooltip label={getActionTooltip(status, role)} />
-              </div>
-              <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-full px-[7px] py-[2px]">{colRows.length}</span>
+  const built = KANBAN_COLUMNS.map(({ status, label }) => {
+    const colRows = rows.filter((r) => r.status === status && getDiscardedBucket(r) === null && isDraftVisibleToRole(r, role));
+    const color = STATUS_COLOR[status];
+    return {
+      key: status,
+      label,
+      count: colRows.length,
+      color,
+      header: (
+          <div className="flex items-center justify-between px-[2px]">
+            <div className="flex items-center gap-[7px]">
+              <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] tracking-[0.06em] uppercase" style={{ color }}>{label}</span>
+              <ColumnInfoTooltip label={getActionTooltip(status, role)} />
             </div>
-            <div className="flex flex-col gap-[8px]">
-              {colRows.length === 0 ? (
-                <div className="border border-dashed border-[#e5e5e5] rounded-[8px] py-[28px] flex items-center justify-center bg-white">
-                  <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8]">No messages</p>
-                </div>
-              ) : (
-                colRows.map((row) => (
-                  <KanbanCard
-                    key={row.id}
-                    row={row}
-                    role={role}
-                    onEdit={() => onEdit(row)}
-                    onDelete={() => onDelete(row.id)}
-                    onDiscontinue={() => onDiscontinue(row.id)}
-                    onSendForApproval={() => onSendForApproval(row.id)}
-                    onApprove={() => onApprove(row.id)}
-                    onReject={() => onReject(row.id)}
-                    highlight={highlightIds.has(row.id)}
-                  />
-                ))
-              )}
-            </div>
+            <span className="font-['Montserrat',sans-serif] font-medium text-[11px] text-[#9a9a9a] bg-[#efefef] rounded-[4px] size-[17px] flex items-center justify-center shrink-0">{colRows.length}</span>
           </div>
-        );
-      })}
-    </div>
+      ),
+      body: (
+          <div className="flex flex-col gap-[8px]">
+            {colRows.length === 0 ? (
+              <div className="border border-dashed border-[#e5e5e5] rounded-[8px] py-[28px] flex items-center justify-center bg-white">
+                <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-[#b8b8b8]">No messages</p>
+              </div>
+            ) : (
+              colRows.map((row) => (
+                <KanbanCard
+                  key={row.id}
+                  row={row}
+                  role={role}
+                  onEdit={() => onEdit(row)}
+                  onDelete={() => onDelete(row.id)}
+                  onDiscontinue={() => onDiscontinue(row.id)}
+                  onSendForApproval={() => onSendForApproval(row.id)}
+                  onApprove={() => onApprove(row.id)}
+                  onReject={() => onReject(row.id)}
+                  highlight={highlightIds.has(row.id)}
+                />
+              ))
+            )}
+          </div>
+      ),
+    };
+  });
+
+  return (
+    <ResponsiveBoard columns={built} />
   );
 }
 
@@ -1749,6 +1933,7 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
 }) {
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
   const [showDiscontinueConfirm, setShowDiscontinueConfirm] = useState(false);
+  const isBelowDesktop = useIsBelowDesktop();
 
   const isEmergency = row.type === 'Emergency';
   const effectiveFormat: 'Overlay' | 'Banner' = isEmergency ? 'Banner' : ((row.formData?.displayFormat as 'Overlay' | 'Banner') || 'Overlay');
@@ -1790,49 +1975,51 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
       )}
       <div className="absolute inset-0 bg-white flex flex-col overflow-hidden">
           {/* Header — the modal's own close is always the exit */}
-          <div className="flex items-center justify-between px-[20px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', height: '56px' }}>
-            <div className="flex flex-col gap-[4px]">
-              <p className="font-['Montserrat',sans-serif] font-semibold text-[15px] leading-[20px] text-black">Message Preview</p>
-              <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[16px]" style={{ color: '#8b8b8b' }}>
-                {[row.subject, row.formData?.author, row.formData?.department].filter(Boolean).join(' · ')}
-              </p>
-            </div>
-            <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
+          <div className="flex items-center justify-between gap-[16px] px-[20px] py-[12px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', minHeight: '56px' }}>
+            <p className="font-['Montserrat',sans-serif] font-semibold text-[15px] leading-[20px] text-black">Message Preview</p>
+            <button type="button" onClick={onClose} className="cursor-pointer flex items-center shrink-0">
               <IoIosClose size={26} color="#27496D" />
             </button>
           </div>
 
           {/* Context bar — device toggle + "what recipients see" + push indicator */}
-          <div className="flex items-center justify-between gap-[12px] px-[20px] py-[10px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', backgroundColor: '#ffffff' }}>
-            <div className="flex items-center gap-[6px] min-w-0 flex-wrap">
-              {statusChipText && (
-                <span
-                  className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
-                  style={{ backgroundColor: chipBg, color: chipColor }}
-                >
-                  <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: chipColor }} />
-                  {statusChipText}
-                </span>
-              )}
-              {placementChips.map((chip) => (
-                <span
-                  key={chip}
-                  className="flex items-center font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
-                  style={{ backgroundColor: chipBg, color: chipColor }}
-                >
-                  {chip}
-                </span>
-              ))}
-              {effectiveFormat === 'Banner' && row.formData?.pushNotification && (
-                <span
-                  className="flex items-center gap-[4px] font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
-                  style={{ backgroundColor: chipBg, color: chipColor }}
-                >
-                  <MdOutlineNotificationsActive size={12} />
-                  Push Notification
-                </span>
-              )}
-            </div>
+          <div className="flex flex-col gap-[8px] px-[20px] py-[10px] shrink-0" style={{ borderBottom: '1px solid #E5E5E5', backgroundColor: '#ffffff' }}>
+            {/* Which message this is, on its own full-width line above the
+                chips — in the header it had to share the row with the close
+                button and wrapped into it on narrow screens. */}
+            <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[16px]" style={{ color: '#8b8b8b' }}>
+              {[row.subject, row.formData?.author, row.formData?.department].filter(Boolean).join(' · ')}
+            </p>
+            <div className="flex items-center justify-between gap-[12px]">
+              <div className="flex items-center gap-[6px] min-w-0 flex-wrap">
+                {statusChipText && (
+                  <span
+                    className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
+                    style={{ backgroundColor: chipBg, color: chipColor }}
+                  >
+                    <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: chipColor }} />
+                    {statusChipText}
+                  </span>
+                )}
+                {placementChips.map((chip) => (
+                  <span
+                    key={chip}
+                    className="flex items-center font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
+                    style={{ backgroundColor: chipBg, color: chipColor }}
+                  >
+                    {chip}
+                  </span>
+                ))}
+                {effectiveFormat === 'Banner' && row.formData?.pushNotification && (
+                  <span
+                    className="flex items-center gap-[4px] font-['Montserrat',sans-serif] font-medium text-[11px] leading-[15px] px-[8px] py-[3px] rounded-[4px] shrink-0 whitespace-nowrap"
+                    style={{ backgroundColor: chipBg, color: chipColor }}
+                  >
+                    <MdOutlineNotificationsActive size={12} />
+                    Push Notification
+                  </span>
+                )}
+              </div>
             <div className="flex items-center rounded-[6px] border border-[#e5e5e5] bg-white overflow-hidden shrink-0">
               <button type="button" onClick={() => setDeviceView('desktop')} className="flex items-center justify-center w-[32px] h-[32px] transition-colors duration-150" style={{ backgroundColor: deviceView === 'desktop' ? '#27496d' : 'white' }} title="Desktop view">
                 <MdDesktopWindows size={16} color={deviceView === 'desktop' ? 'white' : '#8a8a8a'} />
@@ -1841,18 +2028,31 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
                 <MdPhoneIphone size={16} color={deviceView === 'phone' ? 'white' : '#8a8a8a'} />
               </button>
             </div>
+            </div>
           </div>
 
           {/* Stage — faithful in-context render, always contained */}
           <div className="flex-1 min-h-0 p-[20px]" style={{ backgroundColor: '#f5f6f7' }}>
             {deviceView === 'desktop' ? (
-              <div className="w-full h-full flex justify-center">
-                <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
+              isBelowDesktop ? (
+                // Below desktop this box is narrow, and driving the mock off
+                // height lets max-width override the ratio — the "desktop"
+                // screen comes out portrait and its 320px message panel then
+                // covers the app behind it. Scale a real-size mock instead.
+                <ScaledMock baseWidth={MOCK_WIDTH} baseHeight={MOCK_WIDTH / 1.6}>
                   <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+                </ScaledMock>
+              ) : (
+                <div className="w-full h-full flex justify-center">
+                  <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
+                    <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+                  </div>
                 </div>
-              </div>
+              )
             ) : (
-              <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+              <ScaledMock baseWidth={PHONE_WIDTH} baseHeight={PHONE_HEIGHT}>
+                <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+              </ScaledMock>
             )}
           </div>
 
@@ -1894,6 +2094,9 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
   const [viewingRow, setViewingRow] = useState<BroadcastMessageRow | null>(null);
   const [viewingDiscardedRow, setViewingDiscardedRow] = useState<{ row: BroadcastMessageRow; bucket: DiscardedBucket } | null>(null);
   const [highlightIds, setHighlightIds] = useState<Set<string>>(new Set());
+
+  const anyOverlayOpen =
+    isComposeOpen || !!editingRow || !!reviewingRow || !!rejectingRow || !!viewingRow || !!viewingDiscardedRow;
 
   // Diffs each card's current column/bucket against a baseline every time
   // `messages` changes — whether that's a fresh mount (baseline = whatever
@@ -2031,12 +2234,23 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
 
       {/* {viewMode === 'kanban' && <AudienceMetrics rows={messages} />} */}
 
-      <div className="flex items-center gap-[12px] w-full">
+      {/* Wraps at any width, not just on phones: the toolbar runs out of room
+          well before 640px once the sidebar and notification rail take their
+          share, and the controls are fixed-width, so without this they overflow
+          rather than reflow. */}
+      <div className="flex items-center gap-[12px] w-full flex-wrap">
         <SearchInput value={search} onChange={setSearch} />
         <ShowDiscardedToggle checked={showDiscarded} onChange={setShowDiscarded} />
         <NewMessageButton onClick={() => setIsComposeOpen(true)} />
-        <div className="flex-1" />
-        {SHOW_VIEW_TOGGLE && <ViewToggle view={viewMode} onChange={setViewMode} />}
+        {/* The spacer only exists to push the view toggle right, so it is tied
+            to it — left on its own in a wrapping row it would swallow the free
+            space and shove the controls onto a line of their own. */}
+        {SHOW_VIEW_TOGGLE && (
+          <>
+            <div className="flex-1" />
+            <ViewToggle view={viewMode} onChange={setViewMode} />
+          </>
+        )}
       </div>
 
       {showDiscarded ? (
@@ -2155,6 +2369,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           overlayTitle={`${viewingDiscardedRow.bucket} Message`}
           readOnly
           rejectionReason={viewingDiscardedRow.row.rejectionReason}
+          rejected={viewingDiscardedRow.bucket === 'Rejected'}
           initialData={{
             title: viewingDiscardedRow.row.subject,
             messageType: viewingDiscardedRow.row.type,
@@ -2167,7 +2382,10 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
         />
       )}
 
-      <RoleToggle role={role} onChange={onRoleChange} />
+      {/* The switcher floats bottom-left, which on a phone is exactly where the
+          overlay's left-hand action now sits. It is a demo control and the
+          overlay is modal, so it stands down while one is open. */}
+      {!anyOverlayOpen && <RoleToggle role={role} onChange={onRoleChange} />}
 
       {isComposeOpen && (
         <ComposeMessageOverlay
