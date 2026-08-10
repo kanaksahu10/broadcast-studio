@@ -74,7 +74,8 @@ rather than repeated per row.
 
 Common to every email: sender **GEOH Broadcast Studio**, a status pill matching
 the message's new status, and a **View in Broadcast Studio** link to that
-message.
+message — see §3.9 for where that link lands and how it behaves when it cannot
+deliver what it promises.
 
 Field labels below use the product's own names. In particular **Category** is
 the Message Category field (Billing Notice / Emergency / New Release / Upsell /
@@ -214,6 +215,46 @@ the "no reason" fallback when they left it blank.
 | Message | System maintenance alert |
 | Discontinued by | Priya |
 | Was scheduled until | Aug 16, 2026 |
+
+### 3.9 The "View in Broadcast Studio" link
+
+Every email carries exactly one link, and it is the only interactive element.
+It always deep-links to **the specific message**, never to the board in general —
+an approver with a queue of twelve should not have to find the one the email is
+about.
+
+**Label.** *View in Broadcast Studio*. The sender line already reads "GEOH
+Broadcast Studio", so repeating GEOH in the link is redundant; if the product
+prefers the fully qualified name everywhere, *View in GEOH Broadcast Studio* is
+the alternative — pick one and use it in all eight emails.
+
+**Where it lands**, by email:
+
+| Email | Opens |
+|---|---|
+| 3.1 Pending your review | The message's **Review** overlay, actions ready |
+| 3.2 / 3.3 Approved | The message preview |
+| 3.4 Rejected | The Rejected message, reason banner visible |
+| 3.5 Not approved in time | The Rejected message, generated reason visible |
+| 3.6 Now live | The message preview |
+| 3.7 Expired | The Expired message |
+| 3.8 Discontinued | The Discontinued message |
+
+**When the link cannot do what it promises.** These are the cases worth
+designing, because an email outlives the state that produced it:
+
+- **Already actioned.** Two approvers get 3.1; one approves; the other clicks
+  their link. It must open the message in its *current* state rather than a
+  review screen with dead buttons, and say who actioned it and when.
+- **Message deleted.** Discarded messages auto-delete after 30 days
+  (`RETENTION_DAYS`), so any email older than that points at nothing. Land on
+  Broadcast Studio with a plain "This message is no longer available — discarded
+  messages are removed after 30 days" rather than a generic 404.
+- **Recipient lost access.** A user who is no longer an Executive Approver, or
+  no longer with the org, should meet the normal sign-in and permission
+  behaviour, not a broken screen.
+- **Not signed in.** The link should survive authentication and land on the
+  message afterwards, rather than dropping the user on the dashboard.
 
 ---
 
