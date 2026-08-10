@@ -1,11 +1,13 @@
 # Broadcast Studio — Email Notifications
 
-Companion to *[UX] Prototype Spec & Handoff*. Covers the emails Broadcast Studio
-sends when a message changes status: who receives each one, what triggers it,
-and what it says.
+> **Status:** Draft v1 · **Owner:** UX · **Parent:** [UX Prototype Spec & Handoff](https://geoh.atlassian.net/wiki/spaces/GM/pages/975241218/UX+Prototype+Spec+Handoff) · **Not built** — this is a build spec, not a description of the prototype
 
-Not built in the prototype — this is a build spec. Screenshots of each email
-accompany this page in Confluence.
+Covers the emails Broadcast Studio sends when a message changes status: who
+receives each one, what triggers it, and what it says.
+
+Eight transitions send email. Six come from the original notification table; two
+are additions, and several of the original six changed — §2 lists what changed
+and why. Screenshots of each email accompany this page.
 
 ---
 
