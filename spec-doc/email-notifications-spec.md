@@ -167,6 +167,20 @@ Wording avoids blame: it states what happened rather than that an approver
 failed to act. To the author it is *"your message was not approved in time"*; to
 approvers the same email reads as a lapsed item.
 
+**The message carries a system-generated rejection reason.** A lapsed message
+lands in the Rejected bucket without anyone having rejected it, so the reason
+banner cannot fall back to *"No reason was provided by the approver"* — there was
+no approver. The reason is generated from the window that passed:
+
+> **Rejection Reason:** Not reviewed before the display window ended
+> (Jul 18, 2026 – Jul 19, 2026), so it can no longer run. The message was never
+> published.
+
+This is derived at display time rather than stored, since nothing writes a
+reason for a transition no one performed. Built in the prototype as
+`getRejectionReason()`; an approver's own rejection still shows their note, or
+the "no reason" fallback when they left it blank.
+
 ### 3.6 Message is now live → Author + approving approver
 
 > **Subject:** Message is now live

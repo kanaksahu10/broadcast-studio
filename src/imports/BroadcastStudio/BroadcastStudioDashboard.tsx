@@ -186,6 +186,21 @@ function getDiscardedBucket(row: BroadcastMessageRow): DiscardedBucket | null {
   return null;
 }
 
+/**
+ * The reason shown on a Rejected message.
+ *
+ * A Pending message whose window passed is displayed as Rejected without anyone
+ * having rejected it, so falling back to "no reason was provided by the
+ * approver" would be actively misleading — the lapse *is* the reason. Nothing
+ * writes a reason for that case, so it is derived here rather than stored.
+ */
+function getRejectionReason(row: BroadcastMessageRow): string | undefined {
+  const lapsed = row.status === 'Pending' && getDiscardedBucket(row) === 'Rejected';
+  if (!lapsed) return row.rejectionReason;
+  const window = row.startDate === '—' ? '' : ` (${row.startDate} – ${row.endDate})`;
+  return `Not reviewed before the display window ended${window}, so it can no longer run. The message was never published.`;
+}
+
 // Identifies which column/bucket a row currently renders in, so we can tell
 // when a card has moved somewhere new since the user last saw the board.
 function getColumnKey(row: BroadcastMessageRow): string {
@@ -2368,7 +2383,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           onClose={() => setViewingDiscardedRow(null)}
           overlayTitle={`${viewingDiscardedRow.bucket} Message`}
           readOnly
-          rejectionReason={viewingDiscardedRow.row.rejectionReason}
+          rejectionReason={getRejectionReason(viewingDiscardedRow.row)}
           rejected={viewingDiscardedRow.bucket === 'Rejected'}
           initialData={{
             title: viewingDiscardedRow.row.subject,
