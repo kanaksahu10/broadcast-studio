@@ -39,7 +39,7 @@ rather than repeated per row.
 | 5 | Pending Approval → Rejected | **Nobody acted** before the display window ended | Author + Executive Approvers | At window end |
 | 6 | Approved → Live | Scheduled go-live reached | Author + the approver who approved it | At go-live |
 | 7 | Live → Expired | Display end date reached | Author | At expiration |
-| 8 | Live → Discontinued | **Executive Approver** ends it early | Author + the approver who approved it | Immediate |
+| 8 | Live → Discontinued | **Executive Approver** ends it early | Author + **all** Executive Approvers | Immediate |
 
 ### What changed from the original table, and why
 
@@ -54,11 +54,19 @@ rather than repeated per row.
 - **Row 6 adds the approver.** The original told only the author when a message
   went live, yet told the approver when one was discontinued. If approvers care
   that a message came down, they care that it went up.
-- **Row 8 is approver-only.** The original allowed "author or extra-super
-  admin" to discontinue. Discontinuing is an Executive Approver action; an
-  author cannot take their own live message down. Per principle 2, the approver
-  performing it is dropped from the recipients, so in practice this reaches the
-  author, plus the original approver when a different approver ends it.
+- **Row 8 is approver-only, and reaches the whole approver pool.** The original
+  allowed "author or extra-super admin" to discontinue; discontinuing is an
+  Executive Approver action and an author cannot take their own live message
+  down. Recipients are the author plus *every* Executive Approver, not just the
+  one who approved it: taking a live message down reverses a published decision
+  the pool collectively owns, and any approver may be asked why the message
+  disappeared. Per principle 2 the approver who performed it is dropped, so they
+  do not get told about their own click.
+
+  Row 6 deliberately stays narrower — the author plus the approver who approved
+  it. A scheduled message going live is that approver's own decision taking
+  effect on time, not news the pool needs. If you would rather both be
+  pool-wide for consistency, that is a one-line change.
 
 ---
 
@@ -182,7 +190,7 @@ approvers the same email reads as a lapsed item.
 | Audience | Billing package, Ohio |
 | Display window | Aug 1 – Aug 10, 2026 |
 
-### 3.8 Message discontinued → Author (+ approving approver)
+### 3.8 Message discontinued → Author + all Executive Approvers
 
 > **Subject:** Message discontinued
 > **Body:** This live message was manually taken down by {approver} before its scheduled end date.
@@ -203,27 +211,20 @@ approvers the same email reads as a lapsed item.
   send on. These three need a job that evaluates display windows and records
   which notifications have already gone out, so a message cannot email its
   author every time the job runs.
-- **"The approver who approved it" needs storing.** Rows 6 and 8 address the
+- **"The approver who approved it" needs storing.** Row 6 addresses the
   approving approver, and 3.2/3.3 name them in the body. The prototype records
   no such field; approval needs to persist the acting user's id.
 - **Recipients need real accounts.** Row 1 goes to "the approver pool" and
   principle 2 drops the acting user — both need individual users, not the
   prototype's two-role toggle. Same underlying gap as draft privacy (see the
   main spec's open questions).
-- **Volume.** Row 1 sends to every Executive Approver on every submission. If
-  the pool is large or submissions frequent, this wants a per-approver digest
-  option. Flagged, not specified.
-
----
-
-## 5. Prototype mismatch to fix
-
-**Discontinue is not consistently gated to Executive Approver.** The message
-preview modal gates it correctly (`canDiscontinue = role === 'executive-approver'
-&& row.status === 'Live'`), but the card's kebab menu offers **Discontinue** on a
-Live card to any role, so a Super Admin can currently take a live message down.
-Row 8 assumes approver-only. Either gate the kebab action to match the modal, or
-the spec's trigger and recipients need revisiting.
+- **Volume.** Rows 1 and 8 send to every Executive Approver. If the pool is
+  large or submissions frequent, this wants a per-approver digest option.
+  Flagged, not specified.
+- **Approver-only discontinue is already enforced** in the prototype, in both
+  places it is offered: the preview modal guards it with `role ===
+  'executive-approver'`, and a Live card only renders its kebab when the viewer
+  is not a Super Admin. Row 8's trigger needs no product change.
 
 ---
 
