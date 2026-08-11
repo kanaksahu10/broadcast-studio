@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
-import { MdAdd, MdApps, MdBlock, MdBusiness, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
+import { MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
 import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
 import { useIsBelowDesktop, useIsPhone } from './useIsPhone';
@@ -167,7 +167,7 @@ const BUCKET_COLOR: Record<DiscardedBucket, string> = {
 const RETENTION_DAYS = 30;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-function getDiscardedBucket(row: BroadcastMessageRow): DiscardedBucket | null {
+export function getDiscardedBucket(row: BroadcastMessageRow): DiscardedBucket | null {
   if (row.status === 'Rejected') return 'Rejected';
   if (row.status === 'Discontinued') return 'Discontinued';
   if (row.status === 'Live' && row.endDate !== '—') {
@@ -175,13 +175,13 @@ function getDiscardedBucket(row: BroadcastMessageRow): DiscardedBucket | null {
     const end = new Date(row.endDate);
     if (today > end) return 'Expired';
   }
-  // A Pending message whose window has passed without a decision is treated
-  // as rejected — it's moot now, and sitting in the queue forever would just
-  // be noise for the approver.
-  if (row.status === 'Pending' && row.endDate !== '—') {
+  // A Pending message that goes past its own start (live) date without a
+  // decision is treated as rejected — it's too late to start on schedule,
+  // and sitting in the queue forever would just be noise for the approver.
+  if (row.status === 'Pending' && row.startDate !== '—') {
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const end = new Date(row.endDate);
-    if (today > end) return 'Rejected';
+    const start = new Date(row.startDate);
+    if (today > start) return 'Rejected';
   }
   return null;
 }
@@ -189,16 +189,17 @@ function getDiscardedBucket(row: BroadcastMessageRow): DiscardedBucket | null {
 /**
  * The reason shown on a Rejected message.
  *
- * A Pending message whose window passed is displayed as Rejected without anyone
- * having rejected it, so falling back to "no reason was provided by the
- * approver" would be actively misleading — the lapse *is* the reason. Nothing
- * writes a reason for that case, so it is derived here rather than stored.
+ * A Pending message whose live date passed is displayed as Rejected without
+ * anyone having rejected it, so falling back to "no reason was provided by
+ * the approver" would be actively misleading — the lapse *is* the reason.
+ * Nothing writes a reason for that case, so it is derived here rather than
+ * stored.
  */
 function getRejectionReason(row: BroadcastMessageRow): string | undefined {
   const lapsed = row.status === 'Pending' && getDiscardedBucket(row) === 'Rejected';
   if (!lapsed) return row.rejectionReason;
-  const window = row.startDate === '—' ? '' : ` (${row.startDate} – ${row.endDate})`;
-  return `Not reviewed before the display window ended${window}, so it can no longer run. The message was never published.`;
+  const window = row.startDate === '—' ? '' : ` (was due to go live ${row.startDate})`;
+  return `Not reviewed before its scheduled live date${window}, so it can no longer run. The message was never published.`;
 }
 
 // Identifies which column/bucket a row currently renders in, so we can tell
@@ -246,6 +247,19 @@ function isMessageCurrentlyLive(row: BroadcastMessageRow): boolean {
   return today >= start && today <= end;
 }
 
+// Whole days from today to a display-formatted date string ("Aug 10, 2026").
+// Negative means the date is in the past. Null for unset ('—') or unparsable
+// dates, so callers can push those to the end of a sort rather than treating
+// them as "today".
+function daysUntilDate(dateStr: string): number | null {
+  if (!dateStr || dateStr === '—') return null;
+  const target = new Date(dateStr);
+  if (isNaN(target.getTime())) return null;
+  target.setHours(0, 0, 0, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / MS_PER_DAY);
+}
+
 // The optional "Message Category" tag: the chosen preset label, or the
 // author's own typed name when they picked "Custom". Empty/unset shows no tag.
 function getCategoryLabel(row: BroadcastMessageRow): string | null {
@@ -289,6 +303,18 @@ function parseDisplayDate(str: string): string {
   const d = new Date(str);
   if (isNaN(d.getTime())) return '';
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Display-formatted date `offsetDays` from today ("Aug 12, 2026"), for demo
+// seed data whose relevance depends on staying relative to "now" — e.g. the
+// Pending Approval urgency indicator and Live "expiring soon" caption both
+// key off real elapsed time, so a fixed calendar date would look wrong (or
+// silently auto-reject/expire) the moment the demo runs on a later day.
+function daysFromNow(offsetDays: number): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + offsetDays);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 const INITIAL_MESSAGES: BroadcastMessageRow[] = [
@@ -410,11 +436,11 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'Sunrise Home Care +3',
     channel: 'Email',
     status: 'Pending',
-    startDate: 'Jul 20, 2026',
-    endDate: 'Jul 27, 2026',
+    startDate: daysFromNow(14),
+    endDate: daysFromNow(21),
     recipients: 3150,
     formData: {
-      author: 'John Doe',
+      author: 'Priya Nair',
       department: 'Support',
       body: 'Our offices will be closed for the upcoming holiday. Emergency on-call support remains available throughout the closure.',
       reason: 'Holiday schedule',
@@ -437,11 +463,11 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'All',
     channel: 'Push',
     status: 'Pending',
-    startDate: 'Jul 18, 2026',
-    endDate: 'Jul 19, 2026',
+    startDate: daysFromNow(2),
+    endDate: daysFromNow(3),
     recipients: 892,
     formData: {
-      author: 'John Doe',
+      author: 'Marcus Chen',
       department: 'Product',
       messageCategory: 'Emergency',
       body: 'The client portal will undergo emergency maintenance tonight from 11 PM to 2 AM. Access will be intermittent during this window.',
@@ -464,8 +490,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'Sunshine State Care +1',
     channel: 'Email',
     status: 'Pending',
-    startDate: 'Aug 10, 2026',
-    endDate: 'Aug 24, 2026',
+    startDate: daysFromNow(18),
+    endDate: daysFromNow(32),
     recipients: 2100,
     formData: {
       author: 'John Doe',
@@ -492,11 +518,11 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'Windy City Homecare',
     channel: 'Push',
     status: 'Pending',
-    startDate: 'Aug 3, 2026',
-    endDate: 'Aug 4, 2026',
+    startDate: daysFromNow(21),
+    endDate: daysFromNow(22),
     recipients: 640,
     formData: {
-      author: 'John Doe',
+      author: 'Priya Nair',
       department: 'Billing',
       messageCategory: 'Emergency',
       body: 'Payroll systems will be offline for scheduled maintenance. Time-off requests submitted during this window may be delayed.',
@@ -519,11 +545,11 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'Brooklyn Senior Services +1',
     channel: 'Email',
     status: 'Pending',
-    startDate: 'Sep 1, 2026',
-    endDate: 'Sep 30, 2026',
+    startDate: daysFromNow(28),
+    endDate: daysFromNow(57),
     recipients: 1540,
     formData: {
-      author: 'John Doe',
+      author: 'Elena Rodriguez',
       department: 'Marketing',
       messageCategory: 'Upsell',
       body: 'Open enrollment kicks off next month — remind your team to complete their benefits selections before the deadline.',
@@ -547,11 +573,11 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'All',
     channel: 'Push',
     status: 'Pending',
-    startDate: 'Aug 12, 2026',
-    endDate: 'Aug 12, 2026',
+    startDate: daysFromNow(4),
+    endDate: daysFromNow(4),
     recipients: 4300,
     formData: {
-      author: 'John Doe',
+      author: 'Marcus Chen',
       department: 'Customer Success',
       body: 'We are aware of a service disruption affecting East Coast agencies and are actively working on a fix. Updates to follow.',
       reason: 'Active incident',
@@ -573,11 +599,11 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'Everglades Health Network',
     channel: 'Email',
     status: 'Pending',
-    startDate: 'Aug 25, 2026',
-    endDate: 'Sep 8, 2026',
+    startDate: daysFromNow(35),
+    endDate: daysFromNow(49),
     recipients: 780,
     formData: {
-      author: 'John Doe',
+      author: 'Elena Rodriguez',
       department: 'Admin Services',
       messageCategory: 'Custom', customCategoryName: 'Compliance',
       body: 'Our data retention policy has been updated to align with new state requirements. Review the changes before they take effect.',
@@ -635,7 +661,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     endDate: 'Jul 28, 2026',
     recipients: 42,
     formData: {
-      author: 'John Doe',
+      author: 'Priya Nair',
       department: 'Billing',
       body: 'Effective immediately: overtime must be pre-approved by a supervisor. Unapproved overtime will not be compensated.',
       reason: 'Policy change',
@@ -661,7 +687,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     endDate: 'Aug 15, 2026',
     recipients: 560,
     formData: {
-      author: 'John Doe',
+      author: 'Marcus Chen',
       department: 'Customer Success',
       messageCategory: 'Billing Notice',
       body: 'Benefits open enrollment begins August 1st. Take a few minutes to review your options and make any changes for the coming year.',
@@ -688,7 +714,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     endDate: 'Aug 3, 2026',
     recipients: 3400,
     formData: {
-      author: 'John Doe',
+      author: 'Elena Rodriguez',
       department: 'Admin Services',
       messageCategory: 'Emergency',
       body: "A severe weather advisory is in effect for your area. Please review your agency's emergency procedures.",
@@ -745,7 +771,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     recipients: 480,
     statusChangedAt: '2026-07-20T00:00:00.000Z',
     formData: {
-      author: 'John Doe',
+      author: 'Priya Nair',
       department: 'Billing',
       messageCategory: 'Billing Notice',
       body: 'Placeholder rejected message for prototyping the Rejected bucket.',
@@ -772,7 +798,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     recipients: 210,
     statusChangedAt: '2026-07-22T00:00:00.000Z',
     formData: {
-      author: 'John Doe',
+      author: 'Marcus Chen',
       department: 'Support',
       body: 'This is a placeholder message for prototyping purposes.',
       reason: 'Placeholder reason',
@@ -800,7 +826,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     recipients: 640,
     statusChangedAt: '2026-07-24T00:00:00.000Z',
     formData: {
-      author: 'John Doe',
+      author: 'Elena Rodriguez',
       department: 'Product',
       messageCategory: 'New Release',
       body: 'The legacy client portal has been discontinued. Please use the new portal for all requests going forward.',
@@ -822,9 +848,9 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
 // from a previous version keeps them forever — and new fields (author,
 // department, authorRole, rejectionReason) read as undefined on those old
 // rows, which silently empties the Drafts and Pending columns.
-const STORAGE_KEY = 'bs-messages-v10';
+const STORAGE_KEY = 'bs-messages-v12';
 
-function useSharedMessages() {
+export function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -1095,7 +1121,7 @@ function getBucketTooltip(bucket: DiscardedBucket): string {
 // A small info icon next to a column/bucket header explaining what that
 // whole bucket holds. Replaces the old per-card hover tooltip, which
 // covered the entire card and got in the way.
-function ColumnInfoTooltip({ label }: { label: string }) {
+function ColumnInfoTooltip({ label, icon }: { label: string; icon?: React.ReactNode }) {
   const [hovered, setHovered] = useState(false);
   // Fades in only after a short hover-intent delay, rather than snapping in
   // instantly.
@@ -1145,7 +1171,7 @@ function ColumnInfoTooltip({ label }: { label: string }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); setVisible(false); setShiftX(0); }}
     >
-      <MdInfoOutline size={14} color="#27496D" />
+      {icon ?? <MdInfoOutline size={14} color="#27496D" />}
       {hovered && (
         <div
           ref={tooltipRef}
@@ -1245,6 +1271,42 @@ function AudienceOverlay({ formData, recipientCount, onClose }: { formData: NonN
   );
 }
 
+// A brief top-right confirmation after an action completes — save draft,
+// send for approval, approve, reject, discontinue. Slides/fades in, holds,
+// then fades back out on its own; `key`-ing this by a fresh id on every
+// call is what restarts the animation for back-to-back toasts.
+function ActionToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setVisible(true));
+    const hideTimer = setTimeout(() => setVisible(false), 4700);
+    const unmountTimer = setTimeout(onDismiss, 5000);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(hideTimer);
+      clearTimeout(unmountTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="fixed top-[36px] left-0 right-0 z-[10000] flex items-center justify-center pointer-events-none">
+      <div
+        className="flex items-center gap-[8px] rounded-[9px] px-[16px] py-[12px] transition-all duration-300 ease-out"
+        style={{
+          backgroundColor: '#E0FFE0',
+          border: '1.5px solid #00AA00',
+          transform: visible ? 'scale(1)' : 'scale(0.92)',
+          opacity: visible ? 1 : 0,
+        }}
+      >
+        <MdCheckCircleOutline size={17} color="#00AA00" />
+        <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[16px] whitespace-nowrap" style={{ color: '#00AA00' }}>{message}</span>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Approver-facing reject step. Mirrors DeleteConfirmOverlay so every
  * destructive confirmation in the board looks the same, with an optional
@@ -1287,7 +1349,7 @@ function RejectConfirmOverlay({ subject, onConfirm, onClose }: { subject: string
           </button>
         </div>
         <div className="flex-1 px-[16px] pt-[16px] pb-[24px] flex flex-col gap-[16px]">
-          <p className="font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px]" style={{ color: '#343434' }}>
+          <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px]" style={{ color: '#343434' }}>
             You are about to reject the <span className="font-semibold">"{subject}"</span> message. It will move to the Rejected bucket and the author can copy it back to Drafts to revise it.
           </p>
           <TextAreaField
@@ -1479,6 +1541,16 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
               <p className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] text-[#8b8b8b] mt-[2px]">
                 <MdDateRange size={13} color="#8b8b8b" />
                 {dateRange}
+                {isPending && (() => {
+                  const daysToStart = daysUntilDate(row.startDate);
+                  if (daysToStart === null || daysToStart > 5) return null;
+                  const label = daysToStart < 0
+                    ? `Was due to go live ${Math.abs(daysToStart)} ${Math.abs(daysToStart) === 1 ? 'day' : 'days'} ago and still hasn't been reviewed`
+                    : daysToStart === 0
+                      ? "Due to go live today and hasn't been reviewed yet"
+                      : `Going live in ${daysToStart} ${daysToStart === 1 ? 'day' : 'days'} — review needed soon`;
+                  return <ColumnInfoTooltip icon={<MdErrorOutline size={14} color="#DA4040" />} label={label} />;
+                })()}
               </p>
             )}
           </div>
@@ -1525,6 +1597,7 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
         {(() => {
           const categoryLabel = getCategoryLabel(row);
           let liveBadge: React.ReactNode = null;
+          let expiringCaption: React.ReactNode = null;
           if (row.status === 'Live' && row.startDate !== '—') {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -1539,6 +1612,18 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
                   Live
                 </span>
               );
+              // Only a real end date can lapse — "Until stopped" messages
+              // have nothing to count down to.
+              if (row.endDate !== '—') {
+                const daysToEnd = daysUntilDate(row.endDate);
+                if (daysToEnd !== null && daysToEnd >= 0 && daysToEnd <= 5) {
+                  expiringCaption = (
+                    <p className="font-['Montserrat',sans-serif] font-normal text-[11px] leading-[15px] text-[#b8b8b8]">
+                      Expiring in {daysToEnd} {daysToEnd === 1 ? 'day' : 'days'}
+                    </p>
+                  );
+                }
+              }
             } else if (isScheduled) {
               liveBadge = (
                 <span className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]" style={{ backgroundColor: '#E8F4FF', color: '#2699FB' }}>
@@ -1550,9 +1635,12 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
           }
           if (!liveBadge && !categoryLabel) return null;
           return (
-            <div className="flex items-center gap-[6px] flex-wrap self-start">
-              {liveBadge}
-              {categoryLabel && <CategoryTag label={categoryLabel} />}
+            <div className="flex flex-col gap-[4px] self-start">
+              <div className="flex items-center gap-[6px] flex-wrap">
+                {liveBadge}
+                {categoryLabel && <CategoryTag label={categoryLabel} />}
+              </div>
+              {expiringCaption}
             </div>
           );
         })()}
@@ -1893,6 +1981,21 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
 }) {
   const built = KANBAN_COLUMNS.map(({ status, label }) => {
     const colRows = rows.filter((r) => r.status === status && getDiscardedBucket(r) === null && isDraftVisibleToRole(r, role));
+    // Pending Approval surfaces whatever's closest to going live at the top,
+    // since that's the one an approver should look at first. Every other
+    // column stays in "latest saved" order (new items are prepended when
+    // created, so the array's own order already does this) — live date isn't
+    // relevant once a message has already been approved, rejected, etc.
+    if (status === 'Pending') {
+      colRows.sort((a, b) => {
+        const da = daysUntilDate(a.startDate);
+        const db = daysUntilDate(b.startDate);
+        if (da === null && db === null) return 0;
+        if (da === null) return 1;
+        if (db === null) return -1;
+        return da - db;
+      });
+    }
     const color = STATUS_COLOR[status];
     return {
       key: status,
@@ -2109,6 +2212,8 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
   const [viewingRow, setViewingRow] = useState<BroadcastMessageRow | null>(null);
   const [viewingDiscardedRow, setViewingDiscardedRow] = useState<{ row: BroadcastMessageRow; bucket: DiscardedBucket } | null>(null);
   const [highlightIds, setHighlightIds] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
+  const showToast = (message: string) => setToast({ id: Date.now(), message });
 
   const anyOverlayOpen =
     isComposeOpen || !!editingRow || !!reviewingRow || !!rejectingRow || !!viewingRow || !!viewingDiscardedRow;
@@ -2172,20 +2277,24 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
 
   const handleSendForApproval = (id: string) => {
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Pending' } : m));
+    showToast('Message sent for approval');
   };
 
   const handleApprove = (id: string) => {
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Live' } : m));
+    showToast('Message approved');
   };
 
   const handleReject = (id: string, reason?: string) => {
     setMessages((prev) => prev.map((m) => m.id === id
       ? { ...m, status: 'Rejected', statusChangedAt: new Date().toISOString(), ...(reason ? { rejectionReason: reason } : {}) }
       : m));
+    showToast('Message rejected');
   };
 
   const handleDiscontinue = (id: string) => {
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Discontinued', statusChangedAt: new Date().toISOString() } : m));
+    showToast('Message discontinued');
   };
 
   const handleCopyToDrafts = (row: BroadcastMessageRow) => {
@@ -2221,6 +2330,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
     };
     setMessages((prev) => [newMessage, ...prev]);
     setSelectedStatus(newStatus);
+    showToast(role === 'executive-approver' ? 'Message published' : 'Message sent for approval');
   };
 
   const liveCount = messages.filter((m) => m.status === 'Live' && getDiscardedBucket(m) === null).length;
@@ -2334,6 +2444,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
             }, ...prev.filter((m) => m.id !== editingRow!.id)]);
             setSelectedStatus('Draft');
             setEditingRow(null);
+            showToast('Draft saved');
           }}
         />
       )}
@@ -2428,9 +2539,12 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
               ...prev,
             ]);
             setSelectedStatus('Draft');
+            showToast('Draft saved');
           }}
         />
       )}
+
+      {toast && <ActionToast key={toast.id} message={toast.message} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

@@ -1190,7 +1190,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
         onClick={handleClose}
       />
       <div
-        className="absolute right-0 top-0 bottom-0 w-[305px] min-w-[305px] max-w-[305px] bg-white flex flex-col transition-transform duration-300 ease-out"
+        className="absolute right-0 top-0 bottom-0 w-[305px] min-w-[305px] max-w-[305px] sm:w-[399px] sm:min-w-[399px] sm:max-w-[399px] bg-white flex flex-col transition-transform duration-300 ease-out"
         style={{ transform: mounted && !closing ? 'translateX(0)' : 'translateX(100%)' }}
       >
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderBottom: '1px solid #CFCFCF', height: '56px' }}>
