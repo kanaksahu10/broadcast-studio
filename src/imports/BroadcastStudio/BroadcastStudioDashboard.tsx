@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
-import { MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircle, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
+import { MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
 import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
 import { useIsBelowDesktop, useIsPhone } from './useIsPhone';
@@ -1290,18 +1290,18 @@ function ActionToast({ message, onDismiss }: { message: string; onDismiss: () =>
   }, []);
 
   return (
-    <div className="fixed top-[16px] right-[16px] z-[10000] pointer-events-none">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center pointer-events-none">
       <div
-        className="flex items-center gap-[8px] rounded-[8px] pl-[12px] pr-[16px] py-[10px] bg-white border transition-all duration-300 ease-out"
+        className="flex items-center gap-[14px] rounded-[16px] px-[28px] py-[18px] transition-all duration-300 ease-out"
         style={{
-          borderColor: '#E5E5E5',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-          transform: visible ? 'translateX(0)' : 'translateX(24px)',
+          backgroundColor: '#EAF9E1',
+          border: '2px solid #5BAE4C',
+          transform: visible ? 'scale(1)' : 'scale(0.92)',
           opacity: visible ? 1 : 0,
         }}
       >
-        <MdCheckCircle size={16} color="#00AA00" />
-        <span className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] text-black whitespace-nowrap">{message}</span>
+        <MdCheckCircleOutline size={30} color="#3E7A2D" />
+        <span className="font-['Montserrat',sans-serif] font-semibold text-[22px] leading-[28px] whitespace-nowrap" style={{ color: '#3E7A2D' }}>{message}</span>
       </div>
     </div>
   );

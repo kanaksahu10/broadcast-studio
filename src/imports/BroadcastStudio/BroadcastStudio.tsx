@@ -1490,6 +1490,20 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
   const pendingApprovalCount = role === 'executive-approver'
     ? sharedMessages.filter((m) => m.status === 'Pending' && getDiscardedBucket(m) === null).length
     : 0;
+  const showPendingBadge = role === 'executive-approver' && pendingApprovalCount > 0;
+  const pendingBadgeLabel = `${pendingApprovalCount} pending approval${pendingApprovalCount === 1 ? '' : 's'}`;
+  // Same badge markup used in two spots: inline after the label (collapsed
+  // rail, where the icon/label column stacks vertically so this lands right
+  // below the text) and pinned to the row's right edge (expanded sidebar).
+  const pendingBadge = (
+    <div
+      role="status"
+      aria-label={pendingBadgeLabel}
+      className="bg-[#2699fb] rounded-full w-[21px] h-[21px] flex items-center justify-center shrink-0"
+    >
+      <p className="font-['Montserrat',sans-serif] font-medium text-[8.4px] leading-none text-white text-center">{pendingApprovalCount}</p>
+    </div>
+  );
 
   // Re-apply the breakpoint default whenever the viewport crosses the desktop
   // line — not just on first load. Without this, resizing the window (or
@@ -1664,24 +1678,22 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
                   </div>
                 </div>
                 {/* Broadcast Studio — active */}
-                <div className="bg-[#cfcfcf] content-stretch flex gap-[12px] h-[45px] items-center justify-between pr-[14px] relative shrink-0 w-full" data-name="Sidebar States">
+                <div className={`bg-[#cfcfcf] content-stretch flex gap-[12px] h-[45px] items-center ${sidebarCollapsed ? '' : 'justify-between'} pr-[14px] relative shrink-0 w-full`} data-name="Sidebar States">
                   <div className="content-stretch flex gap-[16px] items-center relative shrink-0">
                     <div className="bg-[#0078d4] h-[45px] relative shrink-0 w-[4px]" />
                     <div className="content-stretch flex gap-[9px] items-center relative shrink-0">
                       <GrAnnounce className="shrink-0 text-[#27496d]" size={23} />
                       <p className="font-['Montserrat',sans-serif] font-bold leading-[20px] not-italic relative shrink-0 text-[#27496d] text-[14px] whitespace-nowrap">Broadcast Studio</p>
+                      {/* Collapsed rail: the icon+label wrapper stacks vertically (see
+                          .sidebar-collapsed div:has(> p) in globals.css), so putting the
+                          badge here — instead of pinned to the row's right edge — lands
+                          it centered right below the label, matching the rail pattern
+                          used elsewhere in the app. */}
+                      {sidebarCollapsed && showPendingBadge && pendingBadge}
                     </div>
                   </div>
-                  {/* Executive-approver-only badge: count of messages awaiting their approval. */}
-                  {role === 'executive-approver' && pendingApprovalCount > 0 && (
-                    <div
-                      role="status"
-                      aria-label={`${pendingApprovalCount} pending approval${pendingApprovalCount === 1 ? '' : 's'}`}
-                      className="bg-[#2699fb] rounded-full w-[21px] h-[21px] flex items-center justify-center shrink-0"
-                    >
-                      <p className="font-['Montserrat',sans-serif] font-medium text-[8.4px] leading-none text-white text-center">{pendingApprovalCount}</p>
-                    </div>
-                  )}
+                  {/* Expanded sidebar: pin the badge to the row's right edge. */}
+                  {!sidebarCollapsed && showPendingBadge && pendingBadge}
                 </div>
                 {/* Invoices */}
                 <div className="bg-[#dcdcdc] content-stretch flex gap-[213px] h-[45px] items-center pr-[14px] relative shrink-0 w-full" data-name="Sidebar States">
