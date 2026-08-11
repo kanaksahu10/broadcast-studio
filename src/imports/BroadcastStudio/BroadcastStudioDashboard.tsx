@@ -1279,8 +1279,8 @@ function ActionToast({ message, onDismiss }: { message: string; onDismiss: () =>
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     const raf = requestAnimationFrame(() => setVisible(true));
-    const hideTimer = setTimeout(() => setVisible(false), 2700);
-    const unmountTimer = setTimeout(onDismiss, 3000);
+    const hideTimer = setTimeout(() => setVisible(false), 4700);
+    const unmountTimer = setTimeout(onDismiss, 5000);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(hideTimer);
@@ -1290,18 +1290,18 @@ function ActionToast({ message, onDismiss }: { message: string; onDismiss: () =>
   }, []);
 
   return (
-    <div className="fixed top-[16px] left-0 right-0 z-[10000] flex items-center justify-center pointer-events-none">
+    <div className="fixed top-[36px] left-0 right-0 z-[10000] flex items-center justify-center pointer-events-none">
       <div
-        className="flex items-center gap-[14px] rounded-[16px] px-[28px] py-[18px] transition-all duration-300 ease-out"
+        className="flex items-center gap-[8px] rounded-[9px] px-[16px] py-[12px] transition-all duration-300 ease-out"
         style={{
           backgroundColor: '#E0FFE0',
-          border: '2px solid #00AA00',
+          border: '1.5px solid #00AA00',
           transform: visible ? 'scale(1)' : 'scale(0.92)',
           opacity: visible ? 1 : 0,
         }}
       >
-        <MdCheckCircleOutline size={30} color="#00AA00" />
-        <span className="font-['Montserrat',sans-serif] font-semibold text-[22px] leading-[28px] whitespace-nowrap" style={{ color: '#00AA00' }}>{message}</span>
+        <MdCheckCircleOutline size={17} color="#00AA00" />
+        <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[16px] whitespace-nowrap" style={{ color: '#00AA00' }}>{message}</span>
       </div>
     </div>
   );
