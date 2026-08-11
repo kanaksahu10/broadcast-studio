@@ -167,7 +167,7 @@ const BUCKET_COLOR: Record<DiscardedBucket, string> = {
 const RETENTION_DAYS = 30;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-function getDiscardedBucket(row: BroadcastMessageRow): DiscardedBucket | null {
+export function getDiscardedBucket(row: BroadcastMessageRow): DiscardedBucket | null {
   if (row.status === 'Rejected') return 'Rejected';
   if (row.status === 'Discontinued') return 'Discontinued';
   if (row.status === 'Live' && row.endDate !== '—') {
@@ -837,7 +837,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
 // rows, which silently empties the Drafts and Pending columns.
 const STORAGE_KEY = 'bs-messages-v11';
 
-function useSharedMessages() {
+export function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);

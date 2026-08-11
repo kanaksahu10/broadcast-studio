@@ -15,7 +15,7 @@ import TopbarSearch from '../TopbarSearch/TopbarSearch';
 import NotificationPanel from '../NotificationPanel-1/NotificationPanel-29-20200';
 import { useState, useRef, useEffect } from 'react';
 import kebabSvgPaths from '../Menus/svg-duzgfqtilr';
-import BroadcastStudioDashboard from './BroadcastStudioDashboard';
+import BroadcastStudioDashboard, { useSharedMessages, getDiscardedBucket } from './BroadcastStudioDashboard';
 import { useRole, getUserIdentity, type UserIdentity } from './userIdentity';
 import { TABLET_UP_QUERY } from './useIsPhone';
 
@@ -1479,6 +1479,17 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
   // Owned here so the chrome and the dashboard share one source of truth for who is viewing.
   const [role, setRole] = useRole();
   const identity = getUserIdentity(role);
+  // Sidebar-only read of the shared message store — just to badge the nav
+  // item with a pending count for approvers. Stays in sync with the
+  // dashboard's own useSharedMessages instance via the storage event
+  // listener baked into the hook.
+  const [sharedMessages] = useSharedMessages();
+  // Excludes messages whose approval window already lapsed — those sit in
+  // the Rejected discard bucket rather than the actionable Pending Approval
+  // column, so they shouldn't inflate the badge count.
+  const pendingApprovalCount = role === 'executive-approver'
+    ? sharedMessages.filter((m) => m.status === 'Pending' && getDiscardedBucket(m) === null).length
+    : 0;
 
   // Re-apply the breakpoint default whenever the viewport crosses the desktop
   // line — not just on first load. Without this, resizing the window (or
@@ -1653,7 +1664,7 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
                   </div>
                 </div>
                 {/* Broadcast Studio — active */}
-                <div className="bg-[#cfcfcf] content-stretch flex gap-[12px] h-[45px] items-center pr-[14px] relative shrink-0 w-full" data-name="Sidebar States">
+                <div className="bg-[#cfcfcf] content-stretch flex gap-[12px] h-[45px] items-center justify-between pr-[14px] relative shrink-0 w-full" data-name="Sidebar States">
                   <div className="content-stretch flex gap-[16px] items-center relative shrink-0">
                     <div className="bg-[#0078d4] h-[45px] relative shrink-0 w-[4px]" />
                     <div className="content-stretch flex gap-[9px] items-center relative shrink-0">
@@ -1661,6 +1672,12 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
                       <p className="font-['Montserrat',sans-serif] font-bold leading-[20px] not-italic relative shrink-0 text-[#27496d] text-[14px] whitespace-nowrap">Broadcast Studio</p>
                     </div>
                   </div>
+                  {/* Executive-approver-only badge: count of messages awaiting their approval. */}
+                  {role === 'executive-approver' && pendingApprovalCount > 0 && (
+                    <div className="bg-[#2699fb] rounded-full min-w-[22px] h-[22px] px-[6px] flex items-center justify-center shrink-0">
+                      <p className="font-['Montserrat',sans-serif] font-semibold text-[12px] leading-[16px] text-white text-center">{pendingApprovalCount}</p>
+                    </div>
+                  )}
                 </div>
                 {/* Invoices */}
                 <div className="bg-[#dcdcdc] content-stretch flex gap-[213px] h-[45px] items-center pr-[14px] relative shrink-0 w-full" data-name="Sidebar States">
