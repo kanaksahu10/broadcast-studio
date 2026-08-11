@@ -1674,8 +1674,12 @@ export default function BroadcastStudio({ goalTemplates = [] }: BroadcastStudioP
                   </div>
                   {/* Executive-approver-only badge: count of messages awaiting their approval. */}
                   {role === 'executive-approver' && pendingApprovalCount > 0 && (
-                    <div className="bg-[#2699fb] rounded-full min-w-[22px] h-[22px] px-[6px] flex items-center justify-center shrink-0">
-                      <p className="font-['Montserrat',sans-serif] font-semibold text-[12px] leading-[16px] text-white text-center">{pendingApprovalCount}</p>
+                    <div
+                      role="status"
+                      aria-label={`${pendingApprovalCount} pending approval${pendingApprovalCount === 1 ? '' : 's'}`}
+                      className="bg-[#2699fb] rounded-full w-[21px] h-[21px] flex items-center justify-center shrink-0"
+                    >
+                      <p className="font-['Montserrat',sans-serif] font-medium text-[8.4px] leading-none text-white text-center">{pendingApprovalCount}</p>
                     </div>
                   )}
                 </div>

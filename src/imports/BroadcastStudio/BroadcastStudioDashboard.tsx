@@ -175,13 +175,13 @@ export function getDiscardedBucket(row: BroadcastMessageRow): DiscardedBucket | 
     const end = new Date(row.endDate);
     if (today > end) return 'Expired';
   }
-  // A Pending message whose window has passed without a decision is treated
-  // as rejected — it's moot now, and sitting in the queue forever would just
-  // be noise for the approver.
-  if (row.status === 'Pending' && row.endDate !== '—') {
+  // A Pending message that goes past its own start (live) date without a
+  // decision is treated as rejected — it's too late to start on schedule,
+  // and sitting in the queue forever would just be noise for the approver.
+  if (row.status === 'Pending' && row.startDate !== '—') {
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const end = new Date(row.endDate);
-    if (today > end) return 'Rejected';
+    const start = new Date(row.startDate);
+    if (today > start) return 'Rejected';
   }
   return null;
 }
@@ -189,16 +189,17 @@ export function getDiscardedBucket(row: BroadcastMessageRow): DiscardedBucket | 
 /**
  * The reason shown on a Rejected message.
  *
- * A Pending message whose window passed is displayed as Rejected without anyone
- * having rejected it, so falling back to "no reason was provided by the
- * approver" would be actively misleading — the lapse *is* the reason. Nothing
- * writes a reason for that case, so it is derived here rather than stored.
+ * A Pending message whose live date passed is displayed as Rejected without
+ * anyone having rejected it, so falling back to "no reason was provided by
+ * the approver" would be actively misleading — the lapse *is* the reason.
+ * Nothing writes a reason for that case, so it is derived here rather than
+ * stored.
  */
 function getRejectionReason(row: BroadcastMessageRow): string | undefined {
   const lapsed = row.status === 'Pending' && getDiscardedBucket(row) === 'Rejected';
   if (!lapsed) return row.rejectionReason;
-  const window = row.startDate === '—' ? '' : ` (${row.startDate} – ${row.endDate})`;
-  return `Not reviewed before the display window ended${window}, so it can no longer run. The message was never published.`;
+  const window = row.startDate === '—' ? '' : ` (was due to go live ${row.startDate})`;
+  return `Not reviewed before its scheduled live date${window}, so it can no longer run. The message was never published.`;
 }
 
 // Identifies which column/bucket a row currently renders in, so we can tell
@@ -302,6 +303,18 @@ function parseDisplayDate(str: string): string {
   const d = new Date(str);
   if (isNaN(d.getTime())) return '';
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Display-formatted date `offsetDays` from today ("Aug 12, 2026"), for demo
+// seed data whose relevance depends on staying relative to "now" — e.g. the
+// Pending Approval urgency indicator and Live "expiring soon" caption both
+// key off real elapsed time, so a fixed calendar date would look wrong (or
+// silently auto-reject/expire) the moment the demo runs on a later day.
+function daysFromNow(offsetDays: number): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + offsetDays);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 const INITIAL_MESSAGES: BroadcastMessageRow[] = [
@@ -423,8 +436,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'Sunrise Home Care +3',
     channel: 'Email',
     status: 'Pending',
-    startDate: 'Jul 20, 2026',
-    endDate: 'Jul 27, 2026',
+    startDate: daysFromNow(14),
+    endDate: daysFromNow(21),
     recipients: 3150,
     formData: {
       author: 'Priya Nair',
@@ -450,8 +463,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'All',
     channel: 'Push',
     status: 'Pending',
-    startDate: 'Jul 18, 2026',
-    endDate: 'Jul 19, 2026',
+    startDate: daysFromNow(2),
+    endDate: daysFromNow(3),
     recipients: 892,
     formData: {
       author: 'Marcus Chen',
@@ -477,8 +490,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'Sunshine State Care +1',
     channel: 'Email',
     status: 'Pending',
-    startDate: 'Aug 10, 2026',
-    endDate: 'Aug 24, 2026',
+    startDate: daysFromNow(18),
+    endDate: daysFromNow(32),
     recipients: 2100,
     formData: {
       author: 'John Doe',
@@ -505,8 +518,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'Windy City Homecare',
     channel: 'Push',
     status: 'Pending',
-    startDate: 'Aug 3, 2026',
-    endDate: 'Aug 4, 2026',
+    startDate: daysFromNow(21),
+    endDate: daysFromNow(22),
     recipients: 640,
     formData: {
       author: 'Priya Nair',
@@ -532,8 +545,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'Brooklyn Senior Services +1',
     channel: 'Email',
     status: 'Pending',
-    startDate: 'Sep 1, 2026',
-    endDate: 'Sep 30, 2026',
+    startDate: daysFromNow(28),
+    endDate: daysFromNow(57),
     recipients: 1540,
     formData: {
       author: 'Elena Rodriguez',
@@ -560,8 +573,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'All',
     channel: 'Push',
     status: 'Pending',
-    startDate: 'Aug 12, 2026',
-    endDate: 'Aug 12, 2026',
+    startDate: daysFromNow(4),
+    endDate: daysFromNow(4),
     recipients: 4300,
     formData: {
       author: 'Marcus Chen',
@@ -586,8 +599,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'Everglades Health Network',
     channel: 'Email',
     status: 'Pending',
-    startDate: 'Aug 25, 2026',
-    endDate: 'Sep 8, 2026',
+    startDate: daysFromNow(35),
+    endDate: daysFromNow(49),
     recipients: 780,
     formData: {
       author: 'Elena Rodriguez',
@@ -835,7 +848,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
 // from a previous version keeps them forever — and new fields (author,
 // department, authorRole, rejectionReason) read as undefined on those old
 // rows, which silently empties the Drafts and Pending columns.
-const STORAGE_KEY = 'bs-messages-v11';
+const STORAGE_KEY = 'bs-messages-v12';
 
 export function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
