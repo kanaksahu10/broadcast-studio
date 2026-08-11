@@ -1290,18 +1290,18 @@ function ActionToast({ message, onDismiss }: { message: string; onDismiss: () =>
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center pointer-events-none">
+    <div className="fixed top-[16px] left-0 right-0 z-[10000] flex items-center justify-center pointer-events-none">
       <div
         className="flex items-center gap-[14px] rounded-[16px] px-[28px] py-[18px] transition-all duration-300 ease-out"
         style={{
-          backgroundColor: '#EAF9E1',
-          border: '2px solid #5BAE4C',
+          backgroundColor: '#E0FFE0',
+          border: '2px solid #00AA00',
           transform: visible ? 'scale(1)' : 'scale(0.92)',
           opacity: visible ? 1 : 0,
         }}
       >
-        <MdCheckCircleOutline size={30} color="#3E7A2D" />
-        <span className="font-['Montserrat',sans-serif] font-semibold text-[22px] leading-[28px] whitespace-nowrap" style={{ color: '#3E7A2D' }}>{message}</span>
+        <MdCheckCircleOutline size={30} color="#00AA00" />
+        <span className="font-['Montserrat',sans-serif] font-semibold text-[22px] leading-[28px] whitespace-nowrap" style={{ color: '#00AA00' }}>{message}</span>
       </div>
     </div>
   );
