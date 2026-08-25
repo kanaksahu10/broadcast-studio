@@ -1533,7 +1533,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
           {/* Author card — no separate "Author Details" heading, since the
               "Author:" line already says what this card is. */}
-          <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+          <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] text-[13px] leading-[18px]">
               <span className="font-semibold" style={{ color: LABEL_GREY }}>Author: </span>
               <span className="font-normal" style={{ color: '#000000' }}>{author}</span>
@@ -1546,7 +1546,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           </div>
 
           {/* Message Details card */}
-          <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+          <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Message Details</p>
             <RadioField label="Display Format *" value={displayFormat} onChange={(v) => setDisplayFormat(v as DisplayFormat)} options={['Overlay', 'Banner']} disabled={effectiveReadOnly} />
             {displayFormat === 'Banner' && (
@@ -1569,7 +1569,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           </div>
 
           {/* Date & Time card */}
-          <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+          <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Date &amp; Time</p>
             <DateField label="Start Date *" value={startDate} onChange={setStartDate} disabled={effectiveReadOnly} />
             <DateField label="End Date" value={endDate} onChange={setEndDate} disabled={effectiveReadOnly || noEndDate} />
@@ -1582,7 +1582,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           </div>
 
           {/* Audience card */}
-          <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+          <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <div className="flex flex-col">
               <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Audience</p>
               <p className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] text-[#585858]">
@@ -1604,7 +1604,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           </div>
 
           {/* Display Settings card */}
-          <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+          <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Display Settings</p>
             {/* Overlay is always dismissible (forced above), so the choice is
                 meaningless there — only Banner gets to pick. */}
