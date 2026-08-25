@@ -925,8 +925,9 @@ function NewMessageButton({ onClick }: { onClick: () => void }) {
 function ShowDiscardedButton({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   // Text-only, no bounding box — matches the plain-link button style used
   // elsewhere in the app (e.g. the Clients screen's own "Show Discharged").
-  // Active state reuses the same blue+underline treatment as hover, so
-  // toggled-on reads as a persistent version of "you're pointing at this".
+  // Dark blue is the resting look regardless of checked state; hover is the
+  // only state that goes light blue, and only the label underlines there —
+  // a click doesn't leave the button looking "hovered".
   return (
     <button
       type="button"
@@ -934,13 +935,11 @@ function ShowDiscardedButton({ checked, onChange }: { checked: boolean; onChange
       className="group flex items-center gap-[6px] shrink-0 cursor-pointer"
     >
       {checked ? (
-        <MdVisibility className="shrink-0" size={16} color="#27486d" />
+        <MdVisibility className="shrink-0 text-[#27486d] group-hover:text-[#2699fb] transition-colors" size={16} />
       ) : (
-        <MdDeleteOutline className="shrink-0" size={16} color="#27486d" />
+        <MdDeleteOutline className="shrink-0 text-[#27486d] group-hover:text-[#2699fb] transition-colors" size={16} />
       )}
-      <span
-        className={`font-['Montserrat',sans-serif] font-medium text-[13px] uppercase whitespace-nowrap transition-colors group-hover:text-[#2699fb] group-hover:underline ${checked ? 'text-[#2699fb] underline' : 'text-[#27486d]'}`}
-      >
+      <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase whitespace-nowrap transition-colors text-[#27486d] group-hover:text-[#2699fb] group-hover:underline">
         {checked ? 'Show Active' : 'Show Discarded'}
       </span>
     </button>
