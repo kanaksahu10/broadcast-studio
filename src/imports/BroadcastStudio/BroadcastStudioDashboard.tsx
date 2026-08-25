@@ -2530,7 +2530,9 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           // flips into an editor for this same row, in place. Nothing
           // closes here; onSaveAsDraft/onMessageCreated below (reachable
           // only once that edit mode is on) are what eventually close it.
-          onEditAsDraft={role === 'super-admin' ? () => handleEditAsDraft(viewingDiscardedRow.row) : undefined}
+          // Available to any role — resurrecting a discarded message into a
+          // draft isn't a Super Admin-only action, same as Delete above.
+          onEditAsDraft={() => handleEditAsDraft(viewingDiscardedRow.row)}
           onSaveAsDraft={(data) => {
             const agencies = data.statesOrAgencies ?? [];
             const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;
