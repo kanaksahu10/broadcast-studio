@@ -4,7 +4,7 @@ import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline } from 'react-icons/md';
+import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline } from 'react-icons/md';
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
@@ -1228,7 +1228,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onEditAsDraft, discardedBucketLabel, currentUserName, rejectionReason, rejected }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onEditAsDraft, discardedBucketLabel, originalAuthorName, currentUserName, rejectionReason, rejected }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -1249,6 +1249,14 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   onEditAsDraft?: () => void;
   /** Which discarded bucket this message currently sits in — used to retitle the header once editing starts ("Edit Message - Rejected"). */
   discardedBucketLabel?: string;
+  /**
+   * Who authored this message before ownership passed to whoever is editing
+   * it now. Deliberately separate from initialData.author — that field gets
+   * overwritten to the new editor on save, so deriving this from it would
+   * show the new editor their own name back as the "original" author on a
+   * second reopen.
+   */
+  originalAuthorName?: string;
   /** Whoever is composing — stamped as the author on a brand-new message. */
   currentUserName?: string;
   /** Approver's note from rejecting this message — surfaced as a banner above Author Details. */
@@ -1274,7 +1282,17 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [department, setDepartment] = useState(initialData?.department ?? '');
   const [messageCategory, setMessageCategory] = useState(initialData?.messageCategory ?? '');
   const [customCategoryName, setCustomCategoryName] = useState(initialData?.customCategoryName ?? '');
-  const author = initialData?.author ?? currentUserName ?? CURRENT_USER_NAME;
+  // A message that started in a discarded bucket keeps its original author
+  // in initialData.author while still locked/read-only. The moment it's
+  // actually editable as a draft (mid-transition via "Edit as Draft", or
+  // reopened straight from Drafts), ownership passes to whoever is editing
+  // it now — the original author is called out separately instead, via the
+  // dedicated originalAuthorName prop (not initialData.author, which gets
+  // overwritten to the new editor on save).
+  const showOriginContext = !effectiveReadOnly && !!discardedBucketLabel;
+  const author = showOriginContext
+    ? (currentUserName ?? CURRENT_USER_NAME)
+    : (initialData?.author ?? currentUserName ?? CURRENT_USER_NAME);
   const [messageColor, setMessageColor] = useState(initialData?.messageColor ?? MESSAGE_COLOR_OPTIONS[1]);
   const [displayFormat, setDisplayFormat] = useState<DisplayFormat>((initialData?.displayFormat as DisplayFormat) ?? '');
   const [placement, setPlacement] = useState<Placement>((initialData?.placement as Placement) ?? '');
@@ -1486,6 +1504,25 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: effectiveReadOnly ? '#DA4040' : '#000000' }}>
                 <span className="font-semibold" style={{ color: effectiveReadOnly ? '#DA4040' : LABEL_GREY }}>Rejection Reason: </span>
                 {rejectionReason || 'No reason was provided by the approver.'}
+              </p>
+            </div>
+          )}
+
+          {/* Only while this discarded-origin message is actually a draft —
+              i.e. moved and editable, not just the locked preview. Ownership
+              (the "Author" field below) has already passed to whoever is
+              editing now, so this is the only place the original author is
+              still visible. Gone the instant it's resubmitted: the resulting
+              Pending/Live row is a fresh object that never carries this. */}
+          {showOriginContext && originalAuthorName && (
+            <div
+              className="flex items-start gap-[8px] rounded-[4px] px-[12px] py-[10px]"
+              style={{ backgroundColor: 'white', border: `1px solid ${BORDER}` }}
+            >
+              <MdPersonOutline size={16} color={LABEL_GREY} className="shrink-0 mt-[1px]" />
+              <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: '#000000' }}>
+                <span className="font-semibold" style={{ color: LABEL_GREY }}>Original Author: </span>
+                {originalAuthorName}
               </p>
             </div>
           )}

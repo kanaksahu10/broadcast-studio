@@ -131,6 +131,14 @@ interface BroadcastMessageRow {
    * brand-new row that doesn't carry this forward.
    */
   originBucket?: DiscardedBucket;
+  /**
+   * Who authored this message before "Edit as Draft" reassigned ownership to
+   * whoever clicked it. Captured once, separately from formData.author —
+   * that field itself gets overwritten to the new editor on the very first
+   * save, so without a separate copy a second reopen would show the new
+   * editor's own name back to themselves as the "original" author.
+   */
+  originalAuthor?: string;
 }
 
 const STATUS_COLOR: Record<MessageStatus, string> = {
@@ -2339,6 +2347,11 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       // rejection reason banner (muted styling) and needs it. originBucket is
       // what lets that view — and its title — know this Draft came from here.
       originBucket: bucket,
+      // Snapshot the pre-transition author before authorRole/ownership below
+      // reassigns it — this is what the "Original Author" box reads from,
+      // kept separate from formData.author so it survives that field being
+      // overwritten to the new editor on save.
+      originalAuthor: m.formData?.author,
       authorRole: role,
     } : m));
     setSelectedStatus('Draft');
@@ -2445,6 +2458,9 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
         <ComposeMessageOverlay
           onClose={() => setEditingRow(null)}
           overlayTitle={editingRow.originBucket ? `Edit Message - ${editingRow.originBucket}` : 'Edit Message'}
+          discardedBucketLabel={editingRow.originBucket}
+          originalAuthorName={editingRow.originalAuthor}
+          currentUserName={getUserIdentity(role).name}
           submitLabel={role === 'executive-approver' ? 'Publish' : 'Send for Approval'}
           rejectionReason={editingRow.rejectionReason}
           rejected={editingRow.originBucket === 'Rejected'}
@@ -2477,9 +2493,11 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
               formData: data,
               // Carried forward so re-saving a draft that came from a
               // discarded message doesn't silently lose its "Edit Message -
-              // Rejected" title / reason banner on the next open.
+              // Rejected" title / reason banner / original-author note on
+              // the next open.
               originBucket: editingRow!.originBucket,
               rejectionReason: editingRow!.rejectionReason,
+              originalAuthor: editingRow!.originalAuthor,
             }, ...prev.filter((m) => m.id !== editingRow!.id)]);
             setSelectedStatus('Draft');
             setEditingRow(null);
@@ -2533,6 +2551,12 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           onClose={() => setViewingDiscardedRow(null)}
           overlayTitle={`${viewingDiscardedRow.bucket} Message`}
           discardedBucketLabel={viewingDiscardedRow.bucket}
+          // Falls back to the row's current formData.author for the very
+          // first "Edit as Draft" (before originalAuthor has ever been set);
+          // once set, that field takes over on any later reopen so this
+          // can't drift to whoever most recently edited it.
+          originalAuthorName={viewingDiscardedRow.row.originalAuthor ?? viewingDiscardedRow.row.formData?.author}
+          currentUserName={getUserIdentity(role).name}
           submitLabel={role === 'executive-approver' ? 'Publish' : 'Send for Approval'}
           readOnly
           rejectionReason={getRejectionReason(viewingDiscardedRow.row)}
