@@ -1277,6 +1277,18 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [endDate, setEndDate] = useState(initialData?.endDate ?? '');
   const [noEndDate, setNoEndDate] = useState(initialData?.noEndDate ?? false);
   const [dismissible, setDismissible] = useState<Dismissible>((initialData?.dismissible as Dismissible) ?? 'Dismissible');
+  // Overlay messages are always dismissible — there's no non-dismissible
+  // overlay in the design, so the choice only makes sense for Banner. Force
+  // it back to Dismissible whenever the format is (or becomes) Overlay,
+  // rather than just hiding the control, so a message authored as Banner /
+  // Non-Dismissible and then switched to Overlay doesn't silently save with
+  // a stale Non-Dismissible value the user never chose for this format.
+  useEffect(() => {
+    if (displayFormat === 'Overlay' && dismissible !== 'Dismissible') {
+      setDismissible('Dismissible');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayFormat]);
   const [pushNotification, setPushNotification] = useState(initialData?.pushNotification ?? false);
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
   const [isSubmitHovered, setIsSubmitHovered] = useState(false);
@@ -1333,7 +1345,11 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   };
 
   const messageType: MessageType = displayFormat === '' ? '' : (isEmergency ? 'Emergency' : 'Announcement');
-  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, searchMode, statesOrAgencies, packages, roles, dismissible, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
+  // Computed directly (not just left to the effect above) so a submit that
+  // lands in the same render as switching to Overlay can't slip through
+  // with a stale Non-Dismissible value before the effect has a chance to run.
+  const savedDismissible: Dismissible = displayFormat === 'Overlay' ? 'Dismissible' : dismissible;
+  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, searchMode, statesOrAgencies, packages, roles, dismissible: savedDismissible, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
 
   const handleSubmit = () => {
     onMessageCreated?.(allFormData);
@@ -1346,7 +1362,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   };
 
   const effectiveFormat: DisplayFormat = displayFormat;
-  const effectiveDismissible = dismissible === 'Dismissible';
+  const effectiveDismissible = savedDismissible === 'Dismissible';
   const effectiveBannerColor = messageColor;
   const hasPreview = effectiveFormat !== '';
 
@@ -1516,7 +1532,11 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           {/* Display Settings card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Display Settings</p>
-            <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} disabled={readOnly} />
+            {/* Overlay is always dismissible (forced above), so the choice is
+                meaningless there — only Banner gets to pick. */}
+            {displayFormat === 'Banner' && (
+              <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} disabled={readOnly} />
+            )}
             <CtaBox
               checked={hasCta}
               onChange={setHasCta}

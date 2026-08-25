@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
-import { MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
+import { MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban, MdVisibility } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
 import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
 import { useIsBelowDesktop, useIsPhone } from './useIsPhone';
@@ -918,21 +918,30 @@ function NewMessageButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function ShowDiscardedToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+// A button rather than a toggle: it's not "on/off" settings state, it's a
+// view switch (active bucket vs. discarded bucket), so the control should
+// read like a navigation action — and its own label flips to say where it
+// would take you *back* to, same as the icon does.
+function ShowDiscardedButton({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  // Text-only, no bounding box — matches the plain-link button style used
+  // elsewhere in the app (e.g. the Clients screen's own "Show Discharged").
+  // Active state reuses the same blue+underline treatment as hover, so
+  // toggled-on reads as a persistent version of "you're pointing at this".
   return (
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="group flex items-center gap-[8px] cursor-pointer shrink-0"
+      className="group flex items-center gap-[6px] shrink-0 cursor-pointer"
     >
+      {checked ? (
+        <MdVisibility className="shrink-0" size={16} color="#27486d" />
+      ) : (
+        <MdDeleteOutline className="shrink-0" size={16} color="#27486d" />
+      )}
       <span
-        className="w-[32px] h-[18px] rounded-full flex items-center px-[2px] transition-colors shrink-0"
-        style={{ backgroundColor: checked ? '#2699fb' : '#d0d0d0', justifyContent: checked ? 'flex-end' : 'flex-start' }}
+        className={`font-['Montserrat',sans-serif] font-medium text-[13px] uppercase whitespace-nowrap transition-colors group-hover:text-[#2699fb] group-hover:underline ${checked ? 'text-[#2699fb] underline' : 'text-[#27486d]'}`}
       >
-        <span className="size-[14px] rounded-full bg-white shadow shrink-0" />
-      </span>
-      <span className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors text-[#27486d] group-hover:text-[#2699fb] group-hover:underline">
-        Show Discarded
+        {checked ? 'Show Active' : 'Show Discarded'}
       </span>
     </button>
   );
@@ -1646,24 +1655,20 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
         })()}
         <div className="flex items-center justify-between gap-[8px]">
           {(() => {
-            // Recipient count only means something once a message is approved and
-            // actually delivering — on Drafts and Pending the audience isn't final yet.
-            if (row.status !== 'Live') return <span />;
-            const agencies = row.formData?.statesOrAgencies ?? [];
-            const packages = row.formData?.packages ?? [];
-            const roles = row.formData?.roles ?? [];
+            // Shown on every active card now (Draft/Pending/Live alike) — even
+            // before a message is live, its formData already carries a draft
+            // audience, and always opening the same detail overlay (like the
+            // Live cards always did) is simpler than a status-gated condition
+            // that used to hide it on anything not yet approved.
             const count = getRecipientCount(row);
-            if (count === 0) return <span />;
-            const hasDetail = agencies.length > 0 || packages.length > 0 || roles.length > 0;
             return (
               <button
                 type="button"
-                className={`flex items-center gap-[5px] ${hasDetail ? 'group/recipients' : ''}`}
-                style={{ cursor: hasDetail ? 'pointer' : 'default' }}
-                onClick={(e) => { e.stopPropagation(); hasDetail && setShowAudience(true); }}
+                className="flex items-center gap-[5px] group/recipients cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); setShowAudience(true); }}
               >
                 <MdOutlineGroup size={15} color="#27496D" />
-                <span className={`font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px] text-[#27496d] transition-colors ${hasDetail ? 'group-hover/recipients:text-[#2699fb] group-hover/recipients:underline' : ''}`}>{count} {count === 1 ? 'Recipient' : 'Recipients'}</span>
+                <span className="font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px] text-[#27496d] transition-colors group-hover/recipients:text-[#2699fb] group-hover/recipients:underline">{count} {count === 1 ? 'Recipient' : 'Recipients'}</span>
               </button>
             );
           })()}
@@ -1686,6 +1691,7 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showAudience, setShowAudience] = useState(false);
   const [flickerOn, setFlickerOn] = useState(false);
   const [flickerActive, setFlickerActive] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
@@ -1713,6 +1719,9 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
 
   return (
     <>
+    {showAudience && row.formData && (
+      <AudienceOverlay formData={row.formData} recipientCount={getRecipientCount(row)} onClose={() => setShowAudience(false)} />
+    )}
     {showDeleteConfirm && (
       <PermanentDeleteOverlay
         subject={row.subject}
@@ -1776,8 +1785,15 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
           </div>
         </div>
         {getCategoryLabel(row) && <CategoryTag label={getCategoryLabel(row)!} />}
-        {/* Discarded messages aren't delivering, so the recipient count is dropped here. */}
-        <div className="flex items-center justify-end gap-[8px]">
+        <div className="flex items-center justify-between gap-[8px]">
+          <button
+            type="button"
+            className="flex items-center gap-[5px] group/recipients cursor-pointer"
+            onClick={(e) => { e.stopPropagation(); setShowAudience(true); }}
+          >
+            <MdOutlineGroup size={15} color="#27496D" />
+            <span className="font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px] text-[#27496d] transition-colors group-hover/recipients:text-[#2699fb] group-hover/recipients:underline">{getRecipientCount(row)} {getRecipientCount(row) === 1 ? 'Recipient' : 'Recipients'}</span>
+          </button>
           <p className="font-['Montserrat',sans-serif] font-normal text-[11px] leading-[15px] text-[#b8b8b8] shrink-0">
             Auto-deletes in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}
           </p>
@@ -2365,7 +2381,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           rather than reflow. */}
       <div className="flex items-center gap-[12px] w-full flex-wrap">
         <SearchInput value={search} onChange={setSearch} />
-        <ShowDiscardedToggle checked={showDiscarded} onChange={setShowDiscarded} />
+        <ShowDiscardedButton checked={showDiscarded} onChange={setShowDiscarded} />
         <NewMessageButton onClick={() => setIsComposeOpen(true)} />
         {/* The spacer only exists to push the view toggle right, so it is tied
             to it — left on its own in a wrapping row it would swallow the free
