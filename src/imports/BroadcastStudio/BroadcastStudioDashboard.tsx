@@ -2312,18 +2312,23 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
     showToast('Message discontinued');
   };
 
-  const handleCopyToDrafts = (row: BroadcastMessageRow) => {
-    const draft: BroadcastMessageRow = {
-      ...row,
-      id: Date.now().toString(),
+  // Moves a discarded (Rejected/Expired/Discontinued) message straight into
+  // Drafts — same row, same id, just a status change — rather than copying
+  // it into a brand-new row and leaving the original sitting in the
+  // discarded bucket. Fired the instant "Edit as Draft" is clicked, before
+  // the user has touched a single field: the overlay then switches itself
+  // into an editor for this same now-Draft row in place.
+  const handleEditAsDraft = (row: BroadcastMessageRow) => {
+    setMessages((prev) => prev.map((m) => m.id === row.id ? {
+      ...m,
       status: 'Draft',
       startDate: '—',
       endDate: '—',
       recipients: null,
       statusChangedAt: undefined,
+      rejectionReason: undefined,
       authorRole: role,
-    };
-    setMessages((prev) => [draft, ...prev]);
+    } : m));
     setSelectedStatus('Draft');
   };
 
@@ -2508,6 +2513,8 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
         <ComposeMessageOverlay
           onClose={() => setViewingDiscardedRow(null)}
           overlayTitle={`${viewingDiscardedRow.bucket} Message`}
+          discardedBucketLabel={viewingDiscardedRow.bucket}
+          submitLabel={role === 'executive-approver' ? 'Publish' : 'Send for Approval'}
           readOnly
           rejectionReason={getRejectionReason(viewingDiscardedRow.row)}
           rejected={viewingDiscardedRow.bucket === 'Rejected'}
@@ -2519,7 +2526,32 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
             ...viewingDiscardedRow.row.formData,
           }}
           onDeleteRow={() => { handleDelete(viewingDiscardedRow.row.id); setViewingDiscardedRow(null); }}
-          onCopyToDrafts={role === 'super-admin' ? () => { handleCopyToDrafts(viewingDiscardedRow.row); setViewingDiscardedRow(null); } : undefined}
+          // Moves the row to Draft immediately — the overlay itself then
+          // flips into an editor for this same row, in place. Nothing
+          // closes here; onSaveAsDraft/onMessageCreated below (reachable
+          // only once that edit mode is on) are what eventually close it.
+          onEditAsDraft={role === 'super-admin' ? () => handleEditAsDraft(viewingDiscardedRow.row) : undefined}
+          onSaveAsDraft={(data) => {
+            const agencies = data.statesOrAgencies ?? [];
+            const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;
+            setMessages((prev) => prev.map((m) => m.id === viewingDiscardedRow.row.id ? {
+              ...m,
+              subject: data.title || 'Untitled Draft',
+              type: (data.messageType as MessageType) || '',
+              audience,
+              startDate: data.startDate ? formatDisplayDate(data.startDate) : '—',
+              endDate: data.endDate ? formatDisplayDate(data.endDate) : '—',
+              formData: data,
+            } : m));
+            setSelectedStatus('Draft');
+            setViewingDiscardedRow(null);
+            showToast('Draft saved');
+          }}
+          onMessageCreated={(data) => {
+            setMessages((prev) => prev.filter((m) => m.id !== viewingDiscardedRow.row.id));
+            handleMessageCreated(data);
+            setViewingDiscardedRow(null);
+          }}
         />
       )}
 

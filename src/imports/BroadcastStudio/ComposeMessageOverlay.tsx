@@ -4,7 +4,7 @@ import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdOutlineContentCopy } from 'react-icons/md';
+import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline } from 'react-icons/md';
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
@@ -1228,7 +1228,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onCopyToDrafts, currentUserName, rejectionReason, rejected }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onEditAsDraft, discardedBucketLabel, currentUserName, rejectionReason, rejected }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -1239,7 +1239,16 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   onApprove?: () => void;
   onReject?: () => void;
   onDeleteRow?: () => void;
-  onCopyToDrafts?: () => void;
+  /**
+   * A discarded (Rejected/Expired/Discontinued) message's "Edit as Draft"
+   * action. Fires the backend move to Draft immediately on click — the
+   * overlay doesn't wait for a save — then this same instance flips itself
+   * out of read-only and into a live editor, so there's no close-and-reopen
+   * round trip through the Drafts column.
+   */
+  onEditAsDraft?: () => void;
+  /** Which discarded bucket this message currently sits in — used to retitle the header once editing starts ("Edit Message - Rejected"). */
+  discardedBucketLabel?: string;
   /** Whoever is composing — stamped as the author on a brand-new message. */
   currentUserName?: string;
   /** Approver's note from rejecting this message — surfaced as a banner above Author Details. */
@@ -1252,6 +1261,13 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   rejected?: boolean;
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // Flips true the instant "Edit as Draft" is clicked on a discarded
+  // message's read-only view — the backend move already happened by then
+  // (see onEditAsDraft above), this just switches this same overlay's own
+  // chrome (title, lock overlay, field disabled-ness, footer) into the
+  // normal editable-draft look, in place.
+  const [editingAsDraft, setEditingAsDraft] = useState(false);
+  const effectiveReadOnly = readOnly && !editingAsDraft;
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [body, setBody] = useState(initialData?.body ?? '');
   const [reason, setReason] = useState(initialData?.reason ?? '');
@@ -1307,6 +1323,13 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // While you are on Details the preview keeps updating out of sight, so the
   // tab carries a dot until you next look at it.
   const [previewSeen, setPreviewSeen] = useState(true);
+  // A discarded message opens on Preview (readOnly). The moment "Edit as
+  // Draft" flips this into an editor, jump to Details — that's where the
+  // now-editable fields live, and staying on Preview would show an
+  // unchanged read-only-looking screen right after clicking "edit".
+  useEffect(() => {
+    if (editingAsDraft) setStackedTab('details');
+  }, [editingAsDraft]);
 
   // Only the fields the preview actually draws count as a change worth a dot —
   // editing the department or the audience leaves the preview identical.
@@ -1337,7 +1360,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     placement !== '' &&
     (placement !== 'Feature Specific' || featurePath !== '');
 
-  const showFooter = !!onDeleteRow || !!onCopyToDrafts || !!(onApprove && onReject) || !readOnly;
+  const showFooter = editingAsDraft || !!onDeleteRow || !!onEditAsDraft || !!(onApprove && onReject) || !effectiveReadOnly;
 
   const handleSearchModeChange = (v: string) => {
     setSearchMode(v as SearchMode);
@@ -1380,7 +1403,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
       {/* Top header bar */}
       <div className="flex items-center justify-between h-[56px] px-[24px] border-b shrink-0" style={{ borderColor: BORDER }}>
-        <h2 className="font-['Montserrat',sans-serif] font-semibold text-[16px] text-black">{overlayTitle ?? 'New Message'}</h2>
+        <h2 className="font-['Montserrat',sans-serif] font-semibold text-[16px] text-black">
+          {editingAsDraft && discardedBucketLabel ? `Edit Message - ${discardedBucketLabel}` : (overlayTitle ?? 'New Message')}
+        </h2>
         <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
           <IoIosClose size={26} color="#27496D" />
         </button>
@@ -1438,7 +1463,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           }}
           className="p-[24px] max-sm:p-[16px] flex flex-col gap-[16px]"
         >
-          {readOnly && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} />}
+          {effectiveReadOnly && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} />}
 
           {/* Shown for every rejected message. The reason is optional, so when
               the approver left it blank the banner says so rather than
@@ -1464,17 +1489,17 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               <span className="font-semibold" style={{ color: LABEL_GREY }}>Author: </span>
               <span className="font-normal" style={{ color: '#000000' }}>{author}</span>
             </p>
-            <SelectField label="Department *" value={department} onChange={setDepartment} placeholder="Select department..." options={DEPARTMENT_OPTIONS} disabled={readOnly} />
-            <SelectField label="Message Category" value={messageCategory} onChange={setMessageCategory} placeholder="Select category..." options={CATEGORY_OPTIONS} disabled={readOnly} />
+            <SelectField label="Department *" value={department} onChange={setDepartment} placeholder="Select department..." options={DEPARTMENT_OPTIONS} disabled={effectiveReadOnly} />
+            <SelectField label="Message Category" value={messageCategory} onChange={setMessageCategory} placeholder="Select category..." options={CATEGORY_OPTIONS} disabled={effectiveReadOnly} />
             {messageCategory === 'Custom' && (
-              <TextField label="Category Name" value={customCategoryName} onChange={setCustomCategoryName} placeholder="Type a category name" disabled={readOnly} />
+              <TextField label="Category Name" value={customCategoryName} onChange={setCustomCategoryName} placeholder="Type a category name" disabled={effectiveReadOnly} />
             )}
           </div>
 
           {/* Message Details card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Message Details</p>
-            <RadioField label="Display Format *" value={displayFormat} onChange={(v) => setDisplayFormat(v as DisplayFormat)} options={['Overlay', 'Banner']} disabled={readOnly} />
+            <RadioField label="Display Format *" value={displayFormat} onChange={(v) => setDisplayFormat(v as DisplayFormat)} options={['Overlay', 'Banner']} disabled={effectiveReadOnly} />
             {displayFormat === 'Banner' && (
               <ColorField
                 label="Message Color"
@@ -1482,28 +1507,28 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 onChange={setMessageColor}
                 options={MESSAGE_COLOR_OPTIONS}
                 optionLabels={{ '#DA4040': 'Emergency', '#27496D': 'Regular' }}
-                disabled={readOnly}
+                disabled={effectiveReadOnly}
               />
             )}
-            <SelectField label="Placement *" value={placement} onChange={(v) => setPlacement(v as Placement)} placeholder="Select placement..." options={['App-wide', 'Feature Specific']} disabled={readOnly} />
+            <SelectField label="Placement *" value={placement} onChange={(v) => setPlacement(v as Placement)} placeholder="Select placement..." options={['App-wide', 'Feature Specific']} disabled={effectiveReadOnly} />
             {placement === 'Feature Specific' && (
-              <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} disabled={readOnly} />
+              <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} disabled={effectiveReadOnly} />
             )}
-            <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={readOnly} />
-            <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={readOnly} />
-            <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={readOnly} />
+            <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={effectiveReadOnly} />
+            <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={effectiveReadOnly} />
+            <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
           </div>
 
           {/* Date & Time card */}
           <div className="bg-white rounded-[8px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Date &amp; Time</p>
-            <DateField label="Start Date *" value={startDate} onChange={setStartDate} disabled={readOnly} />
-            <DateField label="End Date" value={endDate} onChange={setEndDate} disabled={readOnly || noEndDate} />
+            <DateField label="Start Date *" value={startDate} onChange={setStartDate} disabled={effectiveReadOnly} />
+            <DateField label="End Date" value={endDate} onChange={setEndDate} disabled={effectiveReadOnly || noEndDate} />
             <CheckboxRow
               label="No end date"
               checked={noEndDate}
               onChange={(v) => { setNoEndDate(v); if (v) setEndDate(''); }}
-              disabled={readOnly}
+              disabled={effectiveReadOnly}
             />
           </div>
 
@@ -1515,18 +1540,18 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 {audienceCount} {audienceCount === 1 ? 'recipient' : 'recipients'} will see this message
               </p>
             </div>
-            <RadioField label="Search By *" value={searchMode} onChange={handleSearchModeChange} options={['Agency', 'State']} disabled={readOnly} />
+            <RadioField label="Search By *" value={searchMode} onChange={handleSearchModeChange} options={['Agency', 'State']} disabled={effectiveReadOnly} />
             <MultiSelectField
               label={searchMode === 'Agency' ? 'Agency *' : 'State *'}
               values={statesOrAgencies}
               onChange={setStatesOrAgencies}
               placeholder={searchMode === 'State' ? 'Select states...' : 'Select agencies...'}
               options={searchMode === 'Agency' ? AGENCIES.map((a) => a.name) : STATES}
-              disabled={readOnly}
+              disabled={effectiveReadOnly}
               variant={searchMode === 'Agency' ? 'agency' : 'state'}
             />
-            <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} disabled={readOnly} variant="package" />
-            <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} disabled={readOnly} variant="role" />
+            <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} disabled={effectiveReadOnly} variant="package" />
+            <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} disabled={effectiveReadOnly} variant="role" />
           </div>
 
           {/* Display Settings card */}
@@ -1535,7 +1560,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             {/* Overlay is always dismissible (forced above), so the choice is
                 meaningless there — only Banner gets to pick. */}
             {displayFormat === 'Banner' && (
-              <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} disabled={readOnly} />
+              <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} disabled={effectiveReadOnly} />
             )}
             <CtaBox
               checked={hasCta}
@@ -1546,9 +1571,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               onDestinationChange={setCtaDestination}
               stopOnClick={stopOnCtaClick}
               onStopOnClickChange={setStopOnCtaClick}
-              disabled={readOnly}
+              disabled={effectiveReadOnly}
             />
-            <ToggleRow label="Also send as push notification" checked={pushNotification} onChange={setPushNotification} disabled={readOnly} />
+            <ToggleRow label="Also send as push notification" checked={pushNotification} onChange={setPushNotification} disabled={effectiveReadOnly} />
           </div>
         </div>
 
@@ -1651,62 +1676,11 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
       </div>
 
       {/* Action buttons — full-width footer bar across the whole overlay */}
-      {showFooter && (
-      <div className="shrink-0 border-t px-[24px] max-sm:px-[16px] py-[16px] flex items-center justify-end" style={{ borderColor: BORDER, backgroundColor: 'white' }}>
-        {onDeleteRow || onCopyToDrafts ? (
-          <div className={`flex items-center gap-[16px] ${onDeleteRow && onCopyToDrafts ? 'w-full justify-between' : ''}`}>
-            {onDeleteRow && (
-              <button
-                type="button"
-                className="flex items-center gap-[6px] shrink-0 font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
-                style={{ color: '#DA4040' }}
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                <RiDeleteBinLine size={17} color="#DA4040" />
-                Delete
-              </button>
-            )}
-            {onCopyToDrafts && (
-              <button
-                type="button"
-                className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
-                onClick={onCopyToDrafts}
-              >
-                <MdOutlineContentCopy size={15} />
-                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
-                  Copy to Drafts
-                </span>
-              </button>
-            )}
-          </div>
-        ) : onApprove && onReject ? (
-            /* Pushed to opposite ends of the footer: the destructive action sits
-               well away from the one people mean to hit. */
-            <div className="flex items-center gap-[8px] w-full justify-between">
-              <button
-                type="button"
-                onClick={onReject}
-                className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#fdeaea] border-[#DA4040] text-[#DA4040] hover:bg-[#DA4040] hover:text-white"
-              >
-                <FaRegTimesCircle size={15} />
-                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
-                  Reject
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={onApprove}
-                className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[8px] max-sm:gap-[6px] cursor-pointer"
-                style={{ backgroundColor: '#00AA00' }}
-              >
-                <FaRegCheckCircle size={15} color="white" />
-                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap" style={{ color: 'white' }}>
-                  Approve
-                </span>
-              </button>
-            </div>
-        ) : !readOnly ? (
-          /* Pushed to opposite ends of the footer, same as the review actions. */
+      {(() => {
+        // Save as Draft / Submit — the normal editable footer. Shared between
+        // the plain new/edit flow and a discarded message mid-transition into
+        // "Edit as Draft", so the two don't drift out of sync.
+        const editableFooterButtons = (
           <div className="flex items-center gap-[8px] w-full justify-between">
             <button
               type="button"
@@ -1751,9 +1725,70 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               )}
             </div>
           </div>
-        ) : null}
-      </div>
-      )}
+        );
+
+        return showFooter && (
+          <div className="shrink-0 border-t px-[24px] max-sm:px-[16px] py-[16px] flex items-center justify-end" style={{ borderColor: BORDER, backgroundColor: 'white' }}>
+            {editingAsDraft ? (
+              editableFooterButtons
+            ) : onDeleteRow || onEditAsDraft ? (
+              <div className={`flex items-center gap-[16px] ${onDeleteRow && onEditAsDraft ? 'w-full justify-between' : ''}`}>
+                {onDeleteRow && (
+                  <button
+                    type="button"
+                    className="flex items-center gap-[6px] shrink-0 font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+                    style={{ color: '#DA4040' }}
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    <RiDeleteBinLine size={17} color="#DA4040" />
+                    Delete
+                  </button>
+                )}
+                {onEditAsDraft && (
+                  <button
+                    type="button"
+                    className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
+                    onClick={() => { onEditAsDraft(); setEditingAsDraft(true); }}
+                  >
+                    <MdModeEditOutline size={15} />
+                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
+                      Edit as Draft
+                    </span>
+                  </button>
+                )}
+              </div>
+            ) : onApprove && onReject ? (
+                /* Pushed to opposite ends of the footer: the destructive action sits
+                   well away from the one people mean to hit. */
+                <div className="flex items-center gap-[8px] w-full justify-between">
+                  <button
+                    type="button"
+                    onClick={onReject}
+                    className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#fdeaea] border-[#DA4040] text-[#DA4040] hover:bg-[#DA4040] hover:text-white"
+                  >
+                    <FaRegTimesCircle size={15} />
+                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
+                      Reject
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onApprove}
+                    className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[8px] max-sm:gap-[6px] cursor-pointer"
+                    style={{ backgroundColor: '#00AA00' }}
+                  >
+                    <FaRegCheckCircle size={15} color="white" />
+                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap" style={{ color: 'white' }}>
+                      Approve
+                    </span>
+                  </button>
+                </div>
+            ) : !effectiveReadOnly ? (
+              editableFooterButtons
+            ) : null}
+          </div>
+        );
+      })()}
     </div>
   );
 }
