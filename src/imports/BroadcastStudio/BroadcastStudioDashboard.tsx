@@ -2347,12 +2347,17 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       // rejection reason banner (muted styling) and needs it. originBucket is
       // what lets that view — and its title — know this Draft came from here.
       originBucket: bucket,
-      // Snapshot the pre-transition author before authorRole/ownership below
-      // reassigns it — this is what the "Original Author" box reads from,
+      // Snapshot the pre-transition author before formData.author below gets
+      // reassigned — this is what the "Original Author" box reads from,
       // kept separate from formData.author so it survives that field being
-      // overwritten to the new editor on save.
+      // overwritten again on save.
       originalAuthor: m.formData?.author,
       authorRole: role,
+      // Reassigned immediately (not just inside the editor's own display, and
+      // not deferred until the first Save) — this is what the Drafts board
+      // card itself reads, and it's the user's own draft now, not whoever
+      // originally sent the message.
+      formData: m.formData ? { ...m.formData, author: getUserIdentity(role).name } : m.formData,
     } : m));
     setSelectedStatus('Draft');
   };
