@@ -1483,49 +1483,53 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
         >
           {effectiveReadOnly && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} />}
 
-          {/* Shown for every rejected message. The reason is optional, so when
-              the approver left it blank the banner says so rather than
-              vanishing — otherwise the absence of a note is indistinguishable
-              from the message never having been rejected.
+          {/* Rejection Reason and Original Author share one card instead of
+              stacking as two separate ones — same border, same padding, one
+              row each. The reason is optional, so when the approver left it
+              blank the row says so rather than vanishing — otherwise the
+              absence of a note is indistinguishable from the message never
+              having been rejected.
               Red/filled while this is still the locked read-only "Rejected
-              Message" view — once it's actually editable (mid-transition via
-              "Edit as Draft", or reopened straight from the Drafts column),
-              it drops the alert styling for a plain neutral card matching
-              every other section below, since it's no longer flagging an
-              unresolved rejection — just carrying the note forward. */}
-          {(rejected || rejectionReason) && (
-            <div
-              className="flex items-start gap-[8px] rounded-[4px] px-[12px] py-[10px]"
-              style={effectiveReadOnly
-                ? { backgroundColor: '#FFE9E9' }
-                : { backgroundColor: 'white', border: `1px solid ${BORDER}` }}
-            >
-              <RiErrorWarningLine size={16} color={effectiveReadOnly ? '#DA4040' : LABEL_GREY} className="shrink-0 mt-[1px]" />
-              <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: effectiveReadOnly ? '#DA4040' : '#000000' }}>
-                <span className="font-semibold" style={{ color: effectiveReadOnly ? '#DA4040' : LABEL_GREY }}>Rejection Reason: </span>
-                {rejectionReason || 'No reason was provided by the approver.'}
-              </p>
-            </div>
-          )}
-
-          {/* Only while this discarded-origin message is actually a draft —
-              i.e. moved and editable, not just the locked preview. Ownership
-              (the "Author" field below) has already passed to whoever is
-              editing now, so this is the only place the original author is
-              still visible. Gone the instant it's resubmitted: the resulting
-              Pending/Live row is a fresh object that never carries this. */}
-          {showOriginContext && originalAuthorName && (
-            <div
-              className="flex items-start gap-[8px] rounded-[4px] px-[12px] py-[10px]"
-              style={{ backgroundColor: 'white', border: `1px solid ${BORDER}` }}
-            >
-              <MdPersonOutline size={16} color={LABEL_GREY} className="shrink-0 mt-[1px]" />
-              <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: '#000000' }}>
-                <span className="font-semibold" style={{ color: LABEL_GREY }}>Original Author: </span>
-                {originalAuthorName}
-              </p>
-            </div>
-          )}
+              Message" view (Original Author never shows there — ownership
+              hasn't moved yet) — once it's actually editable (mid-transition
+              via "Edit as Draft", or reopened straight from the Drafts
+              column), it drops the alert styling for a plain neutral card
+              matching every other section below, since it's no longer
+              flagging an unresolved rejection — just carrying context
+              forward. Original Author is gone the instant this is
+              resubmitted: the resulting Pending/Live row is a fresh object
+              that never carries either field forward. */}
+          {(() => {
+            const showRejection = !!(rejected || rejectionReason);
+            const showOriginalAuthor = showOriginContext && !!originalAuthorName;
+            if (!showRejection && !showOriginalAuthor) return null;
+            const alert = effectiveReadOnly && showRejection;
+            return (
+              <div
+                className="flex flex-col gap-[10px] rounded-[4px] px-[12px] py-[10px]"
+                style={alert ? { backgroundColor: '#FFE9E9' } : { backgroundColor: 'white', border: `1px solid ${BORDER}` }}
+              >
+                {showRejection && (
+                  <div className="flex items-start gap-[8px]">
+                    <RiErrorWarningLine size={16} color={alert ? '#DA4040' : LABEL_GREY} className="shrink-0 mt-[1px]" />
+                    <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: alert ? '#DA4040' : '#000000' }}>
+                      <span className="font-semibold" style={{ color: alert ? '#DA4040' : LABEL_GREY }}>Rejection Reason: </span>
+                      {rejectionReason || 'No reason was provided by the approver.'}
+                    </p>
+                  </div>
+                )}
+                {showOriginalAuthor && (
+                  <div className="flex items-start gap-[8px]">
+                    <MdPersonOutline size={16} color={LABEL_GREY} className="shrink-0 mt-[1px]" />
+                    <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: '#000000' }}>
+                      <span className="font-semibold" style={{ color: LABEL_GREY }}>Original Author: </span>
+                      {originalAuthorName}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Author card — no separate "Author Details" heading, since the
               "Author:" line already says what this card is. */}
