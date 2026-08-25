@@ -865,7 +865,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
 // from a previous version keeps them forever — and new fields (author,
 // department, authorRole, rejectionReason) read as undefined on those old
 // rows, which silently empties the Drafts and Pending columns.
-const STORAGE_KEY = 'bs-messages-v12';
+const STORAGE_KEY = 'bs-messages-v13';
 
 export function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
