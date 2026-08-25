@@ -1468,15 +1468,23 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           {/* Shown for every rejected message. The reason is optional, so when
               the approver left it blank the banner says so rather than
               vanishing — otherwise the absence of a note is indistinguishable
-              from the message never having been rejected. */}
+              from the message never having been rejected.
+              Red/filled while this is still the locked read-only "Rejected
+              Message" view — once it's actually editable (mid-transition via
+              "Edit as Draft", or reopened straight from the Drafts column),
+              it drops the alert styling for a plain neutral card matching
+              every other section below, since it's no longer flagging an
+              unresolved rejection — just carrying the note forward. */}
           {(rejected || rejectionReason) && (
             <div
               className="flex items-start gap-[8px] rounded-[4px] px-[12px] py-[10px]"
-              style={{ backgroundColor: '#FFE9E9' }}
+              style={effectiveReadOnly
+                ? { backgroundColor: '#FFE9E9' }
+                : { backgroundColor: 'white', border: `1px solid ${BORDER}` }}
             >
-              <RiErrorWarningLine size={16} color="#DA4040" className="shrink-0 mt-[1px]" />
-              <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: '#DA4040' }}>
-                <span className="font-semibold">Rejection Reason: </span>
+              <RiErrorWarningLine size={16} color={effectiveReadOnly ? '#DA4040' : LABEL_GREY} className="shrink-0 mt-[1px]" />
+              <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: effectiveReadOnly ? '#DA4040' : '#000000' }}>
+                <span className="font-semibold" style={{ color: effectiveReadOnly ? '#DA4040' : LABEL_GREY }}>Rejection Reason: </span>
                 {rejectionReason || 'No reason was provided by the approver.'}
               </p>
             </div>

@@ -122,6 +122,15 @@ interface BroadcastMessageRow {
   authorRole?: UserRole;
   /** Optional note the approver left when rejecting. Only set on rejected messages. */
   rejectionReason?: string;
+  /**
+   * Which discarded bucket this row was moved to Draft from, via "Edit as
+   * Draft". Only meaningful while status is 'Draft' — lets the Drafts-column
+   * edit view retitle itself ("Edit Message - Rejected") and keep showing
+   * the rejection reason banner even after the message has left the
+   * discarded board entirely. A message resubmitted from here becomes a
+   * brand-new row that doesn't carry this forward.
+   */
+  originBucket?: DiscardedBucket;
 }
 
 const STATUS_COLOR: Record<MessageStatus, string> = {
@@ -2318,7 +2327,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
   // discarded bucket. Fired the instant "Edit as Draft" is clicked, before
   // the user has touched a single field: the overlay then switches itself
   // into an editor for this same now-Draft row in place.
-  const handleEditAsDraft = (row: BroadcastMessageRow) => {
+  const handleEditAsDraft = (row: BroadcastMessageRow, bucket: DiscardedBucket) => {
     setMessages((prev) => prev.map((m) => m.id === row.id ? {
       ...m,
       status: 'Draft',
@@ -2326,7 +2335,10 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       endDate: '—',
       recipients: null,
       statusChangedAt: undefined,
-      rejectionReason: undefined,
+      // Retained (not cleared) — the Drafts-column edit view still shows the
+      // rejection reason banner (muted styling) and needs it. originBucket is
+      // what lets that view — and its title — know this Draft came from here.
+      originBucket: bucket,
       authorRole: role,
     } : m));
     setSelectedStatus('Draft');
@@ -2432,8 +2444,10 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       {editingRow && (
         <ComposeMessageOverlay
           onClose={() => setEditingRow(null)}
-          overlayTitle="Edit Message"
+          overlayTitle={editingRow.originBucket ? `Edit Message - ${editingRow.originBucket}` : 'Edit Message'}
           submitLabel={role === 'executive-approver' ? 'Publish' : 'Send for Approval'}
+          rejectionReason={editingRow.rejectionReason}
+          rejected={editingRow.originBucket === 'Rejected'}
           initialData={{
             title: editingRow.subject,
             messageType: editingRow.type,
@@ -2461,6 +2475,11 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
               recipients: null,
               authorRole: role,
               formData: data,
+              // Carried forward so re-saving a draft that came from a
+              // discarded message doesn't silently lose its "Edit Message -
+              // Rejected" title / reason banner on the next open.
+              originBucket: editingRow!.originBucket,
+              rejectionReason: editingRow!.rejectionReason,
             }, ...prev.filter((m) => m.id !== editingRow!.id)]);
             setSelectedStatus('Draft');
             setEditingRow(null);
@@ -2532,7 +2551,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           // only once that edit mode is on) are what eventually close it.
           // Available to any role — resurrecting a discarded message into a
           // draft isn't a Super Admin-only action, same as Delete above.
-          onEditAsDraft={() => handleEditAsDraft(viewingDiscardedRow.row)}
+          onEditAsDraft={() => handleEditAsDraft(viewingDiscardedRow.row, viewingDiscardedRow.bucket)}
           onSaveAsDraft={(data) => {
             const agencies = data.statesOrAgencies ?? [];
             const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;
