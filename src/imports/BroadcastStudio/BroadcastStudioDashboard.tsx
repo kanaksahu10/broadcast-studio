@@ -256,12 +256,26 @@ function isDraftVisibleToRole(row: BroadcastMessageRow, role: UserRole): boolean
   return row.status !== 'Draft' || row.authorRole === role;
 }
 
-function isMessageCurrentlyLive(row: BroadcastMessageRow): boolean {
-  if (row.status !== 'Live' || row.startDate === '—') return false;
+/**
+ * Where a message sits in its display window today.
+ *
+ * A message with no end date runs until someone stops it, so its window has no
+ * upper bound. Treating the missing end as the start date — which three copies
+ * of this calculation used to do — made such a message Live for exactly one
+ * day and then neither Live nor Scheduled, so its card lost its badge
+ * entirely the day after it started.
+ */
+function getDisplayWindowStatus(row: BroadcastMessageRow): 'Live' | 'Scheduled' | 'Ended' | null {
+  if (row.startDate === '—') return null;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const start = new Date(row.startDate);
-  const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
-  return today >= start && today <= end;
+  if (today < start) return 'Scheduled';
+  if (row.endDate === '—') return 'Live'; // open-ended: started, never expires on its own
+  return today <= new Date(row.endDate) ? 'Live' : 'Ended';
+}
+
+function isMessageCurrentlyLive(row: BroadcastMessageRow): boolean {
+  return row.status === 'Live' && getDisplayWindowStatus(row) === 'Live';
 }
 
 // Whole days from today to a display-formatted date string ("Aug 10, 2026").
@@ -1760,12 +1774,9 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
           let liveBadge: React.ReactNode = null;
           let expiringCaption: React.ReactNode = null;
           if (row.status === 'Live' && row.startDate !== '—') {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const start = new Date(row.startDate);
-            const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
-            const isLive = today >= start && today <= end;
-            const isScheduled = today < start;
+            const windowStatus = getDisplayWindowStatus(row);
+            const isLive = windowStatus === 'Live';
+            const isScheduled = windowStatus === 'Scheduled';
             if (isLive) {
               liveBadge = (
                 <span className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]" style={{ backgroundColor: '#EEFFEE', color: '#00AA00' }}>
@@ -2235,14 +2246,9 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
   const featurePath = row.formData?.featurePath || '';
 
   // Determine live vs scheduled for the status chip.
-  let previewStatus: 'Live' | 'Scheduled' | null = null;
-  if (row.startDate !== '—') {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const start = new Date(row.startDate);
-    const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
-    if (today < start) previewStatus = 'Scheduled';
-    else if (today >= start && today <= end) previewStatus = 'Live';
-  }
+  const windowStatus = getDisplayWindowStatus(row);
+  const previewStatus: 'Live' | 'Scheduled' | null =
+    windowStatus === 'Live' || windowStatus === 'Scheduled' ? windowStatus : null;
   const chipBg = previewStatus === 'Live' ? '#EEFFEE' : previewStatus === 'Scheduled' ? '#E8F4FF' : '#F2F2F2';
   const chipColor = previewStatus === 'Live' ? '#00AA00' : previewStatus === 'Scheduled' ? '#2699FB' : '#585858';
   const scheduleRange = row.endDate !== '—' ? `${row.startDate} – ${row.endDate}` : row.startDate;
