@@ -700,7 +700,7 @@ function ToggleRow({ label, description, checked, onChange, disabled }: { label:
   return (
     <div className="border rounded-[4px] px-[12px] py-[16px] flex items-center justify-between gap-[12px] w-full" style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : '#fcfcfc' }}>
       <span className="flex flex-col gap-[2px] min-w-0">
-        <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: LABEL_GREY }}>
+        <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: NAVY }}>
           {label}
         </span>
         {description && (
