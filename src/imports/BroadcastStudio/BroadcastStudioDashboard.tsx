@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
-import { MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban } from 'react-icons/md';
+import { MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban, MdVisibility } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
 import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
 import { useIsBelowDesktop, useIsPhone } from './useIsPhone';
@@ -122,6 +122,23 @@ interface BroadcastMessageRow {
   authorRole?: UserRole;
   /** Optional note the approver left when rejecting. Only set on rejected messages. */
   rejectionReason?: string;
+  /**
+   * Which discarded bucket this row was moved to Draft from, via "Edit as
+   * Draft". Only meaningful while status is 'Draft' — lets the Drafts-column
+   * edit view retitle itself ("Edit Message - Rejected") and keep showing
+   * the rejection reason banner even after the message has left the
+   * discarded board entirely. A message resubmitted from here becomes a
+   * brand-new row that doesn't carry this forward.
+   */
+  originBucket?: DiscardedBucket;
+  /**
+   * Who authored this message before "Edit as Draft" reassigned ownership to
+   * whoever clicked it. Captured once, separately from formData.author —
+   * that field itself gets overwritten to the new editor on the very first
+   * save, so without a separate copy a second reopen would show the new
+   * editor's own name back to themselves as the "original" author.
+   */
+  originalAuthor?: string;
 }
 
 const STATUS_COLOR: Record<MessageStatus, string> = {
@@ -848,7 +865,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
 // from a previous version keeps them forever — and new fields (author,
 // department, authorRole, rejectionReason) read as undefined on those old
 // rows, which silently empties the Drafts and Pending columns.
-const STORAGE_KEY = 'bs-messages-v12';
+const STORAGE_KEY = 'bs-messages-v13';
 
 export function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
@@ -918,21 +935,29 @@ function NewMessageButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function ShowDiscardedToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+// A button rather than a toggle: it's not "on/off" settings state, it's a
+// view switch (active bucket vs. discarded bucket), so the control should
+// read like a navigation action — and its own label flips to say where it
+// would take you *back* to, same as the icon does.
+function ShowDiscardedButton({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  // Text-only, no bounding box — matches the plain-link button style used
+  // elsewhere in the app (e.g. the Clients screen's own "Show Discharged").
+  // Dark blue is the resting look regardless of checked state; hover is the
+  // only state that goes light blue, and only the label underlines there —
+  // a click doesn't leave the button looking "hovered".
   return (
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="group flex items-center gap-[8px] cursor-pointer shrink-0"
+      className="group flex items-center gap-[6px] shrink-0 cursor-pointer"
     >
-      <span
-        className="w-[32px] h-[18px] rounded-full flex items-center px-[2px] transition-colors shrink-0"
-        style={{ backgroundColor: checked ? '#2699fb' : '#d0d0d0', justifyContent: checked ? 'flex-end' : 'flex-start' }}
-      >
-        <span className="size-[14px] rounded-full bg-white shadow shrink-0" />
-      </span>
-      <span className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] uppercase whitespace-nowrap transition-colors text-[#27486d] group-hover:text-[#2699fb] group-hover:underline">
-        Show Discarded
+      {checked ? (
+        <MdVisibility className="shrink-0 text-[#27486d] group-hover:text-[#2699fb] transition-colors" size={16} />
+      ) : (
+        <MdDeleteOutline className="shrink-0 text-[#27486d] group-hover:text-[#2699fb] transition-colors" size={16} />
+      )}
+      <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase whitespace-nowrap transition-colors text-[#27486d] group-hover:text-[#2699fb] group-hover:underline">
+        {checked ? 'Show Active' : 'Show Discarded'}
       </span>
     </button>
   );
@@ -1646,24 +1671,20 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
         })()}
         <div className="flex items-center justify-between gap-[8px]">
           {(() => {
-            // Recipient count only means something once a message is approved and
-            // actually delivering — on Drafts and Pending the audience isn't final yet.
-            if (row.status !== 'Live') return <span />;
-            const agencies = row.formData?.statesOrAgencies ?? [];
-            const packages = row.formData?.packages ?? [];
-            const roles = row.formData?.roles ?? [];
+            // Shown on every active card now (Draft/Pending/Live alike) — even
+            // before a message is live, its formData already carries a draft
+            // audience, and always opening the same detail overlay (like the
+            // Live cards always did) is simpler than a status-gated condition
+            // that used to hide it on anything not yet approved.
             const count = getRecipientCount(row);
-            if (count === 0) return <span />;
-            const hasDetail = agencies.length > 0 || packages.length > 0 || roles.length > 0;
             return (
               <button
                 type="button"
-                className={`flex items-center gap-[5px] ${hasDetail ? 'group/recipients' : ''}`}
-                style={{ cursor: hasDetail ? 'pointer' : 'default' }}
-                onClick={(e) => { e.stopPropagation(); hasDetail && setShowAudience(true); }}
+                className="flex items-center gap-[5px] group/recipients cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); setShowAudience(true); }}
               >
                 <MdOutlineGroup size={15} color="#27496D" />
-                <span className={`font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px] text-[#27496d] transition-colors ${hasDetail ? 'group-hover/recipients:text-[#2699fb] group-hover/recipients:underline' : ''}`}>{count} {count === 1 ? 'Recipient' : 'Recipients'}</span>
+                <span className="font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px] text-[#27496d] transition-colors group-hover/recipients:text-[#2699fb] group-hover/recipients:underline">{count} {count === 1 ? 'Recipient' : 'Recipients'}</span>
               </button>
             );
           })()}
@@ -1686,6 +1707,7 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showAudience, setShowAudience] = useState(false);
   const [flickerOn, setFlickerOn] = useState(false);
   const [flickerActive, setFlickerActive] = useState(false);
   const kebabRef = useRef<HTMLDivElement>(null);
@@ -1713,6 +1735,9 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
 
   return (
     <>
+    {showAudience && row.formData && (
+      <AudienceOverlay formData={row.formData} recipientCount={getRecipientCount(row)} onClose={() => setShowAudience(false)} />
+    )}
     {showDeleteConfirm && (
       <PermanentDeleteOverlay
         subject={row.subject}
@@ -1776,8 +1801,15 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
           </div>
         </div>
         {getCategoryLabel(row) && <CategoryTag label={getCategoryLabel(row)!} />}
-        {/* Discarded messages aren't delivering, so the recipient count is dropped here. */}
-        <div className="flex items-center justify-end gap-[8px]">
+        <div className="flex items-center justify-between gap-[8px]">
+          <button
+            type="button"
+            className="flex items-center gap-[5px] group/recipients cursor-pointer"
+            onClick={(e) => { e.stopPropagation(); setShowAudience(true); }}
+          >
+            <MdOutlineGroup size={15} color="#27496D" />
+            <span className="font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px] text-[#27496d] transition-colors group-hover/recipients:text-[#2699fb] group-hover/recipients:underline">{getRecipientCount(row)} {getRecipientCount(row) === 1 ? 'Recipient' : 'Recipients'}</span>
+          </button>
           <p className="font-['Montserrat',sans-serif] font-normal text-[11px] leading-[15px] text-[#b8b8b8] shrink-0">
             Auto-deletes in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}
           </p>
@@ -2297,18 +2329,36 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
     showToast('Message discontinued');
   };
 
-  const handleCopyToDrafts = (row: BroadcastMessageRow) => {
-    const draft: BroadcastMessageRow = {
-      ...row,
-      id: Date.now().toString(),
+  // Moves a discarded (Rejected/Expired/Discontinued) message straight into
+  // Drafts — same row, same id, just a status change — rather than copying
+  // it into a brand-new row and leaving the original sitting in the
+  // discarded bucket. Fired the instant "Edit as Draft" is clicked, before
+  // the user has touched a single field: the overlay then switches itself
+  // into an editor for this same now-Draft row in place.
+  const handleEditAsDraft = (row: BroadcastMessageRow, bucket: DiscardedBucket) => {
+    setMessages((prev) => prev.map((m) => m.id === row.id ? {
+      ...m,
       status: 'Draft',
       startDate: '—',
       endDate: '—',
       recipients: null,
       statusChangedAt: undefined,
+      // Retained (not cleared) — the Drafts-column edit view still shows the
+      // rejection reason banner (muted styling) and needs it. originBucket is
+      // what lets that view — and its title — know this Draft came from here.
+      originBucket: bucket,
+      // Snapshot the pre-transition author before formData.author below gets
+      // reassigned — this is what the "Original Author" box reads from,
+      // kept separate from formData.author so it survives that field being
+      // overwritten again on save.
+      originalAuthor: m.formData?.author,
       authorRole: role,
-    };
-    setMessages((prev) => [draft, ...prev]);
+      // Reassigned immediately (not just inside the editor's own display, and
+      // not deferred until the first Save) — this is what the Drafts board
+      // card itself reads, and it's the user's own draft now, not whoever
+      // originally sent the message.
+      formData: m.formData ? { ...m.formData, author: getUserIdentity(role).name } : m.formData,
+    } : m));
     setSelectedStatus('Draft');
   };
 
@@ -2365,7 +2415,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           rather than reflow. */}
       <div className="flex items-center gap-[12px] w-full flex-wrap">
         <SearchInput value={search} onChange={setSearch} />
-        <ShowDiscardedToggle checked={showDiscarded} onChange={setShowDiscarded} />
+        <ShowDiscardedButton checked={showDiscarded} onChange={setShowDiscarded} />
         <NewMessageButton onClick={() => setIsComposeOpen(true)} />
         {/* The spacer only exists to push the view toggle right, so it is tied
             to it — left on its own in a wrapping row it would swallow the free
@@ -2412,8 +2462,13 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       {editingRow && (
         <ComposeMessageOverlay
           onClose={() => setEditingRow(null)}
-          overlayTitle="Edit Message"
+          overlayTitle={editingRow.originBucket ? `Edit Message - ${editingRow.originBucket}` : 'Edit Message'}
+          discardedBucketLabel={editingRow.originBucket}
+          originalAuthorName={editingRow.originalAuthor}
+          currentUserName={getUserIdentity(role).name}
           submitLabel={role === 'executive-approver' ? 'Publish' : 'Send for Approval'}
+          rejectionReason={editingRow.rejectionReason}
+          rejected={editingRow.originBucket === 'Rejected'}
           initialData={{
             title: editingRow.subject,
             messageType: editingRow.type,
@@ -2441,6 +2496,13 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
               recipients: null,
               authorRole: role,
               formData: data,
+              // Carried forward so re-saving a draft that came from a
+              // discarded message doesn't silently lose its "Edit Message -
+              // Rejected" title / reason banner / original-author note on
+              // the next open.
+              originBucket: editingRow!.originBucket,
+              rejectionReason: editingRow!.rejectionReason,
+              originalAuthor: editingRow!.originalAuthor,
             }, ...prev.filter((m) => m.id !== editingRow!.id)]);
             setSelectedStatus('Draft');
             setEditingRow(null);
@@ -2493,6 +2555,14 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
         <ComposeMessageOverlay
           onClose={() => setViewingDiscardedRow(null)}
           overlayTitle={`${viewingDiscardedRow.bucket} Message`}
+          discardedBucketLabel={viewingDiscardedRow.bucket}
+          // Falls back to the row's current formData.author for the very
+          // first "Edit as Draft" (before originalAuthor has ever been set);
+          // once set, that field takes over on any later reopen so this
+          // can't drift to whoever most recently edited it.
+          originalAuthorName={viewingDiscardedRow.row.originalAuthor ?? viewingDiscardedRow.row.formData?.author}
+          currentUserName={getUserIdentity(role).name}
+          submitLabel={role === 'executive-approver' ? 'Publish' : 'Send for Approval'}
           readOnly
           rejectionReason={getRejectionReason(viewingDiscardedRow.row)}
           rejected={viewingDiscardedRow.bucket === 'Rejected'}
@@ -2504,7 +2574,34 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
             ...viewingDiscardedRow.row.formData,
           }}
           onDeleteRow={() => { handleDelete(viewingDiscardedRow.row.id); setViewingDiscardedRow(null); }}
-          onCopyToDrafts={role === 'super-admin' ? () => { handleCopyToDrafts(viewingDiscardedRow.row); setViewingDiscardedRow(null); } : undefined}
+          // Moves the row to Draft immediately — the overlay itself then
+          // flips into an editor for this same row, in place. Nothing
+          // closes here; onSaveAsDraft/onMessageCreated below (reachable
+          // only once that edit mode is on) are what eventually close it.
+          // Available to any role — resurrecting a discarded message into a
+          // draft isn't a Super Admin-only action, same as Delete above.
+          onEditAsDraft={() => handleEditAsDraft(viewingDiscardedRow.row, viewingDiscardedRow.bucket)}
+          onSaveAsDraft={(data) => {
+            const agencies = data.statesOrAgencies ?? [];
+            const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;
+            setMessages((prev) => prev.map((m) => m.id === viewingDiscardedRow.row.id ? {
+              ...m,
+              subject: data.title || 'Untitled Draft',
+              type: (data.messageType as MessageType) || '',
+              audience,
+              startDate: data.startDate ? formatDisplayDate(data.startDate) : '—',
+              endDate: data.endDate ? formatDisplayDate(data.endDate) : '—',
+              formData: data,
+            } : m));
+            setSelectedStatus('Draft');
+            setViewingDiscardedRow(null);
+            showToast('Draft saved');
+          }}
+          onMessageCreated={(data) => {
+            setMessages((prev) => prev.filter((m) => m.id !== viewingDiscardedRow.row.id));
+            handleMessageCreated(data);
+            setViewingDiscardedRow(null);
+          }}
         />
       )}
 
