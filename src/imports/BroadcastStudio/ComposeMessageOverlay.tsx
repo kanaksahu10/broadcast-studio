@@ -120,6 +120,8 @@ const BORDER = '#e5e5e5';
 const LABEL_GREY = '#646464';
 const NAVY = '#334c6d';
 const PRIMARY = '#2699fb';
+/** Core/Primary/Background — the tinted blue behind primary-flavoured rows. */
+const PRIMARY_BG = '#E8F4FF';
 const ICON_LIGHT = '#8a8a8a';
 const PLACEHOLDER = '#b8b8b8';
 
@@ -782,8 +784,10 @@ function BannerPreview({
         the message, this is an action on it. On Background/Global so it reads
         as part of the page, and the height simply hugs the line. */}
     {allowOptOut && (
-      <div className="w-full px-[16px] py-[8px] flex items-center justify-center" style={{ backgroundColor: '#F8F8F8' }}>
-        <span className="font-['Montserrat',sans-serif] font-normal italic text-[12px] leading-[17px] cursor-pointer" style={{ color: '#585858' }}>
+      <div className="w-full px-[16px] py-[8px] flex items-center justify-center" style={{ backgroundColor: PRIMARY_BG }}>
+        {/* Same treatment as the overlay's own opt-out link, so the action
+            looks the same wherever a recipient meets it. */}
+        <span className="font-['Montserrat',sans-serif] font-medium text-[11px] tracking-wide uppercase whitespace-nowrap cursor-pointer" style={{ color: NAVY }}>
           Don't show again
         </span>
       </div>
