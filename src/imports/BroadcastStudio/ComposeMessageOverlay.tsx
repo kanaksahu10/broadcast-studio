@@ -4,7 +4,7 @@ import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline } from 'react-icons/md';
+import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline } from 'react-icons/md';
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
@@ -23,37 +23,55 @@ interface Agency {
   state: string;
   package: string;
   role: string;
+  /** Feature flags enabled for this agency — an agency can have several. */
+  featureFlags: string[];
   employeeCount: number;
 }
 
 const AGENCIES: Agency[] = [
-  { id: '1', name: 'Sunrise Home Care', state: 'California', package: 'Enterprise', role: 'Owner', employeeCount: 1200 },
-  { id: '2', name: 'Golden Gate Health Partners', state: 'California', package: 'Premium', role: 'Admin', employeeCount: 340 },
-  { id: '3', name: 'Lone Star Caregivers', state: 'Texas', package: 'Standard', role: 'Care Coordinator', employeeCount: 210 },
-  { id: '4', name: 'Austin Family Support', state: 'Texas', package: 'Premium', role: 'Admin', employeeCount: 180 },
-  { id: '5', name: 'Empire Homecare Group', state: 'New York', package: 'Enterprise', role: 'Owner', employeeCount: 950 },
-  { id: '6', name: 'Brooklyn Senior Services', state: 'New York', package: 'Standard', role: 'Field Staff', employeeCount: 275 },
-  { id: '7', name: 'Sunshine State Care', state: 'Florida', package: 'Premium', role: 'Care Coordinator', employeeCount: 410 },
-  { id: '8', name: 'Everglades Health Network', state: 'Florida', package: 'Standard', role: 'Admin', employeeCount: 165 },
-  { id: '9', name: 'Cascade Caregivers', state: 'Washington', package: 'Enterprise', role: 'Owner', employeeCount: 530 },
-  { id: '10', name: 'Windy City Homecare', state: 'Illinois', package: 'Premium', role: 'Field Staff', employeeCount: 295 },
+  { id: '1', name: 'Sunrise Home Care', state: 'California', package: 'Enterprise', role: 'Owner', featureFlags: ['Smart Billing', 'Advanced Scheduling', 'Family Portal'], employeeCount: 1200 },
+  { id: '2', name: 'Golden Gate Health Partners', state: 'California', package: 'Premium', role: 'Admin', featureFlags: ['Smart Billing', 'eMAR'], employeeCount: 340 },
+  { id: '3', name: 'Lone Star Caregivers', state: 'Texas', package: 'Standard', role: 'Care Coordinator', featureFlags: ['Advanced Scheduling'], employeeCount: 210 },
+  { id: '4', name: 'Austin Family Support', state: 'Texas', package: 'Premium', role: 'Admin', featureFlags: ['Smart Billing', 'Family Portal'], employeeCount: 180 },
+  { id: '5', name: 'Empire Homecare Group', state: 'New York', package: 'Enterprise', role: 'Owner', featureFlags: ['Smart Billing', 'Advanced Scheduling', 'eMAR', 'Family Portal'], employeeCount: 950 },
+  { id: '6', name: 'Brooklyn Senior Services', state: 'New York', package: 'Standard', role: 'Field Staff', featureFlags: ['eMAR'], employeeCount: 275 },
+  { id: '7', name: 'Sunshine State Care', state: 'Florida', package: 'Premium', role: 'Care Coordinator', featureFlags: ['Advanced Scheduling', 'Family Portal'], employeeCount: 410 },
+  { id: '8', name: 'Everglades Health Network', state: 'Florida', package: 'Standard', role: 'Admin', featureFlags: ['Smart Billing'], employeeCount: 165 },
+  { id: '9', name: 'Cascade Caregivers', state: 'Washington', package: 'Enterprise', role: 'Owner', featureFlags: ['Advanced Scheduling', 'eMAR'], employeeCount: 530 },
+  { id: '10', name: 'Windy City Homecare', state: 'Illinois', package: 'Premium', role: 'Field Staff', featureFlags: ['Family Portal'], employeeCount: 295 },
 ];
 
 const STATES = Array.from(new Set(AGENCIES.map((a) => a.state)));
 const PACKAGES = Array.from(new Set(AGENCIES.map((a) => a.package)));
 const ROLES = Array.from(new Set(AGENCIES.map((a) => a.role)));
+const FEATURE_FLAGS = Array.from(new Set(AGENCIES.flatMap((a) => a.featureFlags))).sort();
 
 /**
  * Recipient count = number of employees within the selected agencies/states,
  * further filtered down by package and role (an intersection over AGENCIES,
  * not a count of selected filter chips).
  */
-export function getAudienceRecipientCount(statesOrAgencies: string[], packages: string[], roles: string[], searchMode: string = 'Agency'): number {
-  let matching = searchMode === 'State'
-    ? (statesOrAgencies.length > 0 ? AGENCIES.filter((a) => statesOrAgencies.includes(a.state)) : [])
-    : (statesOrAgencies.length > 0 ? AGENCIES.filter((a) => statesOrAgencies.includes(a.name)) : []);
+export type AudienceSelection = {
+  agencies?: string[];
+  states?: string[];
+  packages?: string[];
+  roles?: string[];
+  featureFlags?: string[];
+};
+
+/**
+ * Every provided facet narrows the audience — they AND together. An empty facet
+ * is "no constraint" rather than "match nothing", except that agencies and
+ * states are the starting set: with neither, nothing is targeted yet.
+ */
+export function getAudienceRecipientCount({ agencies = [], states = [], packages = [], roles = [], featureFlags = [] }: AudienceSelection): number {
+  if (agencies.length === 0 && states.length === 0) return 0;
+  let matching = AGENCIES.filter((a) =>
+    (agencies.length === 0 || agencies.includes(a.name)) &&
+    (states.length === 0 || states.includes(a.state)));
   if (packages.length > 0) matching = matching.filter((a) => packages.includes(a.package));
   if (roles.length > 0) matching = matching.filter((a) => roles.includes(a.role));
+  if (featureFlags.length > 0) matching = matching.filter((a) => featureFlags.some((f) => a.featureFlags.includes(f)));
   return matching.reduce((sum, a) => sum + a.employeeCount, 0);
 }
 const STATE_ABBR: Record<string, string> = {
@@ -417,13 +435,14 @@ function DateField({ label, value, onChange, disabled }: { label: string; value:
   );
 }
 
-type MultiSelectVariant = 'agency' | 'state' | 'package' | 'role' | 'default';
+type MultiSelectVariant = 'agency' | 'state' | 'package' | 'role' | 'feature' | 'default';
 
 function OptionIcon({ variant, name }: { variant: MultiSelectVariant; name: string }) {
   const base = 'size-[20px] rounded-full flex items-center justify-center shrink-0';
   if (variant === 'agency') return <span className={base} style={{ backgroundColor: '#2699FB' }}><MdBusiness size={11} color="white" /></span>;
   if (variant === 'role') return <span className={base} style={{ backgroundColor: '#2ECC71' }}><BsPersonBadgeFill size={11} color="white" /></span>;
   if (variant === 'package') return <span className={base} style={{ backgroundColor: '#2699FB' }}><MdApps size={11} color="white" /></span>;
+  if (variant === 'feature') return <span className={base} style={{ backgroundColor: '#2699FB' }}><MdOutlinedFlag size={11} color="white" /></span>;
   if (variant === 'state') {
     const abbr = (STATE_ABBR[name] ?? name.slice(0, 2)).toUpperCase();
     return <span className={`${base} font-['Montserrat',sans-serif] font-bold text-[8px] text-white`} style={{ backgroundColor: stateColor(name) }}>{abbr}</span>;
@@ -1153,7 +1172,10 @@ type FormData = {
   placement?: string;
   featurePath?: string;
   messageColor?: string;
+  /** Retained so older saved rows still parse; superseded by `states`. */
   searchMode?: string;
+  states?: string[];
+  featureFlags?: string[];
   statesOrAgencies?: string[];
   packages?: string[];
   roles?: string[];
@@ -1302,7 +1324,8 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [ctaDestination, setCtaDestination] = useState(initialData?.ctaDestination ?? '');
   const [stopOnCtaClick, setStopOnCtaClick] = useState(initialData?.stopOnCtaClick ?? false);
 
-  const [searchMode, setSearchMode] = useState<SearchMode>((initialData?.searchMode as SearchMode) ?? 'Agency');
+  const [states, setStates] = useState<string[]>(initialData?.states ?? []);
+  const [featureFlags, setFeatureFlags] = useState<string[]>(initialData?.featureFlags ?? []);
   const [statesOrAgencies, setStatesOrAgencies] = useState<string[]>(initialData?.statesOrAgencies ?? []);
   const [packages, setPackages] = useState<string[]>(initialData?.packages ?? []);
   const [roles, setRoles] = useState<string[]>(initialData?.roles ?? []);
@@ -1364,33 +1387,30 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
   const isEmergency = displayFormat === 'Banner' && messageColor === '#DA4040';
 
-  const audienceCount = getAudienceRecipientCount(statesOrAgencies, packages, roles, searchMode);
+  const audienceCount = getAudienceRecipientCount({ agencies: statesOrAgencies, states, packages, roles, featureFlags });
+  // Nothing may be sent to nobody — this gates submission and reddens the count.
+  const hasNoRecipients = audienceCount === 0;
 
   const isFormValid =
+    !hasNoRecipients &&
     title.trim() !== '' &&
     body.trim() !== '' &&
     reason.trim() !== '' &&
     department !== '' &&
     displayFormat !== '' &&
     startDate !== '' &&
-    statesOrAgencies.length > 0 &&
     (!hasCta || (ctaLabel.trim() !== '' && ctaDestination.trim() !== '')) &&
     placement !== '' &&
     (placement !== 'Feature Specific' || featurePath !== '');
 
   const showFooter = editingAsDraft || !!onDeleteRow || !!onEditAsDraft || !!(onApprove && onReject) || !effectiveReadOnly;
 
-  const handleSearchModeChange = (v: string) => {
-    setSearchMode(v as SearchMode);
-    setStatesOrAgencies([]);
-  };
-
   const messageType: MessageType = displayFormat === '' ? '' : (isEmergency ? 'Emergency' : 'Announcement');
   // Computed directly (not just left to the effect above) so a submit that
   // lands in the same render as switching to Overlay can't slip through
   // with a stale Non-Dismissible value before the effect has a chance to run.
   const savedDismissible: Dismissible = displayFormat === 'Overlay' ? 'Dismissible' : dismissible;
-  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, searchMode, statesOrAgencies, packages, roles, dismissible: savedDismissible, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
+  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, statesOrAgencies, states, featureFlags, packages, roles, dismissible: savedDismissible, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
 
   const handleSubmit = () => {
     onMessageCreated?.(allFormData);
@@ -1565,7 +1585,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             )}
             <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={effectiveReadOnly} />
             <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={effectiveReadOnly} />
-            <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
+            <TextAreaField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
           </div>
 
           {/* Date & Time card */}
@@ -1585,20 +1605,19 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <div className="flex flex-col">
               <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Audience</p>
-              <p className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] text-[#585858]">
+              <p
+                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px]"
+                style={{ color: hasNoRecipients ? '#DA4040' : '#585858' }}
+              >
                 {audienceCount} {audienceCount === 1 ? 'recipient' : 'recipients'} will see this message
               </p>
             </div>
-            <RadioField label="Search By *" value={searchMode} onChange={handleSearchModeChange} options={['Agency', 'State']} disabled={effectiveReadOnly} />
-            <MultiSelectField
-              label={searchMode === 'Agency' ? 'Agency *' : 'State *'}
-              values={statesOrAgencies}
-              onChange={setStatesOrAgencies}
-              placeholder={searchMode === 'State' ? 'Select states...' : 'Select agencies...'}
-              options={searchMode === 'Agency' ? AGENCIES.map((a) => a.name) : STATES}
-              disabled={effectiveReadOnly}
-              variant={searchMode === 'Agency' ? 'agency' : 'state'}
-            />
+            {/* Agency and State are both first-class now rather than two modes of
+                one field — targeting "Texas agencies on Premium" needed both at
+                once, which the old Search By radio made impossible. */}
+            <MultiSelectField label="Agency" values={statesOrAgencies} onChange={setStatesOrAgencies} placeholder="Select agencies..." options={AGENCIES.map((a) => a.name)} disabled={effectiveReadOnly} variant="agency" />
+            <MultiSelectField label="State" values={states} onChange={setStates} placeholder="Select states..." options={STATES} disabled={effectiveReadOnly} variant="state" />
+            <MultiSelectField label="Feature Flag" values={featureFlags} onChange={setFeatureFlags} placeholder="Select feature flags..." options={FEATURE_FLAGS} disabled={effectiveReadOnly} variant="feature" />
             <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} disabled={effectiveReadOnly} variant="package" />
             <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} disabled={effectiveReadOnly} variant="role" />
           </div>
@@ -1762,13 +1781,18 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                   {submitLabel ?? 'Send for Approval'}
                 </span>
               </button>
+              {/* An empty audience takes precedence over the generic required-fields
+                  message: it is the more specific reason, and it is the one a
+                  filled-in-looking form will otherwise leave unexplained. */}
               {!isFormValid && (
                 <div
-                  className="absolute bottom-full right-0 mb-[8px] w-max max-w-[220px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 rounded-[4px] px-[8px] py-[10px] z-50"
+                  className="absolute bottom-full right-0 mb-[8px] w-max max-w-[240px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 rounded-[4px] px-[8px] py-[10px] z-50"
                   style={{ backgroundColor: '#3b5c79' }}
                 >
                   <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-white leading-[17px]">
-                    Please fill in all required fields to proceed
+                    {hasNoRecipients
+                      ? 'This message would reach 0 recipients. Widen the audience before sending.'
+                      : 'Please fill in all required fields to proceed'}
                   </p>
                 </div>
               )}

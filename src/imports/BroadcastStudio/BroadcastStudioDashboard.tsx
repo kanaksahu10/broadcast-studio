@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
-import { MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban, MdVisibility } from 'react-icons/md';
+import { MdOutlineLocationOn, MdOutlinedFlag, MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban, MdVisibility } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
 import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
 import { useIsBelowDesktop, useIsPhone } from './useIsPhone';
@@ -95,7 +95,7 @@ type MessageType = '' | 'Announcement' | 'Emergency';
 
 interface MessageFormData {
   body?: string; reason?: string; department?: string; messageCategory?: string; customCategoryName?: string; author?: string; noEndDate?: boolean; displayFormat?: string; placement?: string; featurePath?: string;
-  messageColor?: string; searchMode?: string; statesOrAgencies?: string[];
+  messageColor?: string; searchMode?: string; statesOrAgencies?: string[]; states?: string[]; featureFlags?: string[];
   packages?: string[]; roles?: string[]; dismissible?: string; hasCta?: boolean;
   ctaLabel?: string; ctaDestination?: string; pushNotification?: boolean;
 }
@@ -301,11 +301,13 @@ function CategoryTag({ label }: { label: string }) {
 }
 
 function getRecipientCount(row: BroadcastMessageRow): number {
-  const agencies = row.formData?.statesOrAgencies ?? [];
-  const packages = row.formData?.packages ?? [];
-  const roles = row.formData?.roles ?? [];
-  if (agencies.length === 0) return row.recipients ?? 0;
-  return getAudienceRecipientCount(agencies, packages, roles, row.formData?.searchMode) || (row.recipients ?? 0);
+  const f = row.formData;
+  const agencies = f?.statesOrAgencies ?? [];
+  const states = f?.states ?? [];
+  if (agencies.length === 0 && states.length === 0) return row.recipients ?? 0;
+  return getAudienceRecipientCount({
+    agencies, states, packages: f?.packages ?? [], roles: f?.roles ?? [], featureFlags: f?.featureFlags ?? [],
+  }) || (row.recipients ?? 0);
 }
 
 function formatDisplayDate(dateStr: string): string {
@@ -1210,13 +1212,15 @@ function ColumnInfoTooltip({ label, icon }: { label: string; icon?: React.ReactN
   );
 }
 
-function AudienceChip({ label, variant }: { label: string; variant: 'agency' | 'package' | 'role' }) {
+function AudienceChip({ label, variant }: { label: string; variant: 'agency' | 'state' | 'package' | 'role' | 'feature' }) {
   const iconMap = {
     agency: <BiBuildings size={12} color="white" />,
+    state: <MdOutlineLocationOn size={12} color="white" />,
+    feature: <MdOutlinedFlag size={12} color="white" />,
     package: <MdApps size={11} color="white" />,
     role: <BsPersonBadgeFill size={11} color="white" />,
   };
-  const bgMap = { agency: '#2699FB', package: '#2699FB', role: '#2ECC71' };
+  const bgMap = { agency: '#2699FB', state: '#8E44AD', feature: '#2699FB', package: '#2699FB', role: '#2ECC71' };
   return (
     <span className="flex items-center gap-[8px] pl-[4px] pr-[8px] h-[29px] rounded-full border shrink-0" style={{ backgroundColor: '#F2F2F2', borderColor: '#E5E5E5' }}>
       <span className="rounded-full size-[20px] flex items-center justify-center shrink-0" style={{ backgroundColor: bgMap[variant] }}>
@@ -1227,7 +1231,7 @@ function AudienceChip({ label, variant }: { label: string; variant: 'agency' | '
   );
 }
 
-function AudienceSection({ label, items, variant }: { label: string; items: string[]; variant: 'agency' | 'package' | 'role' }) {
+function AudienceSection({ label, items, variant }: { label: string; items: string[]; variant: 'agency' | 'state' | 'package' | 'role' | 'feature' }) {
   if (items.length === 0) return null;
   return (
     <div className="bg-white border rounded-[4px] flex flex-col gap-[8px] px-[8px] py-[12px]" style={{ borderColor: '#E5E5E5' }}>
@@ -1241,6 +1245,8 @@ function AudienceSection({ label, items, variant }: { label: string; items: stri
 
 function AudienceOverlay({ formData, recipientCount, onClose }: { formData: NonNullable<BroadcastMessageRow['formData']>; recipientCount: number; onClose: () => void }) {
   const agencies = formData.statesOrAgencies ?? [];
+  const states = formData.states ?? [];
+  const featureFlags = formData.featureFlags ?? [];
   const packages = formData.packages ?? [];
   const roles = formData.roles ?? [];
   const [mounted, setMounted] = useState(false);
@@ -1272,11 +1278,13 @@ function AudienceOverlay({ formData, recipientCount, onClose }: { formData: NonN
           </button>
         </div>
         <p className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] text-[#585858] px-[16px] pt-[12px] shrink-0">
-          {recipientCount} {recipientCount === 1 ? 'recipient' : 'recipients'} will see this message
+            {recipientCount} {recipientCount === 1 ? 'recipient' : 'recipients'} will see this message
         </p>
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-[16px] py-[16px] flex flex-col gap-[12px]">
           <AudienceSection label="Agencies" items={agencies} variant="agency" />
+          <AudienceSection label="States" items={states} variant="state" />
+          <AudienceSection label="Feature Flags" items={featureFlags} variant="feature" />
           <AudienceSection label="Packages" items={packages} variant="package" />
           <AudienceSection label="Roles" items={roles} variant="role" />
         </div>
