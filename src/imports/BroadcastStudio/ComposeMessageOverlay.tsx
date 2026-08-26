@@ -4,7 +4,7 @@ import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline } from 'react-icons/md';
+import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline } from 'react-icons/md';
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
@@ -23,38 +23,74 @@ interface Agency {
   state: string;
   package: string;
   role: string;
+  /** Feature flags enabled for this agency — an agency can have several. */
+  featureFlags: string[];
+  /**
+   * How many of this agency's people can actually receive a push: app
+   * installed and notifications allowed. Always <= employeeCount, and the gap
+   * varies by agency, so it is stored rather than derived from a flat rate.
+   */
+  pushEnabledCount: number;
   employeeCount: number;
 }
 
 const AGENCIES: Agency[] = [
-  { id: '1', name: 'Sunrise Home Care', state: 'California', package: 'Enterprise', role: 'Owner', employeeCount: 1200 },
-  { id: '2', name: 'Golden Gate Health Partners', state: 'California', package: 'Premium', role: 'Admin', employeeCount: 340 },
-  { id: '3', name: 'Lone Star Caregivers', state: 'Texas', package: 'Standard', role: 'Care Coordinator', employeeCount: 210 },
-  { id: '4', name: 'Austin Family Support', state: 'Texas', package: 'Premium', role: 'Admin', employeeCount: 180 },
-  { id: '5', name: 'Empire Homecare Group', state: 'New York', package: 'Enterprise', role: 'Owner', employeeCount: 950 },
-  { id: '6', name: 'Brooklyn Senior Services', state: 'New York', package: 'Standard', role: 'Field Staff', employeeCount: 275 },
-  { id: '7', name: 'Sunshine State Care', state: 'Florida', package: 'Premium', role: 'Care Coordinator', employeeCount: 410 },
-  { id: '8', name: 'Everglades Health Network', state: 'Florida', package: 'Standard', role: 'Admin', employeeCount: 165 },
-  { id: '9', name: 'Cascade Caregivers', state: 'Washington', package: 'Enterprise', role: 'Owner', employeeCount: 530 },
-  { id: '10', name: 'Windy City Homecare', state: 'Illinois', package: 'Premium', role: 'Field Staff', employeeCount: 295 },
+  { id: '1', name: 'Sunrise Home Care', state: 'California', package: 'Enterprise', role: 'Owner', featureFlags: ['Smart Billing', 'Advanced Scheduling', 'Family Portal'], pushEnabledCount: 910, employeeCount: 1200 },
+  { id: '2', name: 'Golden Gate Health Partners', state: 'California', package: 'Premium', role: 'Admin', featureFlags: ['Smart Billing', 'eMAR'], pushEnabledCount: 244, employeeCount: 340 },
+  { id: '3', name: 'Lone Star Caregivers', state: 'Texas', package: 'Standard', role: 'Care Coordinator', featureFlags: ['Advanced Scheduling'], pushEnabledCount: 121, employeeCount: 210 },
+  { id: '4', name: 'Austin Family Support', state: 'Texas', package: 'Premium', role: 'Admin', featureFlags: ['Smart Billing', 'Family Portal'], pushEnabledCount: 143, employeeCount: 180 },
+  { id: '5', name: 'Empire Homecare Group', state: 'New York', package: 'Enterprise', role: 'Owner', featureFlags: ['Smart Billing', 'Advanced Scheduling', 'eMAR', 'Family Portal'], pushEnabledCount: 602, employeeCount: 950 },
+  { id: '6', name: 'Brooklyn Senior Services', state: 'New York', package: 'Standard', role: 'Field Staff', featureFlags: ['eMAR'], pushEnabledCount: 198, employeeCount: 275 },
+  { id: '7', name: 'Sunshine State Care', state: 'Florida', package: 'Premium', role: 'Care Coordinator', featureFlags: ['Advanced Scheduling', 'Family Portal'], pushEnabledCount: 351, employeeCount: 410 },
+  { id: '8', name: 'Everglades Health Network', state: 'Florida', package: 'Standard', role: 'Admin', featureFlags: ['Smart Billing'], pushEnabledCount: 0, employeeCount: 165 },
+  { id: '9', name: 'Cascade Caregivers', state: 'Washington', package: 'Enterprise', role: 'Owner', featureFlags: ['Advanced Scheduling', 'eMAR'], pushEnabledCount: 404, employeeCount: 530 },
+  { id: '10', name: 'Windy City Homecare', state: 'Illinois', package: 'Premium', role: 'Field Staff', featureFlags: ['Family Portal'], pushEnabledCount: 166, employeeCount: 295 },
 ];
 
 const STATES = Array.from(new Set(AGENCIES.map((a) => a.state)));
 const PACKAGES = Array.from(new Set(AGENCIES.map((a) => a.package)));
 const ROLES = Array.from(new Set(AGENCIES.map((a) => a.role)));
+const FEATURE_FLAGS = Array.from(new Set(AGENCIES.flatMap((a) => a.featureFlags))).sort();
 
 /**
  * Recipient count = number of employees within the selected agencies/states,
  * further filtered down by package and role (an intersection over AGENCIES,
  * not a count of selected filter chips).
  */
-export function getAudienceRecipientCount(statesOrAgencies: string[], packages: string[], roles: string[], searchMode: string = 'Agency'): number {
-  let matching = searchMode === 'State'
-    ? (statesOrAgencies.length > 0 ? AGENCIES.filter((a) => statesOrAgencies.includes(a.state)) : [])
-    : (statesOrAgencies.length > 0 ? AGENCIES.filter((a) => statesOrAgencies.includes(a.name)) : []);
+export type AudienceSelection = {
+  agencies?: string[];
+  states?: string[];
+  packages?: string[];
+  roles?: string[];
+  featureFlags?: string[];
+};
+
+/**
+ * Every provided facet narrows the audience — they AND together. An empty facet
+ * is "no constraint" rather than "match nothing", except that agencies and
+ * states are the starting set: with neither, nothing is targeted yet.
+ */
+function getMatchingAgencies({ agencies = [], states = [], packages = [], roles = [], featureFlags = [] }: AudienceSelection): Agency[] {
+  if (agencies.length === 0 && states.length === 0) return [];
+  let matching = AGENCIES.filter((a) =>
+    (agencies.length === 0 || agencies.includes(a.name)) &&
+    (states.length === 0 || states.includes(a.state)));
   if (packages.length > 0) matching = matching.filter((a) => packages.includes(a.package));
   if (roles.length > 0) matching = matching.filter((a) => roles.includes(a.role));
-  return matching.reduce((sum, a) => sum + a.employeeCount, 0);
+  if (featureFlags.length > 0) matching = matching.filter((a) => featureFlags.some((f) => a.featureFlags.includes(f)));
+  return matching;
+}
+
+export function getAudienceRecipientCount(selection: AudienceSelection): number {
+  return getMatchingAgencies(selection).reduce((sum, a) => sum + a.employeeCount, 0);
+}
+
+/**
+ * How many of the selected audience can actually be reached by push. Always a
+ * subset of the recipient count — the rest see the message in-app only.
+ */
+export function getAudiencePushCount(selection: AudienceSelection): number {
+  return getMatchingAgencies(selection).reduce((sum, a) => sum + a.pushEnabledCount, 0);
 }
 const STATE_ABBR: Record<string, string> = {
   'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
@@ -100,8 +136,12 @@ const PREVIEW_ON_LEFT = false;
 /* -- Design tokens copied from the GEOH "Overlay - New Message" Figma frame -- */
 const BORDER = '#e5e5e5';
 const LABEL_GREY = '#646464';
+/** Figma Text.Light — the subtext colour under a bounded-card label. */
+const TEXT_LIGHT = '#8B8B8B';
 const NAVY = '#334c6d';
 const PRIMARY = '#2699fb';
+/** Core/Primary/Background — the tinted blue behind primary-flavoured rows. */
+const PRIMARY_BG = '#E8F4FF';
 const ICON_LIGHT = '#8a8a8a';
 const PLACEHOLDER = '#b8b8b8';
 
@@ -109,7 +149,7 @@ function SectionHeader({ children }: { children: string }) {
   return <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px] text-black w-full">{children}</p>;
 }
 
-function FieldShell({ label, height, disabled, open, children }: { label: string; height?: number; disabled?: boolean; open?: boolean; children: React.ReactNode }) {
+function FieldShell({ label, height, disabled, open, subtext, children }: { label: string; height?: number; disabled?: boolean; open?: boolean; subtext?: string; children: React.ReactNode }) {
   return (
     <div
       className={`border px-[12px] py-[8px] flex flex-col gap-[8px] justify-center w-full ${open ? 'rounded-t-[4px]' : 'rounded-[4px]'}`}
@@ -119,6 +159,11 @@ function FieldShell({ label, height, disabled, open, children }: { label: string
         {label}
       </p>
       {children}
+      {subtext && (
+        <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] mt-[4px]" style={{ color: '#B8B8B8' }}>
+          {subtext}
+        </p>
+      )}
     </div>
   );
 }
@@ -417,13 +462,14 @@ function DateField({ label, value, onChange, disabled }: { label: string; value:
   );
 }
 
-type MultiSelectVariant = 'agency' | 'state' | 'package' | 'role' | 'default';
+type MultiSelectVariant = 'agency' | 'state' | 'package' | 'role' | 'feature' | 'default';
 
 function OptionIcon({ variant, name }: { variant: MultiSelectVariant; name: string }) {
   const base = 'size-[20px] rounded-full flex items-center justify-center shrink-0';
   if (variant === 'agency') return <span className={base} style={{ backgroundColor: '#2699FB' }}><MdBusiness size={11} color="white" /></span>;
   if (variant === 'role') return <span className={base} style={{ backgroundColor: '#2ECC71' }}><BsPersonBadgeFill size={11} color="white" /></span>;
   if (variant === 'package') return <span className={base} style={{ backgroundColor: '#2699FB' }}><MdApps size={11} color="white" /></span>;
+  if (variant === 'feature') return <span className={base} style={{ backgroundColor: '#2699FB' }}><MdOutlinedFlag size={11} color="white" /></span>;
   if (variant === 'state') {
     const abbr = (STATE_ABBR[name] ?? name.slice(0, 2)).toUpperCase();
     return <span className={`${base} font-['Montserrat',sans-serif] font-bold text-[8px] text-white`} style={{ backgroundColor: stateColor(name) }}>{abbr}</span>;
@@ -556,9 +602,9 @@ function RadioDot({ selected }: { selected: boolean }) {
   );
 }
 
-function RadioField({ label, value, onChange, options, disabled }: { label: string; value: string; onChange: (v: string) => void; options: string[]; disabled?: boolean }) {
+function RadioField({ label, value, onChange, options, disabled, subtext }: { label: string; value: string; onChange: (v: string) => void; options: string[]; disabled?: boolean; subtext?: string }) {
   return (
-    <FieldShell label={label} disabled={disabled}>
+    <FieldShell label={label} disabled={disabled} subtext={subtext}>
       <div className="flex gap-[16px] items-center w-full">
         {options.map((opt) => (
           <button key={opt} type="button" onClick={() => onChange(opt)} className="flex items-center gap-[8px] cursor-pointer">
@@ -571,9 +617,9 @@ function RadioField({ label, value, onChange, options, disabled }: { label: stri
   );
 }
 
-function ColorField({ label, value, onChange, options, optionLabels, disabled }: { label: string; value: string; onChange: (v: string) => void; options: string[]; optionLabels?: Record<string, string>; disabled?: boolean }) {
+function ColorField({ label, value, onChange, options, optionLabels, disabled, subtext }: { label: string; value: string; onChange: (v: string) => void; options: string[]; optionLabels?: Record<string, string>; disabled?: boolean; subtext?: string }) {
   return (
-    <FieldShell label={label} disabled={disabled}>
+    <FieldShell label={label} disabled={disabled} subtext={subtext}>
       <div className="flex flex-col gap-[14px] w-full pb-[6px]">
         {options.map((opt) => (
           <button
@@ -617,12 +663,52 @@ function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onCha
   );
 }
 
-function ToggleRow({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+/**
+ * A bounded checkbox card — same frame as ToggleRow, so the opt-in controls at
+ * the foot of Display Settings read as one family. Carries a description line
+ * because "Don't Show Again" alone does not say who it affects.
+ */
+function CheckboxCard({ title, description, checked, onChange, disabled }: { title: string; description: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
-    <div className="border rounded-[4px] px-[12px] py-[16px] flex items-center justify-between w-full" style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : '#fcfcfc' }}>
-      <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: NAVY }}>
-        {label}
-      </p>
+    <button
+      type="button"
+      onClick={() => !disabled && onChange(!checked)}
+      className="border rounded-[4px] px-[12px] py-[16px] flex items-start gap-[10px] w-full text-left"
+      style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : '#fcfcfc', cursor: disabled ? 'default' : 'pointer' }}
+    >
+      <span
+        className="flex items-center justify-center shrink-0 transition-colors mt-[1px]"
+        style={{
+          width: 18,
+          height: 18,
+          border: `1.5px solid ${checked ? PRIMARY : ICON_LIGHT}`,
+          backgroundColor: 'white',
+          opacity: disabled ? 0.5 : 1,
+        }}
+      >
+        {checked && <RiCheckLine size={13} color={PRIMARY} />}
+      </span>
+      <span className="flex flex-col gap-[2px] min-w-0">
+        <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: NAVY }}>{title}</span>
+        <span className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: TEXT_LIGHT }}>{description}</span>
+      </span>
+    </button>
+  );
+}
+
+function ToggleRow({ label, description, checked, onChange, disabled }: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <div className="border rounded-[4px] px-[12px] py-[16px] flex items-center justify-between gap-[12px] w-full" style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : '#fcfcfc' }}>
+      <span className="flex flex-col gap-[2px] min-w-0">
+        <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: NAVY }}>
+          {label}
+        </span>
+        {description && (
+          <span className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: TEXT_LIGHT }}>
+            {description}
+          </span>
+        )}
+      </span>
       <ToggleSwitch checked={checked} onChange={onChange} disabled={disabled} />
     </div>
   );
@@ -687,6 +773,7 @@ function BannerPreview({
   body,
   color,
   dismissible,
+  allowOptOut,
   hasCta,
   ctaLabel,
   rounded = true,
@@ -694,26 +781,51 @@ function BannerPreview({
   body: string;
   color: string;
   dismissible: boolean;
+  allowOptOut?: boolean;
   hasCta: boolean;
   ctaLabel: string;
   rounded?: boolean;
 }) {
   return (
     <div
-      className={`flex items-center gap-[16px] px-[16px] py-[12px] w-full ${rounded ? 'rounded-[6px]' : ''}`}
+      className={`flex flex-col gap-[6px] px-[16px] py-[12px] w-full ${rounded ? 'rounded-[6px]' : ''}`}
       style={{ backgroundColor: color }}
     >
+    <div className="flex items-center gap-[16px] w-full">
       {dismissible && <div className="shrink-0" style={{ width: 18 }} />}
-      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-white flex-1 text-center">
+      {/* min-w-0 lets the flex item shrink below its content, and break-words
+          splits a long unbroken string — without both, a single long "word"
+          pushes the banner past the edge of the screen it sits in. */}
+      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-white flex-1 min-w-0 text-center break-words">
         {body || 'Your message body will appear here.'}
         {hasCta && ctaLabel && (
           <>
             {' '}
-            <span className="font-medium underline cursor-pointer">{ctaLabel}</span>
+            {/* Same external-link cue the overlay's CTA carries, so a banner
+                link is visibly a link that leaves the page. Underline stays on
+                the words only — the icon sits beside them, as in the overlay. */}
+            <span className="inline-flex items-center gap-[4px] align-middle cursor-pointer">
+              <span className="font-medium underline">{ctaLabel}</span>
+              <FiExternalLink size={12} className="shrink-0" />
+            </span>
           </>
         )}
       </p>
       {dismissible && <MdClose size={18} color="white" className="shrink-0 cursor-pointer" />}
+    </div>
+    {/* Inside the bar, on its own line under the message and centred on the
+        same axis. Slightly muted so it sits below the CTA in the hierarchy —
+        it is the way out, not the thing we are asking them to do. */}
+    {allowOptOut && (
+      <div className="w-full flex items-center justify-center">
+        <span
+          className="font-['Montserrat',sans-serif] font-medium text-[11px] tracking-wide uppercase whitespace-nowrap cursor-pointer"
+          style={{ color: 'rgba(255,255,255,0.85)' }}
+        >
+          Don't show again
+        </span>
+      </div>
+    )}
     </div>
   );
 }
@@ -722,6 +834,7 @@ function OverlayPreview({
   title,
   body,
   dismissible,
+  allowOptOut,
   hasCta,
   ctaLabel,
   rounded = true,
@@ -731,6 +844,7 @@ function OverlayPreview({
   title: string;
   body: string;
   dismissible: boolean;
+  allowOptOut?: boolean;
   hasCta: boolean;
   ctaLabel: string;
   rounded?: boolean;
@@ -757,11 +871,16 @@ function OverlayPreview({
           </div>
         )}
       </div>
-      {dismissible && (
+      {(dismissible || allowOptOut) && (
         <div className={`flex items-center justify-between gap-[8px] ${compact ? 'px-[12px] py-[8px]' : 'px-[16px] py-[10px]'} border-t shrink-0`} style={{ borderColor: BORDER, backgroundColor: '#fafafa' }}>
-          <span className={`font-['Montserrat',sans-serif] font-medium ${compact ? 'text-[8px] tracking-normal' : 'text-[11px] tracking-wide'} uppercase whitespace-nowrap cursor-pointer`} style={{ color: NAVY }}>
-            Don't show again
-          </span>
+          {/* "Don't show again" is a separate promise from "Dismiss" — never
+              again, versus not now — so the author opts into it explicitly
+              rather than it riding along with dismissibility. */}
+          {allowOptOut ? (
+            <span className={`font-['Montserrat',sans-serif] font-medium ${compact ? 'text-[8px] tracking-normal' : 'text-[11px] tracking-wide'} uppercase whitespace-nowrap cursor-pointer`} style={{ color: NAVY }}>
+              Don't show again
+            </span>
+          ) : <span />}
           <button
             type="button"
             className={`rounded-[6px] shrink-0 ${compact ? 'px-[8px] py-[4px] text-[10px]' : 'px-[12px] py-[6px] text-[12px]'} font-['Montserrat',sans-serif] font-medium text-white flex items-center gap-[4px] cursor-pointer`}
@@ -828,6 +947,7 @@ export function ScreenSkeleton({
   body,
   color,
   dismissible,
+  allowOptOut,
   hasCta,
   ctaLabel,
 }: {
@@ -836,6 +956,7 @@ export function ScreenSkeleton({
   body: string;
   color: string;
   dismissible: boolean;
+  allowOptOut?: boolean;
   hasCta: boolean;
   ctaLabel: string;
 }) {
@@ -926,13 +1047,13 @@ export function ScreenSkeleton({
 
       {effectiveFormat === 'Overlay' && (
         <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
-          <OverlayPreview title={title} body={body} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          <OverlayPreview title={title} body={body} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
         </div>
       )}
 
       {effectiveFormat === 'Banner' && (
         <div className="absolute left-0 right-0 bottom-0">
-          <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          <BannerPreview body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
         </div>
       )}
     </div>
@@ -1036,6 +1157,7 @@ export function PhoneSkeleton({
   body,
   color,
   dismissible,
+  allowOptOut,
   hasCta,
   ctaLabel,
 }: {
@@ -1044,6 +1166,7 @@ export function PhoneSkeleton({
   body: string;
   color: string;
   dismissible: boolean;
+  allowOptOut?: boolean;
   hasCta: boolean;
   ctaLabel: string;
 }) {
@@ -1120,6 +1243,7 @@ export function PhoneSkeleton({
             title={title}
             body={body}
             dismissible={dismissible}
+            allowOptOut={allowOptOut}
             hasCta={hasCta}
             ctaLabel={ctaLabel}
             rounded={false}
@@ -1130,7 +1254,7 @@ export function PhoneSkeleton({
 
       {effectiveFormat === 'Banner' && (
         <div className="absolute left-0 right-0 bottom-0">
-          <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          <BannerPreview body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
         </div>
       )}
     </div>
@@ -1153,11 +1277,16 @@ type FormData = {
   placement?: string;
   featurePath?: string;
   messageColor?: string;
+  /** Retained so older saved rows still parse; superseded by `states`. */
   searchMode?: string;
+  states?: string[];
+  featureFlags?: string[];
   statesOrAgencies?: string[];
   packages?: string[];
   roles?: string[];
   dismissible?: string;
+  /** Whether recipients are offered a permanent "Don't show again". */
+  allowOptOut?: boolean;
   hasCta?: boolean;
   ctaLabel?: string;
   ctaDestination?: string;
@@ -1302,7 +1431,8 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [ctaDestination, setCtaDestination] = useState(initialData?.ctaDestination ?? '');
   const [stopOnCtaClick, setStopOnCtaClick] = useState(initialData?.stopOnCtaClick ?? false);
 
-  const [searchMode, setSearchMode] = useState<SearchMode>((initialData?.searchMode as SearchMode) ?? 'Agency');
+  const [states, setStates] = useState<string[]>(initialData?.states ?? []);
+  const [featureFlags, setFeatureFlags] = useState<string[]>(initialData?.featureFlags ?? []);
   const [statesOrAgencies, setStatesOrAgencies] = useState<string[]>(initialData?.statesOrAgencies ?? []);
   const [packages, setPackages] = useState<string[]>(initialData?.packages ?? []);
   const [roles, setRoles] = useState<string[]>(initialData?.roles ?? []);
@@ -1311,6 +1441,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [endDate, setEndDate] = useState(initialData?.endDate ?? '');
   const [noEndDate, setNoEndDate] = useState(initialData?.noEndDate ?? false);
   const [dismissible, setDismissible] = useState<Dismissible>((initialData?.dismissible as Dismissible) ?? 'Dismissible');
+  const [allowOptOut, setAllowOptOut] = useState<boolean>(initialData?.allowOptOut ?? true);
   // Overlay messages are always dismissible — there's no non-dismissible
   // overlay in the design, so the choice only makes sense for Banner. Force
   // it back to Dismissible whenever the format is (or becomes) Overlay,
@@ -1323,6 +1454,19 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayFormat]);
+
+  // Selecting the Emergency colour preselects Non-Dismissible, since that is
+  // the convention the helper text recommends. Keyed on the transition into
+  // red rather than the state of being red, so an author who deliberately
+  // switches back to Dismissible is not overridden on every later render.
+  const prevMessageColor = useRef(messageColor);
+  useEffect(() => {
+    const becameEmergency = messageColor === '#DA4040' && prevMessageColor.current !== '#DA4040';
+    prevMessageColor.current = messageColor;
+    if (becameEmergency && displayFormat === 'Banner') setDismissible('Non-Dismissible');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messageColor, displayFormat]);
+
   const [pushNotification, setPushNotification] = useState(initialData?.pushNotification ?? false);
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
   const [isSubmitHovered, setIsSubmitHovered] = useState(false);
@@ -1363,34 +1507,43 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   }, [previewSignature, stackedTab]);
 
   const isEmergency = displayFormat === 'Banner' && messageColor === '#DA4040';
+  // Emergency is deliberately unavoidable, and a permanent opt-out on a message
+  // that cannot be closed is meaningless — so the option is unavailable rather
+  // than merely unchecked in those cases.
+  const canOfferOptOut = displayFormat !== '' && !isEmergency && (displayFormat === 'Overlay' || dismissible === 'Dismissible');
+  const effectiveAllowOptOut = canOfferOptOut && allowOptOut;
 
-  const audienceCount = getAudienceRecipientCount(statesOrAgencies, packages, roles, searchMode);
+  const audienceCount = getAudienceRecipientCount({ agencies: statesOrAgencies, states, packages, roles, featureFlags });
+  // Nothing may be sent to nobody — this gates submission and reddens the count.
+  const hasNoRecipients = audienceCount === 0;
+  // Only a subset of the audience has the app installed with notifications
+  // allowed, so turning push on does not mean everyone selected gets one.
+  const pushCount = getAudiencePushCount({ agencies: statesOrAgencies, states, packages, roles, featureFlags });
+  // Push on but reaching nobody is a misconfiguration: the author has asked for
+  // a channel that cannot deliver. Blocked rather than warned, per product call.
+  const hasNoPushReach = pushNotification && pushCount === 0;
 
   const isFormValid =
+    !hasNoRecipients &&
+    !hasNoPushReach &&
     title.trim() !== '' &&
     body.trim() !== '' &&
     reason.trim() !== '' &&
     department !== '' &&
     displayFormat !== '' &&
     startDate !== '' &&
-    statesOrAgencies.length > 0 &&
     (!hasCta || (ctaLabel.trim() !== '' && ctaDestination.trim() !== '')) &&
     placement !== '' &&
     (placement !== 'Feature Specific' || featurePath !== '');
 
   const showFooter = editingAsDraft || !!onDeleteRow || !!onEditAsDraft || !!(onApprove && onReject) || !effectiveReadOnly;
 
-  const handleSearchModeChange = (v: string) => {
-    setSearchMode(v as SearchMode);
-    setStatesOrAgencies([]);
-  };
-
   const messageType: MessageType = displayFormat === '' ? '' : (isEmergency ? 'Emergency' : 'Announcement');
   // Computed directly (not just left to the effect above) so a submit that
   // lands in the same render as switching to Overlay can't slip through
   // with a stale Non-Dismissible value before the effect has a chance to run.
   const savedDismissible: Dismissible = displayFormat === 'Overlay' ? 'Dismissible' : dismissible;
-  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, searchMode, statesOrAgencies, packages, roles, dismissible: savedDismissible, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
+  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, statesOrAgencies, states, featureFlags, packages, roles, dismissible: savedDismissible, allowOptOut: effectiveAllowOptOut, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
 
   const handleSubmit = () => {
     onMessageCreated?.(allFormData);
@@ -1557,6 +1710,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 options={MESSAGE_COLOR_OPTIONS}
                 optionLabels={{ '#DA4040': 'Emergency', '#27496D': 'Regular' }}
                 disabled={effectiveReadOnly}
+                subtext={isEmergency ? 'Red is recommended for emergencies.' : undefined}
               />
             )}
             <SelectField label="Placement *" value={placement} onChange={(v) => setPlacement(v as Placement)} placeholder="Select placement..." options={['App-wide', 'Feature Specific']} disabled={effectiveReadOnly} />
@@ -1565,7 +1719,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             )}
             <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={effectiveReadOnly} />
             <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={effectiveReadOnly} />
-            <TextField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
+            <TextAreaField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
           </div>
 
           {/* Date & Time card */}
@@ -1585,20 +1739,19 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <div className="flex flex-col">
               <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Audience</p>
-              <p className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] text-[#585858]">
+              <p
+                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px]"
+                style={{ color: hasNoRecipients ? '#DA4040' : '#585858' }}
+              >
                 {audienceCount} {audienceCount === 1 ? 'recipient' : 'recipients'} will see this message
               </p>
             </div>
-            <RadioField label="Search By *" value={searchMode} onChange={handleSearchModeChange} options={['Agency', 'State']} disabled={effectiveReadOnly} />
-            <MultiSelectField
-              label={searchMode === 'Agency' ? 'Agency *' : 'State *'}
-              values={statesOrAgencies}
-              onChange={setStatesOrAgencies}
-              placeholder={searchMode === 'State' ? 'Select states...' : 'Select agencies...'}
-              options={searchMode === 'Agency' ? AGENCIES.map((a) => a.name) : STATES}
-              disabled={effectiveReadOnly}
-              variant={searchMode === 'Agency' ? 'agency' : 'state'}
-            />
+            {/* Agency and State are both first-class now rather than two modes of
+                one field — targeting "Texas agencies on Premium" needed both at
+                once, which the old Search By radio made impossible. */}
+            <MultiSelectField label="Agency" values={statesOrAgencies} onChange={setStatesOrAgencies} placeholder="Select agencies..." options={AGENCIES.map((a) => a.name)} disabled={effectiveReadOnly} variant="agency" />
+            <MultiSelectField label="State" values={states} onChange={setStates} placeholder="Select states..." options={STATES} disabled={effectiveReadOnly} variant="state" />
+            <MultiSelectField label="Feature Flag" values={featureFlags} onChange={setFeatureFlags} placeholder="Select feature flags..." options={FEATURE_FLAGS} disabled={effectiveReadOnly} variant="feature" />
             <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} disabled={effectiveReadOnly} variant="package" />
             <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} disabled={effectiveReadOnly} variant="role" />
           </div>
@@ -1609,7 +1762,14 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             {/* Overlay is always dismissible (forced above), so the choice is
                 meaningless there — only Banner gets to pick. */}
             {displayFormat === 'Banner' && (
-              <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} disabled={effectiveReadOnly} />
+              <RadioField
+                label="Display"
+                value={dismissible}
+                onChange={(v) => setDismissible(v as Dismissible)}
+                options={['Dismissible', 'Non-Dismissible']}
+                disabled={effectiveReadOnly}
+                subtext={isEmergency ? 'Non-dismissible is recommended for emergencies (red banners).' : undefined}
+              />
             )}
             <CtaBox
               checked={hasCta}
@@ -1622,7 +1782,24 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               onStopOnClickChange={setStopOnCtaClick}
               disabled={effectiveReadOnly}
             />
-            <ToggleRow label="Also send as push notification" checked={pushNotification} onChange={setPushNotification} disabled={effectiveReadOnly} />
+            {canOfferOptOut && (
+              <CheckboxCard
+                title="Don't Show Again"
+                description="Let recipients turn this message off permanently"
+                checked={allowOptOut}
+                onChange={setAllowOptOut}
+                disabled={effectiveReadOnly}
+              />
+            )}
+            <ToggleRow
+              label="Also send as push notification"
+              description={pushNotification
+                ? `${pushCount.toLocaleString()} of ${audienceCount.toLocaleString()} ${audienceCount === 1 ? 'recipient' : 'recipients'} get a notification`
+                : undefined}
+              checked={pushNotification}
+              onChange={setPushNotification}
+              disabled={effectiveReadOnly}
+            />
           </div>
         </div>
 
@@ -1674,6 +1851,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                           body={body}
                           color={effectiveBannerColor}
                           dismissible={effectiveDismissible}
+                          allowOptOut={effectiveAllowOptOut}
                           hasCta={hasCta}
                           ctaLabel={ctaLabel}
                         />
@@ -1689,6 +1867,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                             body={body}
                             color={effectiveBannerColor}
                             dismissible={effectiveDismissible}
+                            allowOptOut={effectiveAllowOptOut}
                             hasCta={hasCta}
                             ctaLabel={ctaLabel}
                           />
@@ -1705,6 +1884,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                         body={body}
                         color={effectiveBannerColor}
                         dismissible={effectiveDismissible}
+                        allowOptOut={effectiveAllowOptOut}
                         hasCta={hasCta}
                         ctaLabel={ctaLabel}
                       />
@@ -1762,13 +1942,20 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                   {submitLabel ?? 'Send for Approval'}
                 </span>
               </button>
+              {/* An empty audience takes precedence over the generic required-fields
+                  message: it is the more specific reason, and it is the one a
+                  filled-in-looking form will otherwise leave unexplained. */}
               {!isFormValid && (
                 <div
-                  className="absolute bottom-full right-0 mb-[8px] w-max max-w-[220px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 rounded-[4px] px-[8px] py-[10px] z-50"
+                  className="absolute bottom-full right-0 mb-[8px] w-max max-w-[240px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 rounded-[4px] px-[8px] py-[10px] z-50"
                   style={{ backgroundColor: '#3b5c79' }}
                 >
                   <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-white leading-[17px]">
-                    Please fill in all required fields to proceed
+                    {hasNoRecipients
+                      ? 'This message would reach 0 recipients. Widen the audience before sending.'
+                      : hasNoPushReach
+                        ? 'Push is on, but nobody in this audience can receive one. Turn push off or widen the audience.'
+                        : 'Please fill in all required fields to proceed'}
                   </p>
                 </div>
               )}

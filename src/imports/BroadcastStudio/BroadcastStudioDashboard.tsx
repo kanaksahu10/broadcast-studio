@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
-import { MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban, MdVisibility } from 'react-icons/md';
+import { MdOutlineLocationOn, MdOutlinedFlag, MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban, MdVisibility } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
 import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
 import { useIsBelowDesktop, useIsPhone } from './useIsPhone';
@@ -95,7 +95,7 @@ type MessageType = '' | 'Announcement' | 'Emergency';
 
 interface MessageFormData {
   body?: string; reason?: string; department?: string; messageCategory?: string; customCategoryName?: string; author?: string; noEndDate?: boolean; displayFormat?: string; placement?: string; featurePath?: string;
-  messageColor?: string; searchMode?: string; statesOrAgencies?: string[];
+  messageColor?: string; allowOptOut?: boolean; searchMode?: string; statesOrAgencies?: string[]; states?: string[]; featureFlags?: string[];
   packages?: string[]; roles?: string[]; dismissible?: string; hasCta?: boolean;
   ctaLabel?: string; ctaDestination?: string; pushNotification?: boolean;
 }
@@ -256,12 +256,26 @@ function isDraftVisibleToRole(row: BroadcastMessageRow, role: UserRole): boolean
   return row.status !== 'Draft' || row.authorRole === role;
 }
 
-function isMessageCurrentlyLive(row: BroadcastMessageRow): boolean {
-  if (row.status !== 'Live' || row.startDate === '—') return false;
+/**
+ * Where a message sits in its display window today.
+ *
+ * A message with no end date runs until someone stops it, so its window has no
+ * upper bound. Treating the missing end as the start date — which three copies
+ * of this calculation used to do — made such a message Live for exactly one
+ * day and then neither Live nor Scheduled, so its card lost its badge
+ * entirely the day after it started.
+ */
+function getDisplayWindowStatus(row: BroadcastMessageRow): 'Live' | 'Scheduled' | 'Ended' | null {
+  if (row.startDate === '—') return null;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const start = new Date(row.startDate);
-  const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
-  return today >= start && today <= end;
+  if (today < start) return 'Scheduled';
+  if (row.endDate === '—') return 'Live'; // open-ended: started, never expires on its own
+  return today <= new Date(row.endDate) ? 'Live' : 'Ended';
+}
+
+function isMessageCurrentlyLive(row: BroadcastMessageRow): boolean {
+  return row.status === 'Live' && getDisplayWindowStatus(row) === 'Live';
 }
 
 // Whole days from today to a display-formatted date string ("Aug 10, 2026").
@@ -301,11 +315,13 @@ function CategoryTag({ label }: { label: string }) {
 }
 
 function getRecipientCount(row: BroadcastMessageRow): number {
-  const agencies = row.formData?.statesOrAgencies ?? [];
-  const packages = row.formData?.packages ?? [];
-  const roles = row.formData?.roles ?? [];
-  if (agencies.length === 0) return row.recipients ?? 0;
-  return getAudienceRecipientCount(agencies, packages, roles, row.formData?.searchMode) || (row.recipients ?? 0);
+  const f = row.formData;
+  const agencies = f?.statesOrAgencies ?? [];
+  const states = f?.states ?? [];
+  if (agencies.length === 0 && states.length === 0) return row.recipients ?? 0;
+  return getAudienceRecipientCount({
+    agencies, states, packages: f?.packages ?? [], roles: f?.roles ?? [], featureFlags: f?.featureFlags ?? [],
+  }) || (row.recipients ?? 0);
 }
 
 function formatDisplayDate(dateStr: string): string {
@@ -334,8 +350,30 @@ function daysFromNow(offsetDays: number): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// ISO timestamp `daysAgo` days back, for seed `statusChangedAt` values. The
+// 30-day retention sweep prunes discarded rows on mount, so a hardcoded
+// calendar date silently empties the Rejected/Expired/Discontinued buckets
+// once it drifts past the window — every seeded row must stay relative.
+// Every state, i.e. "all agencies". Package/role/feature-flag facets only
+// narrow an existing set — agencies or states have to seed it — so a message
+// aimed at "everyone on a given feature flag" spells out the states.
+const ALL_STATES = ['California', 'Texas', 'New York', 'Florida', 'Washington', 'Illinois'];
+
+function isoDaysAgo(daysAgo: number): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - daysAgo);
+  return d.toISOString();
+}
+
 const INITIAL_MESSAGES: BroadcastMessageRow[] = [
+  // Each card below is a distinct scenario, not a variation in wording — the
+  // set is meant to exercise every display/targeting/lifecycle combination the
+  // board can render, so a walkthrough can reach any state without authoring.
+
   // ---- DRAFTS ----
+  // Private per role: super-admin and executive-approver each own some, so
+  // neither role sees an empty Drafts column.
   {
     id: 'seed-d1',
     subject: 'Q3 Training Reminder',
@@ -343,63 +381,72 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'Sunrise Home Care +2',
     channel: 'Email',
     status: 'Draft',
-    startDate: 'Aug 1, 2026',
-    endDate: 'Aug 8, 2026',
+    startDate: daysFromNow(6),
+    endDate: daysFromNow(20),
     recipients: null,
     authorRole: 'super-admin',
     formData: {
       author: 'John Doe',
       department: 'Support',
+      messageCategory: 'Custom', customCategoryName: 'Compliance',
       body: 'Q3 compliance training is now available. Please complete all assigned modules before the end of the quarter to stay certified.',
       reason: 'Quarterly compliance',
       displayFormat: 'Overlay',
       placement: 'Global',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
+      allowOptOut: true,
       hasCta: true,
       ctaLabel: 'Start training',
       ctaDestination: '#',
       statesOrAgencies: ['Sunrise Home Care', 'Golden Gate Health Partners', 'Lone Star Caregivers'],
-      packages: [],
-      roles: [],
+      states: [], featureFlags: [], packages: [], roles: [],
     },
   },
   {
     id: 'seed-d2',
-    subject: 'Referral Program Launch',
+    subject: 'Scheduling Tips Banner',
     type: 'Announcement',
-    audience: 'All',
+    audience: 'Advanced Scheduling agencies',
     channel: 'Email',
     status: 'Draft',
     startDate: '—',
     endDate: '—',
     recipients: null,
     authorRole: 'executive-approver',
+    // Feature-specific placement + feature-flag targeting: the banner only
+    // shows inside Scheduling, and only to agencies that have it turned on.
     formData: {
       author: 'Jennifer James',
-      department: 'Marketing',
-      body: 'Introducing our new employee referral program — earn bonuses for every successful hire you refer.',
+      department: 'Product',
+      messageCategory: 'New Release',
+      body: 'Drag-and-drop shift swapping is now built into the scheduler. Try it from any open shift.',
+      reason: 'Feature adoption',
       displayFormat: 'Banner',
-      placement: 'Global',
+      placement: 'Feature Specific',
+      featurePath: 'Scheduling',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
-      hasCta: false,
-      statesOrAgencies: ['Austin Family Support'],
-      packages: [],
-      roles: [],
+      allowOptOut: true,
+      hasCta: true,
+      ctaLabel: 'Open scheduler',
+      ctaDestination: '#',
+      statesOrAgencies: [],
+      states: ALL_STATES, featureFlags: ['Advanced Scheduling'], packages: [], roles: [],
     },
   },
   {
     id: 'seed-d3',
-    subject: 'System Outage Alert Draft',
+    subject: 'System Outage Alert',
     type: 'Emergency',
-    audience: 'Sunrise Home Care',
+    audience: 'All',
     channel: 'Push',
     status: 'Draft',
-    startDate: 'Aug 5, 2026',
+    startDate: daysFromNow(0),
     endDate: '—',
     recipients: null,
     authorRole: 'super-admin',
+    // Emergency shape: red, non-dismissible, open-ended, push on, no opt-out.
     formData: {
       author: 'John Doe',
       department: 'Product',
@@ -413,39 +460,73 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       dismissible: 'Non-Dismissible',
       hasCta: false,
       pushNotification: true,
-      statesOrAgencies: ['Sunrise Home Care'],
-      packages: [],
-      roles: [],
+      statesOrAgencies: [],
+      states: ALL_STATES, featureFlags: [], packages: [], roles: [],
     },
   },
   {
     id: 'seed-d4',
-    subject: 'New Benefits Partner Announcement',
+    subject: 'Enterprise Package Upsell',
     type: 'Announcement',
-    audience: 'Cascade Caregivers',
+    audience: 'California · Enterprise',
     channel: 'Email',
     status: 'Draft',
     startDate: '—',
     endDate: '—',
     recipients: null,
     authorRole: 'executive-approver',
+    // Targeted with no agency chips at all — State + Package only.
     formData: {
       author: 'Jennifer James',
-      department: 'Admin Services',
+      department: 'Marketing',
       messageCategory: 'Upsell',
-      body: 'We are excited to announce a new partnership that expands your benefits options starting next quarter.',
+      body: 'Enterprise adds unlimited custom reports and priority onboarding. See what your agency would gain.',
+      reason: 'Expansion campaign',
+      displayFormat: 'Overlay',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      allowOptOut: true,
+      hasCta: true,
+      ctaLabel: 'Compare packages',
+      ctaDestination: '#',
+      statesOrAgencies: [],
+      states: ['California'], featureFlags: [], packages: ['Enterprise'], roles: [],
+    },
+  },
+  {
+    id: 'seed-d5',
+    subject: 'Billing Portal Migration',
+    type: 'Announcement',
+    audience: 'Everglades Health Network',
+    channel: 'Push',
+    status: 'Draft',
+    startDate: daysFromNow(10),
+    endDate: daysFromNow(17),
+    recipients: null,
+    authorRole: 'super-admin',
+    // Push is on but this agency has no app adoption at all, so submitting is
+    // blocked until push is switched off or the audience widens. Open this one
+    // to demo the push-reach guard.
+    formData: {
+      author: 'Priya Nair',
+      department: 'Billing',
+      messageCategory: 'Billing Notice',
+      body: 'Invoices move to the new billing portal next month. Your saved payment methods carry over automatically.',
+      reason: 'Billing migration',
       displayFormat: 'Overlay',
       placement: 'Global',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
       hasCta: false,
-      statesOrAgencies: ['Cascade Caregivers'],
-      packages: [],
-      roles: [],
+      pushNotification: true,
+      statesOrAgencies: ['Everglades Health Network'],
+      states: [], featureFlags: [], packages: [], roles: [],
     },
   },
 
   // ---- PENDING APPROVAL ----
+  // Spread across the urgency range: one due tomorrow, one a month out.
   {
     id: 'seed-p1',
     subject: 'Holiday Closure Notice',
@@ -455,7 +536,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     status: 'Pending',
     startDate: daysFromNow(14),
     endDate: daysFromNow(21),
-    recipients: 3150,
+    recipients: 2700,
     formData: {
       author: 'Priya Nair',
       department: 'Support',
@@ -465,24 +546,25 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       placement: 'Global',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
+      allowOptOut: true,
       hasCta: true,
       ctaLabel: 'View schedule',
       ctaDestination: '#',
       statesOrAgencies: ['Sunrise Home Care', 'Golden Gate Health Partners', 'Lone Star Caregivers', 'Empire Homecare Group'],
-      packages: ['Premium Support'],
-      roles: [],
+      states: [], featureFlags: [], packages: [], roles: [],
     },
   },
   {
     id: 'seed-p2',
-    subject: 'Client Portal Maintenance',
+    subject: 'Client Portal Maintenance Tonight',
     type: 'Emergency',
-    audience: 'All',
+    audience: 'New York',
     channel: 'Push',
     status: 'Pending',
-    startDate: daysFromNow(2),
-    endDate: daysFromNow(3),
-    recipients: 892,
+    startDate: daysFromNow(1),
+    endDate: daysFromNow(2),
+    recipients: 1225,
+    // Goes live tomorrow and still unreviewed — the urgent end of the queue.
     formData: {
       author: 'Marcus Chen',
       department: 'Product',
@@ -495,76 +577,77 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       dismissible: 'Non-Dismissible',
       hasCta: false,
       pushNotification: true,
-      statesOrAgencies: ['Austin Family Support', 'Empire Homecare Group'],
-      packages: [],
-      roles: ['Administrator'],
+      statesOrAgencies: [],
+      states: ['New York'], featureFlags: [], packages: [], roles: [],
     },
   },
   {
     id: 'seed-p3',
-    subject: 'New Mobile App Release',
+    subject: 'eMAR Charting Update',
     type: 'Announcement',
-    audience: 'Sunshine State Care +1',
+    audience: 'eMAR agencies',
     channel: 'Email',
     status: 'Pending',
     startDate: daysFromNow(18),
     endDate: daysFromNow(32),
-    recipients: 2100,
+    recipients: 2095,
     formData: {
       author: 'John Doe',
       department: 'Product',
       messageCategory: 'New Release',
-      body: 'Our redesigned mobile app is rolling out next week with faster scheduling and a new messaging inbox.',
+      body: 'Medication charting now supports partial doses and PRN follow-ups. Existing records are unchanged.',
       reason: 'Product launch',
-      displayFormat: 'Overlay',
-      placement: 'Global',
+      displayFormat: 'Banner',
+      placement: 'Feature Specific',
+      featurePath: 'eMAR',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
       hasCta: true,
       ctaLabel: "See what's new",
       ctaDestination: '#',
-      statesOrAgencies: ['Sunshine State Care', 'Everglades Health Network'],
-      packages: [],
-      roles: [],
+      statesOrAgencies: [],
+      states: ALL_STATES, featureFlags: ['eMAR'], packages: [], roles: [],
     },
   },
   {
     id: 'seed-p4',
-    subject: 'Payroll System Maintenance Window',
-    type: 'Emergency',
-    audience: 'Windy City Homecare',
-    channel: 'Push',
+    subject: 'Updated Data Retention Policy',
+    type: 'Announcement',
+    audience: 'Admins',
+    channel: 'Email',
     status: 'Pending',
-    startDate: daysFromNow(21),
-    endDate: daysFromNow(22),
-    recipients: 640,
+    startDate: daysFromNow(30),
+    endDate: daysFromNow(44),
+    recipients: 685,
+    // Role-only targeting: everyone with the Admin role, regardless of agency.
     formData: {
-      author: 'Priya Nair',
-      department: 'Billing',
-      messageCategory: 'Emergency',
-      body: 'Payroll systems will be offline for scheduled maintenance. Time-off requests submitted during this window may be delayed.',
-      reason: 'Planned maintenance',
-      displayFormat: 'Banner',
+      author: 'Elena Rodriguez',
+      department: 'Admin Services',
+      messageCategory: 'Custom', customCategoryName: 'Compliance',
+      body: 'Our data retention policy has been updated to align with new state requirements. Review the changes before they take effect.',
+      reason: 'Policy update',
+      displayFormat: 'Overlay',
       placement: 'Global',
-      messageColor: '#DA4040',
-      dismissible: 'Non-Dismissible',
-      hasCta: false,
-      pushNotification: true,
-      statesOrAgencies: ['Windy City Homecare'],
-      packages: [],
-      roles: [],
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      allowOptOut: true,
+      hasCta: true,
+      ctaLabel: 'Read the policy',
+      ctaDestination: '#',
+      statesOrAgencies: [],
+      states: ALL_STATES, featureFlags: [], packages: [], roles: ['Admin'],
     },
   },
   {
     id: 'seed-p5',
     subject: 'Fall Enrollment Campaign Kickoff',
     type: 'Announcement',
-    audience: 'Brooklyn Senior Services +1',
+    audience: 'Texas',
     channel: 'Email',
     status: 'Pending',
-    startDate: daysFromNow(28),
-    endDate: daysFromNow(57),
-    recipients: 1540,
+    startDate: daysFromNow(25),
+    endDate: daysFromNow(54),
+    recipients: 390,
     formData: {
       author: 'Elena Rodriguez',
       department: 'Marketing',
@@ -578,77 +661,25 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       hasCta: true,
       ctaLabel: 'Start enrollment',
       ctaDestination: '#',
-      statesOrAgencies: ['Brooklyn Senior Services', 'Cascade Caregivers'],
-      packages: [],
-      roles: [],
-    },
-  },
-  {
-    id: 'seed-p6',
-    subject: 'Service Outage — East Coast Region',
-    type: 'Emergency',
-    audience: 'All',
-    channel: 'Push',
-    status: 'Pending',
-    startDate: daysFromNow(4),
-    endDate: daysFromNow(4),
-    recipients: 4300,
-    formData: {
-      author: 'Marcus Chen',
-      department: 'Customer Success',
-      body: 'We are aware of a service disruption affecting East Coast agencies and are actively working on a fix. Updates to follow.',
-      reason: 'Active incident',
-      displayFormat: 'Banner',
-      placement: 'Global',
-      messageColor: '#DA4040',
-      dismissible: 'Non-Dismissible',
-      hasCta: false,
-      pushNotification: true,
       statesOrAgencies: [],
-      packages: [],
-      roles: [],
-    },
-  },
-  {
-    id: 'seed-p7',
-    subject: 'Updated Data Retention Policy',
-    type: 'Announcement',
-    audience: 'Everglades Health Network',
-    channel: 'Email',
-    status: 'Pending',
-    startDate: daysFromNow(35),
-    endDate: daysFromNow(49),
-    recipients: 780,
-    formData: {
-      author: 'Elena Rodriguez',
-      department: 'Admin Services',
-      messageCategory: 'Custom', customCategoryName: 'Compliance',
-      body: 'Our data retention policy has been updated to align with new state requirements. Review the changes before they take effect.',
-      reason: 'Policy update',
-      displayFormat: 'Overlay',
-      placement: 'Global',
-      messageColor: '#27496D',
-      dismissible: 'Dismissible',
-      hasCta: true,
-      ctaLabel: 'Read the policy',
-      ctaDestination: '#',
-      statesOrAgencies: ['Everglades Health Network'],
-      packages: [],
-      roles: ['Administrator'],
+      states: ['Texas'], featureFlags: [], packages: [], roles: [],
     },
   },
 
   // ---- APPROVED ----
+  // Covers all three window states the card badge can show: Live, Scheduled,
+  // and Live-with-no-end-date.
   {
     id: 'seed-a1',
     subject: 'Summer Schedule Update',
     type: 'Announcement',
-    audience: 'Sunrise Home Care +2',
+    audience: 'Sunrise Home Care +1',
     channel: 'Email',
     status: 'Live',
-    startDate: 'Jul 20, 2026',
-    endDate: 'Jul 27, 2026',
-    recipients: 1204,
+    startDate: daysFromNow(-4),
+    endDate: daysFromNow(3),
+    recipients: 1540,
+    // Live and close to its end date — drives the "expiring soon" caption.
     formData: {
       author: 'John Doe',
       department: 'Support',
@@ -659,55 +690,58 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       featurePath: 'Scheduling',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
+      allowOptOut: true,
       hasCta: true,
       ctaLabel: 'View schedule',
       ctaDestination: '#',
-      statesOrAgencies: ['Sunrise Home Care', 'Golden Gate Health Partners', 'Lone Star Caregivers'],
-      packages: [],
-      roles: [],
+      statesOrAgencies: ['Sunrise Home Care', 'Golden Gate Health Partners'],
+      states: [], featureFlags: [], packages: [], roles: [],
     },
   },
   {
     id: 'seed-a2',
-    subject: 'New Overtime Policy',
-    type: 'Emergency',
-    audience: 'All',
-    channel: 'Push',
+    subject: 'New Wellness Program',
+    type: 'Announcement',
+    audience: 'Enterprise package',
+    channel: 'Email',
     status: 'Live',
-    startDate: 'Jul 22, 2026',
-    endDate: 'Jul 28, 2026',
-    recipients: 42,
+    startDate: daysFromNow(-9),
+    endDate: '—',
+    recipients: 2680,
+    // Open-ended: started, never expires on its own, runs until discontinued.
     formData: {
-      author: 'Priya Nair',
-      department: 'Billing',
-      body: 'Effective immediately: overtime must be pre-approved by a supervisor. Unapproved overtime will not be compensated.',
-      reason: 'Policy change',
-      displayFormat: 'Banner',
+      author: 'John Doe',
+      department: 'Customer Success',
+      noEndDate: true,
+      body: 'Our employee wellness program is live, offering mental health resources and fitness reimbursements to every enrolled agency.',
+      displayFormat: 'Overlay',
       placement: 'Global',
-      messageColor: '#DA4040',
-      dismissible: 'Non-Dismissible',
-      hasCta: false,
-      pushNotification: true,
-      statesOrAgencies: ['Empire Homecare Group'],
-      packages: [],
-      roles: ['Caregiver', 'Administrator'],
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      allowOptOut: true,
+      hasCta: true,
+      ctaLabel: 'Learn more',
+      ctaDestination: '#',
+      statesOrAgencies: [],
+      states: ALL_STATES, featureFlags: [], packages: ['Enterprise'], roles: [],
     },
   },
   {
     id: 'seed-a3',
     subject: 'Open Enrollment Opens',
     type: 'Announcement',
-    audience: 'Sunrise Home Care +1',
+    audience: 'Cascade Caregivers',
     channel: 'Email',
     status: 'Live',
-    startDate: 'Aug 1, 2026',
-    endDate: 'Aug 15, 2026',
-    recipients: 560,
+    startDate: daysFromNow(7),
+    endDate: daysFromNow(21),
+    recipients: 530,
+    // Approved but not started yet — shows as Scheduled, not Live.
     formData: {
       author: 'Marcus Chen',
       department: 'Customer Success',
       messageCategory: 'Billing Notice',
-      body: 'Benefits open enrollment begins August 1st. Take a few minutes to review your options and make any changes for the coming year.',
+      body: 'Benefits open enrollment begins next week. Take a few minutes to review your options and make any changes for the coming year.',
       displayFormat: 'Overlay',
       placement: 'Global',
       messageColor: '#27496D',
@@ -715,21 +749,21 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       hasCta: true,
       ctaLabel: 'Review benefits',
       ctaDestination: '#',
-      statesOrAgencies: ['Sunrise Home Care', 'Austin Family Support'],
-      packages: [],
-      roles: [],
+      statesOrAgencies: ['Cascade Caregivers'],
+      states: [], featureFlags: [], packages: [], roles: [],
     },
   },
   {
     id: 'seed-a4',
     subject: 'Severe Weather Advisory',
     type: 'Emergency',
-    audience: 'Empire Homecare Group +1',
+    audience: 'All',
     channel: 'Push',
     status: 'Live',
-    startDate: 'Jul 28, 2026',
-    endDate: 'Aug 3, 2026',
-    recipients: 3400,
+    startDate: daysFromNow(-1),
+    endDate: daysFromNow(2),
+    recipients: 4555,
+    // Live emergency reaching every agency — the widest possible audience.
     formData: {
       author: 'Elena Rodriguez',
       department: 'Admin Services',
@@ -742,36 +776,35 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       dismissible: 'Non-Dismissible',
       hasCta: false,
       pushNotification: true,
-      statesOrAgencies: ['Empire Homecare Group', 'Brooklyn Senior Services'],
-      packages: [],
-      roles: [],
+      statesOrAgencies: [],
+      states: ALL_STATES, featureFlags: [], packages: [], roles: [],
     },
   },
   {
     id: 'seed-a5',
-    subject: 'New Wellness Program Rollout',
+    subject: 'Family Portal Invitations',
     type: 'Announcement',
-    audience: 'Cascade Caregivers',
+    audience: 'Family Portal agencies',
     channel: 'Email',
     status: 'Live',
-    startDate: 'Aug 20, 2026',
-    endDate: '—',
-    recipients: 980,
+    startDate: daysFromNow(-12),
+    endDate: daysFromNow(16),
+    recipients: 3035,
     formData: {
-      author: 'John Doe',
+      author: 'Priya Nair',
       department: 'Customer Success',
-      noEndDate: true,
-      body: 'Our new employee wellness program launches soon, offering mental health resources and fitness reimbursements.',
-      displayFormat: 'Overlay',
+      body: 'Families can now be invited straight from a client record. Invitations expire after seven days.',
+      reason: 'Feature adoption',
+      displayFormat: 'Banner',
       placement: 'Global',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
+      allowOptOut: true,
       hasCta: true,
-      ctaLabel: 'Learn more',
+      ctaLabel: 'Invite a family',
       ctaDestination: '#',
-      statesOrAgencies: ['Cascade Caregivers'],
-      packages: [],
-      roles: [],
+      statesOrAgencies: [],
+      states: ALL_STATES, featureFlags: ['Family Portal'], packages: [], roles: [],
     },
   },
 
@@ -780,53 +813,139 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     id: 'seed-r1',
     subject: 'Weekend Overtime Bonus',
     type: 'Announcement',
-    audience: 'All',
+    audience: 'Lone Star Caregivers +1',
     channel: 'Email',
     status: 'Rejected',
-    startDate: 'Jul 25, 2026',
-    endDate: 'Aug 1, 2026',
-    recipients: 480,
-    statusChangedAt: '2026-07-20T00:00:00.000Z',
+    startDate: daysFromNow(-2),
+    endDate: daysFromNow(12),
+    recipients: 390,
+    statusChangedAt: isoDaysAgo(3),
+    // Rejected with a written reason.
+    rejectionReason: 'Bonus amounts have not been approved by Finance yet. Hold this until the Q4 budget is signed off, then resubmit with the confirmed figures.',
     formData: {
       author: 'Priya Nair',
       department: 'Billing',
       messageCategory: 'Billing Notice',
-      body: 'Placeholder rejected message for prototyping the Rejected bucket.',
-      reason: 'Needs budget sign-off',
+      body: 'Pick up a weekend shift this month and earn an additional bonus on top of your standard overtime rate.',
+      reason: 'Staffing incentive',
       displayFormat: 'Overlay',
       placement: 'Global',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
       hasCta: false,
       statesOrAgencies: ['Lone Star Caregivers', 'Austin Family Support'],
-      packages: [],
-      roles: [],
+      states: [], featureFlags: [], packages: [], roles: [],
     },
   },
   {
     id: 'seed-r2',
-    subject: 'Placeholder Rejected Message',
+    subject: 'Referral Program Launch',
     type: 'Announcement',
-    audience: 'All',
+    audience: 'Empire Homecare Group',
     channel: 'Email',
     status: 'Rejected',
-    startDate: '—',
-    endDate: '—',
-    recipients: 210,
-    statusChangedAt: '2026-07-22T00:00:00.000Z',
+    startDate: daysFromNow(-8),
+    endDate: daysFromNow(6),
+    recipients: 950,
+    statusChangedAt: isoDaysAgo(14),
+    // Rejected with the reason left blank — exercises the fallback banner.
     formData: {
       author: 'Marcus Chen',
-      department: 'Support',
-      body: 'This is a placeholder message for prototyping purposes.',
-      reason: 'Placeholder reason',
+      department: 'Marketing',
+      messageCategory: 'Upsell',
+      body: 'Introducing our new employee referral program — earn a bonus for every successful hire you refer.',
+      reason: 'Recruitment drive',
       displayFormat: 'Banner',
       placement: 'Global',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
       hasCta: false,
       statesOrAgencies: ['Empire Homecare Group'],
-      packages: [],
-      roles: [],
+      states: [], featureFlags: [], packages: [], roles: [],
+    },
+  },
+  {
+    id: 'seed-r3',
+    subject: 'Payroll Maintenance Window',
+    type: 'Emergency',
+    audience: 'Windy City Homecare',
+    channel: 'Push',
+    status: 'Pending',
+    startDate: daysFromNow(-5),
+    endDate: daysFromNow(-1),
+    recipients: 295,
+    // Still Pending, but its go-live date passed with nobody acting — it lands
+    // in Rejected with a system-generated reason instead of an approver's note.
+    formData: {
+      author: 'Priya Nair',
+      department: 'Billing',
+      messageCategory: 'Emergency',
+      body: 'Payroll systems will be offline for scheduled maintenance. Time-off requests submitted during this window may be delayed.',
+      reason: 'Planned maintenance',
+      displayFormat: 'Banner',
+      placement: 'Global',
+      messageColor: '#DA4040',
+      dismissible: 'Non-Dismissible',
+      hasCta: false,
+      pushNotification: true,
+      statesOrAgencies: ['Windy City Homecare'],
+      states: [], featureFlags: [], packages: [], roles: [],
+    },
+  },
+
+  // ---- EXPIRED ----
+  // Status stays Live; the bucket is derived from the end date having passed.
+  {
+    id: 'seed-e1',
+    subject: 'Spring Onboarding Series',
+    type: 'Announcement',
+    audience: 'Sunshine State Care',
+    channel: 'Email',
+    status: 'Live',
+    startDate: daysFromNow(-18),
+    endDate: daysFromNow(-4),
+    recipients: 410,
+    formData: {
+      author: 'Elena Rodriguez',
+      department: 'Support',
+      messageCategory: 'New Release',
+      body: 'Our spring onboarding series covered scheduling, billing and eMAR. Recordings remain available in the help centre.',
+      reason: 'Training series',
+      displayFormat: 'Overlay',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: true,
+      ctaLabel: 'Watch recordings',
+      ctaDestination: '#',
+      statesOrAgencies: ['Sunshine State Care'],
+      states: [], featureFlags: [], packages: [], roles: [],
+    },
+  },
+  {
+    id: 'seed-e2',
+    subject: 'Tax Document Deadline',
+    type: 'Announcement',
+    audience: 'Washington',
+    channel: 'Email',
+    status: 'Live',
+    startDate: daysFromNow(-40),
+    endDate: daysFromNow(-26),
+    recipients: 530,
+    // Nearly through its 30-day retention — shows the low "days left" state.
+    formData: {
+      author: 'Marcus Chen',
+      department: 'Billing',
+      messageCategory: 'Billing Notice',
+      body: 'Year-end tax documents are ready to download. Verify your mailing address before the filing deadline.',
+      reason: 'Tax season',
+      displayFormat: 'Banner',
+      placement: 'Global',
+      messageColor: '#27496D',
+      dismissible: 'Dismissible',
+      hasCta: false,
+      statesOrAgencies: [],
+      states: ['Washington'], featureFlags: [], packages: [], roles: [],
     },
   },
 
@@ -838,10 +957,11 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     audience: 'Sunrise Home Care +1',
     channel: 'Email',
     status: 'Discontinued',
-    startDate: 'Jul 10, 2026',
-    endDate: 'Jul 24, 2026',
-    recipients: 640,
-    statusChangedAt: '2026-07-24T00:00:00.000Z',
+    startDate: daysFromNow(-20),
+    endDate: daysFromNow(9),
+    recipients: 1540,
+    statusChangedAt: isoDaysAgo(2),
+    // Taken down early by an approver, well before its end date.
     formData: {
       author: 'Elena Rodriguez',
       department: 'Product',
@@ -854,18 +974,42 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       dismissible: 'Dismissible',
       hasCta: false,
       statesOrAgencies: ['Sunrise Home Care', 'Golden Gate Health Partners'],
-      packages: [],
-      roles: [],
+      states: [], featureFlags: [], packages: [], roles: [],
+    },
+  },
+  {
+    id: 'seed-x2',
+    subject: 'Regional Service Disruption',
+    type: 'Emergency',
+    audience: 'Brooklyn Senior Services',
+    channel: 'Push',
+    status: 'Discontinued',
+    startDate: daysFromNow(-16),
+    endDate: '—',
+    recipients: 275,
+    statusChangedAt: isoDaysAgo(11),
+    // An open-ended emergency banner pulled down once the incident resolved —
+    // the only way a message with no end date ever comes off the board.
+    formData: {
+      author: 'Marcus Chen',
+      department: 'Customer Success',
+      messageCategory: 'Emergency',
+      noEndDate: true,
+      body: 'We are aware of a service disruption affecting East Coast agencies and are actively working on a fix. Updates to follow.',
+      reason: 'Active incident',
+      displayFormat: 'Banner',
+      placement: 'Global',
+      messageColor: '#DA4040',
+      dismissible: 'Non-Dismissible',
+      hasCta: false,
+      pushNotification: true,
+      statesOrAgencies: ['Brooklyn Senior Services'],
+      states: [], featureFlags: [], packages: [], roles: [],
     },
   },
 ];
 
-// Bump this whenever INITIAL_MESSAGES changes shape or content. Seed data is
-// only written when storage is empty, so without a bump anyone carrying rows
-// from a previous version keeps them forever — and new fields (author,
-// department, authorRole, rejectionReason) read as undefined on those old
-// rows, which silently empties the Drafts and Pending columns.
-const STORAGE_KEY = 'bs-messages-v13';
+const STORAGE_KEY = 'bs-messages-v17';
 
 export function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
@@ -1210,13 +1354,15 @@ function ColumnInfoTooltip({ label, icon }: { label: string; icon?: React.ReactN
   );
 }
 
-function AudienceChip({ label, variant }: { label: string; variant: 'agency' | 'package' | 'role' }) {
+function AudienceChip({ label, variant }: { label: string; variant: 'agency' | 'state' | 'package' | 'role' | 'feature' }) {
   const iconMap = {
     agency: <BiBuildings size={12} color="white" />,
+    state: <MdOutlineLocationOn size={12} color="white" />,
+    feature: <MdOutlinedFlag size={12} color="white" />,
     package: <MdApps size={11} color="white" />,
     role: <BsPersonBadgeFill size={11} color="white" />,
   };
-  const bgMap = { agency: '#2699FB', package: '#2699FB', role: '#2ECC71' };
+  const bgMap = { agency: '#2699FB', state: '#8E44AD', feature: '#2699FB', package: '#2699FB', role: '#2ECC71' };
   return (
     <span className="flex items-center gap-[8px] pl-[4px] pr-[8px] h-[29px] rounded-full border shrink-0" style={{ backgroundColor: '#F2F2F2', borderColor: '#E5E5E5' }}>
       <span className="rounded-full size-[20px] flex items-center justify-center shrink-0" style={{ backgroundColor: bgMap[variant] }}>
@@ -1227,7 +1373,7 @@ function AudienceChip({ label, variant }: { label: string; variant: 'agency' | '
   );
 }
 
-function AudienceSection({ label, items, variant }: { label: string; items: string[]; variant: 'agency' | 'package' | 'role' }) {
+function AudienceSection({ label, items, variant }: { label: string; items: string[]; variant: 'agency' | 'state' | 'package' | 'role' | 'feature' }) {
   if (items.length === 0) return null;
   return (
     <div className="bg-white border rounded-[4px] flex flex-col gap-[8px] px-[8px] py-[12px]" style={{ borderColor: '#E5E5E5' }}>
@@ -1241,6 +1387,8 @@ function AudienceSection({ label, items, variant }: { label: string; items: stri
 
 function AudienceOverlay({ formData, recipientCount, onClose }: { formData: NonNullable<BroadcastMessageRow['formData']>; recipientCount: number; onClose: () => void }) {
   const agencies = formData.statesOrAgencies ?? [];
+  const states = formData.states ?? [];
+  const featureFlags = formData.featureFlags ?? [];
   const packages = formData.packages ?? [];
   const roles = formData.roles ?? [];
   const [mounted, setMounted] = useState(false);
@@ -1272,11 +1420,13 @@ function AudienceOverlay({ formData, recipientCount, onClose }: { formData: NonN
           </button>
         </div>
         <p className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] text-[#585858] px-[16px] pt-[12px] shrink-0">
-          {recipientCount} {recipientCount === 1 ? 'recipient' : 'recipients'} will see this message
+            {recipientCount} {recipientCount === 1 ? 'recipient' : 'recipients'} will see this message
         </p>
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-[16px] py-[16px] flex flex-col gap-[12px]">
           <AudienceSection label="Agencies" items={agencies} variant="agency" />
+          <AudienceSection label="States" items={states} variant="state" />
+          <AudienceSection label="Feature Flags" items={featureFlags} variant="feature" />
           <AudienceSection label="Packages" items={packages} variant="package" />
           <AudienceSection label="Roles" items={roles} variant="role" />
         </div>
@@ -1624,12 +1774,9 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
           let liveBadge: React.ReactNode = null;
           let expiringCaption: React.ReactNode = null;
           if (row.status === 'Live' && row.startDate !== '—') {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const start = new Date(row.startDate);
-            const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
-            const isLive = today >= start && today <= end;
-            const isScheduled = today < start;
+            const windowStatus = getDisplayWindowStatus(row);
+            const isLive = windowStatus === 'Live';
+            const isScheduled = windowStatus === 'Scheduled';
             if (isLive) {
               liveBadge = (
                 <span className="flex items-center gap-[5px] font-['Montserrat',sans-serif] font-medium text-[11px] px-[8px] py-[3px] rounded-[4px]" style={{ backgroundColor: '#EEFFEE', color: '#00AA00' }}>
@@ -2092,18 +2239,16 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
   const hasCta = row.formData?.hasCta ?? false;
   const ctaLabel = row.formData?.ctaLabel || 'Learn more';
   const dismissible = row.formData?.dismissible !== 'Non-Dismissible';
+  // Older rows predate the field and always showed the link, so treat a missing
+  // value as "offered" rather than silently removing it from existing messages.
+  const allowOptOut = row.formData?.allowOptOut ?? true;
   const isFeatureSpecific = row.formData?.placement === 'Feature Specific';
   const featurePath = row.formData?.featurePath || '';
 
   // Determine live vs scheduled for the status chip.
-  let previewStatus: 'Live' | 'Scheduled' | null = null;
-  if (row.startDate !== '—') {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const start = new Date(row.startDate);
-    const end = new Date(row.endDate !== '—' ? row.endDate : row.startDate);
-    if (today < start) previewStatus = 'Scheduled';
-    else if (today >= start && today <= end) previewStatus = 'Live';
-  }
+  const windowStatus = getDisplayWindowStatus(row);
+  const previewStatus: 'Live' | 'Scheduled' | null =
+    windowStatus === 'Live' || windowStatus === 'Scheduled' ? windowStatus : null;
   const chipBg = previewStatus === 'Live' ? '#EEFFEE' : previewStatus === 'Scheduled' ? '#E8F4FF' : '#F2F2F2';
   const chipColor = previewStatus === 'Live' ? '#00AA00' : previewStatus === 'Scheduled' ? '#2699FB' : '#585858';
   const scheduleRange = row.endDate !== '—' ? `${row.startDate} – ${row.endDate}` : row.startDate;
@@ -2190,18 +2335,18 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
                 // screen comes out portrait and its 320px message panel then
                 // covers the app behind it. Scale a real-size mock instead.
                 <ScaledMock baseWidth={MOCK_WIDTH} baseHeight={MOCK_WIDTH / 1.6}>
-                  <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+                  <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
                 </ScaledMock>
               ) : (
                 <div className="w-full h-full flex justify-center">
                   <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
-                    <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+                    <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
                   </div>
                 </div>
               )
             ) : (
               <ScaledMock baseWidth={PHONE_WIDTH} baseHeight={PHONE_HEIGHT}>
-                <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+                <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
               </ScaledMock>
             )}
           </div>
