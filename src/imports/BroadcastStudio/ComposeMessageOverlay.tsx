@@ -641,6 +641,39 @@ function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onCha
   );
 }
 
+/**
+ * A bounded checkbox card — same frame as ToggleRow, so the opt-in controls at
+ * the foot of Display Settings read as one family. Carries a description line
+ * because "Don't Show Again" alone does not say who it affects.
+ */
+function CheckboxCard({ title, description, checked, onChange, disabled }: { title: string; description: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={() => !disabled && onChange(!checked)}
+      className="border rounded-[4px] px-[12px] py-[16px] flex items-start gap-[10px] w-full text-left"
+      style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : '#fcfcfc', cursor: disabled ? 'default' : 'pointer' }}
+    >
+      <span
+        className="flex items-center justify-center shrink-0 transition-colors mt-[1px]"
+        style={{
+          width: 18,
+          height: 18,
+          border: `1.5px solid ${checked ? PRIMARY : ICON_LIGHT}`,
+          backgroundColor: 'white',
+          opacity: disabled ? 0.5 : 1,
+        }}
+      >
+        {checked && <RiCheckLine size={13} color={PRIMARY} />}
+      </span>
+      <span className="flex flex-col gap-[2px] min-w-0">
+        <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: NAVY }}>{title}</span>
+        <span className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: '#8B8B8B' }}>{description}</span>
+      </span>
+    </button>
+  );
+}
+
 function ToggleRow({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <div className="border rounded-[4px] px-[12px] py-[16px] flex items-center justify-between w-full" style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : '#fcfcfc' }}>
@@ -1685,14 +1718,6 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 subtext={isEmergency ? 'Non-dismissible is recommended for emergencies (red banners).' : undefined}
               />
             )}
-            {canOfferOptOut && (
-              <CheckboxRow
-                label="Let recipients turn this message off permanently"
-                checked={allowOptOut}
-                onChange={setAllowOptOut}
-                disabled={effectiveReadOnly}
-              />
-            )}
             <CtaBox
               checked={hasCta}
               onChange={setHasCta}
@@ -1704,6 +1729,15 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               onStopOnClickChange={setStopOnCtaClick}
               disabled={effectiveReadOnly}
             />
+            {canOfferOptOut && (
+              <CheckboxCard
+                title="Don't Show Again"
+                description="Let recipients turn this message off permanently"
+                checked={allowOptOut}
+                onChange={setAllowOptOut}
+                disabled={effectiveReadOnly}
+              />
+            )}
             <ToggleRow label="Also send as push notification" checked={pushNotification} onChange={setPushNotification} disabled={effectiveReadOnly} />
           </div>
         </div>
