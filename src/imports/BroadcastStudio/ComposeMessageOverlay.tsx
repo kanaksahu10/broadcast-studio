@@ -763,7 +763,10 @@ function BannerPreview({
       style={{ backgroundColor: color }}
     >
       {dismissible && <div className="shrink-0" style={{ width: 18 }} />}
-      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-white flex-1 text-center">
+      {/* min-w-0 lets the flex item shrink below its content, and break-words
+          splits a long unbroken string — without both, a single long "word"
+          pushes the banner past the edge of the screen it sits in. */}
+      <p className="font-['Montserrat',sans-serif] font-normal text-[13px] text-white flex-1 min-w-0 text-center break-words">
         {body || 'Your message body will appear here.'}
         {hasCta && ctaLabel && (
           <>
