@@ -42,7 +42,7 @@ const AGENCIES: Agency[] = [
   { id: '5', name: 'Empire Homecare Group', state: 'New York', package: 'Enterprise', role: 'Owner', featureFlags: ['Smart Billing', 'Advanced Scheduling', 'eMAR', 'Family Portal'], pushEnabledCount: 602, employeeCount: 950 },
   { id: '6', name: 'Brooklyn Senior Services', state: 'New York', package: 'Standard', role: 'Field Staff', featureFlags: ['eMAR'], pushEnabledCount: 198, employeeCount: 275 },
   { id: '7', name: 'Sunshine State Care', state: 'Florida', package: 'Premium', role: 'Care Coordinator', featureFlags: ['Advanced Scheduling', 'Family Portal'], pushEnabledCount: 351, employeeCount: 410 },
-  { id: '8', name: 'Everglades Health Network', state: 'Florida', package: 'Standard', role: 'Admin', featureFlags: ['Smart Billing'], pushEnabledCount: 88, employeeCount: 165 },
+  { id: '8', name: 'Everglades Health Network', state: 'Florida', package: 'Standard', role: 'Admin', featureFlags: ['Smart Billing'], pushEnabledCount: 0, employeeCount: 165 },
   { id: '9', name: 'Cascade Caregivers', state: 'Washington', package: 'Enterprise', role: 'Owner', featureFlags: ['Advanced Scheduling', 'eMAR'], pushEnabledCount: 404, employeeCount: 530 },
   { id: '10', name: 'Windy City Homecare', state: 'Illinois', package: 'Premium', role: 'Field Staff', featureFlags: ['Family Portal'], pushEnabledCount: 166, employeeCount: 295 },
 ];
@@ -136,6 +136,8 @@ const PREVIEW_ON_LEFT = false;
 /* -- Design tokens copied from the GEOH "Overlay - New Message" Figma frame -- */
 const BORDER = '#e5e5e5';
 const LABEL_GREY = '#646464';
+/** Figma Text.Light — the subtext colour under a bounded-card label. */
+const TEXT_LIGHT = '#8B8B8B';
 const NAVY = '#334c6d';
 const PRIMARY = '#2699fb';
 /** Core/Primary/Background — the tinted blue behind primary-flavoured rows. */
@@ -688,21 +690,21 @@ function CheckboxCard({ title, description, checked, onChange, disabled }: { tit
       </span>
       <span className="flex flex-col gap-[2px] min-w-0">
         <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: NAVY }}>{title}</span>
-        <span className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: '#8B8B8B' }}>{description}</span>
+        <span className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: TEXT_LIGHT }}>{description}</span>
       </span>
     </button>
   );
 }
 
-function ToggleRow({ label, description, descriptionColor, checked, onChange, disabled }: { label: string; description?: string; descriptionColor?: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+function ToggleRow({ label, description, checked, onChange, disabled }: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <div className="border rounded-[4px] px-[12px] py-[16px] flex items-center justify-between gap-[12px] w-full" style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : '#fcfcfc' }}>
       <span className="flex flex-col gap-[2px] min-w-0">
-        <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: NAVY }}>
+        <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: LABEL_GREY }}>
           {label}
         </span>
         {description && (
-          <span className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: descriptionColor ?? '#8B8B8B' }}>
+          <span className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: TEXT_LIGHT }}>
             {description}
           </span>
         )}
@@ -1517,9 +1519,13 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // Only a subset of the audience has the app installed with notifications
   // allowed, so turning push on does not mean everyone selected gets one.
   const pushCount = getAudiencePushCount({ agencies: statesOrAgencies, states, packages, roles, featureFlags });
+  // Push on but reaching nobody is a misconfiguration: the author has asked for
+  // a channel that cannot deliver. Blocked rather than warned, per product call.
+  const hasNoPushReach = pushNotification && pushCount === 0;
 
   const isFormValid =
     !hasNoRecipients &&
+    !hasNoPushReach &&
     title.trim() !== '' &&
     body.trim() !== '' &&
     reason.trim() !== '' &&
@@ -1790,7 +1796,6 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               description={pushNotification
                 ? `${pushCount.toLocaleString()} of ${audienceCount.toLocaleString()} ${audienceCount === 1 ? 'recipient' : 'recipients'} get a notification`
                 : 'Recipients get a device notification as well as seeing it in the app'}
-              descriptionColor={pushNotification && pushCount === 0 ? '#DA4040' : undefined}
               checked={pushNotification}
               onChange={setPushNotification}
               disabled={effectiveReadOnly}
@@ -1948,7 +1953,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                   <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-white leading-[17px]">
                     {hasNoRecipients
                       ? 'This message would reach 0 recipients. Widen the audience before sending.'
-                      : 'Please fill in all required fields to proceed'}
+                      : hasNoPushReach
+                        ? 'Push is on, but nobody in this audience can receive one. Turn push off or widen the audience.'
+                        : 'Please fill in all required fields to proceed'}
                   </p>
                 </div>
               )}
