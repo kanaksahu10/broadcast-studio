@@ -676,12 +676,19 @@ function CheckboxCard({ title, description, checked, onChange, disabled }: { tit
   );
 }
 
-function ToggleRow({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+function ToggleRow({ label, description, checked, onChange, disabled }: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
-    <div className="border rounded-[4px] px-[12px] py-[16px] flex items-center justify-between w-full" style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : '#fcfcfc' }}>
-      <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: NAVY }}>
-        {label}
-      </p>
+    <div className="border rounded-[4px] px-[12px] py-[16px] flex items-center justify-between gap-[12px] w-full" style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : '#fcfcfc' }}>
+      <span className="flex flex-col gap-[2px] min-w-0">
+        <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: NAVY }}>
+          {label}
+        </span>
+        {description && (
+          <span className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: '#8B8B8B' }}>
+            {description}
+          </span>
+        )}
+      </span>
       <ToggleSwitch checked={checked} onChange={onChange} disabled={disabled} />
     </div>
   );
@@ -1757,7 +1764,13 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 disabled={effectiveReadOnly}
               />
             )}
-            <ToggleRow label="Also send as push notification" checked={pushNotification} onChange={setPushNotification} disabled={effectiveReadOnly} />
+            <ToggleRow
+              label="Also send as push notification"
+              description="Recipients get a device notification as well as seeing it in the app"
+              checked={pushNotification}
+              onChange={setPushNotification}
+              disabled={effectiveReadOnly}
+            />
           </div>
         </div>
 
