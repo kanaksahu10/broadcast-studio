@@ -758,8 +758,9 @@ function BannerPreview({
   rounded?: boolean;
 }) {
   return (
+    <div className={`flex flex-col w-full ${rounded ? 'rounded-[6px] overflow-hidden' : ''}`}>
     <div
-      className={`flex items-center gap-[16px] px-[16px] py-[12px] w-full ${rounded ? 'rounded-[6px]' : ''}`}
+      className="flex items-center gap-[16px] px-[16px] py-[12px] w-full"
       style={{ backgroundColor: color }}
     >
       {dismissible && <div className="shrink-0" style={{ width: 18 }} />}
@@ -775,14 +776,18 @@ function BannerPreview({
           </>
         )}
       </p>
-      {/* A banner's X only closes this impression, so without this a recurring
-          banner comes back on the next page load with no way to stop it. */}
-      {allowOptOut && (
-        <span className="font-['Montserrat',sans-serif] font-medium text-[11px] underline whitespace-nowrap shrink-0 cursor-pointer" style={{ color: 'white' }}>
+      {dismissible && <MdClose size={18} color="white" className="shrink-0 cursor-pointer" />}
+    </div>
+    {/* Sits under the message rather than inside the coloured bar: the bar is
+        the message, this is an action on it. On Background/Global so it reads
+        as part of the page, and the height simply hugs the line. */}
+    {allowOptOut && (
+      <div className="w-full px-[16px] py-[8px] flex items-center justify-center" style={{ backgroundColor: '#F8F8F8' }}>
+        <span className="font-['Montserrat',sans-serif] font-normal italic text-[12px] leading-[17px] cursor-pointer" style={{ color: '#585858' }}>
           Don't show again
         </span>
-      )}
-      {dismissible && <MdClose size={18} color="white" className="shrink-0 cursor-pointer" />}
+      </div>
+    )}
     </div>
   );
 }
