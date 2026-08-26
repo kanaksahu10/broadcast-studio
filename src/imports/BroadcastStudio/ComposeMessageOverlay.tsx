@@ -760,11 +760,11 @@ function BannerPreview({
   rounded?: boolean;
 }) {
   return (
-    <div className={`flex flex-col w-full ${rounded ? 'rounded-[6px] overflow-hidden' : ''}`}>
     <div
-      className="flex items-center gap-[16px] px-[16px] py-[12px] w-full"
+      className={`flex flex-col gap-[6px] px-[16px] py-[12px] w-full ${rounded ? 'rounded-[6px]' : ''}`}
       style={{ backgroundColor: color }}
     >
+    <div className="flex items-center gap-[16px] w-full">
       {dismissible && <div className="shrink-0" style={{ width: 18 }} />}
       {/* min-w-0 lets the flex item shrink below its content, and break-words
           splits a long unbroken string — without both, a single long "word"
@@ -786,14 +786,15 @@ function BannerPreview({
       </p>
       {dismissible && <MdClose size={18} color="white" className="shrink-0 cursor-pointer" />}
     </div>
-    {/* Sits under the message rather than inside the coloured bar: the bar is
-        the message, this is an action on it. On Background/Global so it reads
-        as part of the page, and the height simply hugs the line. */}
+    {/* Inside the bar, on its own line under the message and centred on the
+        same axis. Slightly muted so it sits below the CTA in the hierarchy —
+        it is the way out, not the thing we are asking them to do. */}
     {allowOptOut && (
-      <div className="w-full px-[16px] py-[8px] flex items-center justify-center" style={{ backgroundColor: PRIMARY_BG }}>
-        {/* Same treatment as the overlay's own opt-out link, so the action
-            looks the same wherever a recipient meets it. */}
-        <span className="font-['Montserrat',sans-serif] font-medium text-[11px] tracking-wide uppercase whitespace-nowrap cursor-pointer" style={{ color: NAVY }}>
+      <div className="w-full flex items-center justify-center">
+        <span
+          className="font-['Montserrat',sans-serif] font-medium text-[11px] tracking-wide uppercase whitespace-nowrap cursor-pointer"
+          style={{ color: 'rgba(255,255,255,0.85)' }}
+        >
           Don't show again
         </span>
       </div>
