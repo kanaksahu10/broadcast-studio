@@ -774,7 +774,13 @@ function BannerPreview({
         {hasCta && ctaLabel && (
           <>
             {' '}
-            <span className="font-medium underline cursor-pointer">{ctaLabel}</span>
+            {/* Same external-link cue the overlay's CTA carries, so a banner
+                link is visibly a link that leaves the page. Underline stays on
+                the words only — the icon sits beside them, as in the overlay. */}
+            <span className="inline-flex items-center gap-[4px] align-middle cursor-pointer">
+              <span className="font-medium underline">{ctaLabel}</span>
+              <FiExternalLink size={12} className="shrink-0" />
+            </span>
           </>
         )}
       </p>
