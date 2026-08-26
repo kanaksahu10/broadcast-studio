@@ -95,7 +95,7 @@ type MessageType = '' | 'Announcement' | 'Emergency';
 
 interface MessageFormData {
   body?: string; reason?: string; department?: string; messageCategory?: string; customCategoryName?: string; author?: string; noEndDate?: boolean; displayFormat?: string; placement?: string; featurePath?: string;
-  messageColor?: string; searchMode?: string; statesOrAgencies?: string[]; states?: string[]; featureFlags?: string[];
+  messageColor?: string; allowOptOut?: boolean; searchMode?: string; statesOrAgencies?: string[]; states?: string[]; featureFlags?: string[];
   packages?: string[]; roles?: string[]; dismissible?: string; hasCta?: boolean;
   ctaLabel?: string; ctaDestination?: string; pushNotification?: boolean;
 }
@@ -2100,6 +2100,9 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
   const hasCta = row.formData?.hasCta ?? false;
   const ctaLabel = row.formData?.ctaLabel || 'Learn more';
   const dismissible = row.formData?.dismissible !== 'Non-Dismissible';
+  // Older rows predate the field and always showed the link, so treat a missing
+  // value as "offered" rather than silently removing it from existing messages.
+  const allowOptOut = row.formData?.allowOptOut ?? true;
   const isFeatureSpecific = row.formData?.placement === 'Feature Specific';
   const featurePath = row.formData?.featurePath || '';
 
@@ -2198,18 +2201,18 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
                 // screen comes out portrait and its 320px message panel then
                 // covers the app behind it. Scale a real-size mock instead.
                 <ScaledMock baseWidth={MOCK_WIDTH} baseHeight={MOCK_WIDTH / 1.6}>
-                  <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+                  <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
                 </ScaledMock>
               ) : (
                 <div className="w-full h-full flex justify-center">
                   <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
-                    <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+                    <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
                   </div>
                 </div>
               )
             ) : (
               <ScaledMock baseWidth={PHONE_WIDTH} baseHeight={PHONE_HEIGHT}>
-                <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} />
+                <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
               </ScaledMock>
             )}
           </div>

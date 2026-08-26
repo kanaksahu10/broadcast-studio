@@ -706,6 +706,7 @@ function BannerPreview({
   body,
   color,
   dismissible,
+  allowOptOut,
   hasCta,
   ctaLabel,
   rounded = true,
@@ -713,6 +714,7 @@ function BannerPreview({
   body: string;
   color: string;
   dismissible: boolean;
+  allowOptOut?: boolean;
   hasCta: boolean;
   ctaLabel: string;
   rounded?: boolean;
@@ -732,6 +734,13 @@ function BannerPreview({
           </>
         )}
       </p>
+      {/* A banner's X only closes this impression, so without this a recurring
+          banner comes back on the next page load with no way to stop it. */}
+      {allowOptOut && (
+        <span className="font-['Montserrat',sans-serif] font-medium text-[11px] underline whitespace-nowrap shrink-0 cursor-pointer" style={{ color: 'white' }}>
+          Don't show again
+        </span>
+      )}
       {dismissible && <MdClose size={18} color="white" className="shrink-0 cursor-pointer" />}
     </div>
   );
@@ -741,6 +750,7 @@ function OverlayPreview({
   title,
   body,
   dismissible,
+  allowOptOut,
   hasCta,
   ctaLabel,
   rounded = true,
@@ -750,6 +760,7 @@ function OverlayPreview({
   title: string;
   body: string;
   dismissible: boolean;
+  allowOptOut?: boolean;
   hasCta: boolean;
   ctaLabel: string;
   rounded?: boolean;
@@ -776,11 +787,16 @@ function OverlayPreview({
           </div>
         )}
       </div>
-      {dismissible && (
+      {(dismissible || allowOptOut) && (
         <div className={`flex items-center justify-between gap-[8px] ${compact ? 'px-[12px] py-[8px]' : 'px-[16px] py-[10px]'} border-t shrink-0`} style={{ borderColor: BORDER, backgroundColor: '#fafafa' }}>
-          <span className={`font-['Montserrat',sans-serif] font-medium ${compact ? 'text-[8px] tracking-normal' : 'text-[11px] tracking-wide'} uppercase whitespace-nowrap cursor-pointer`} style={{ color: NAVY }}>
-            Don't show again
-          </span>
+          {/* "Don't show again" is a separate promise from "Dismiss" — never
+              again, versus not now — so the author opts into it explicitly
+              rather than it riding along with dismissibility. */}
+          {allowOptOut ? (
+            <span className={`font-['Montserrat',sans-serif] font-medium ${compact ? 'text-[8px] tracking-normal' : 'text-[11px] tracking-wide'} uppercase whitespace-nowrap cursor-pointer`} style={{ color: NAVY }}>
+              Don't show again
+            </span>
+          ) : <span />}
           <button
             type="button"
             className={`rounded-[6px] shrink-0 ${compact ? 'px-[8px] py-[4px] text-[10px]' : 'px-[12px] py-[6px] text-[12px]'} font-['Montserrat',sans-serif] font-medium text-white flex items-center gap-[4px] cursor-pointer`}
@@ -847,6 +863,7 @@ export function ScreenSkeleton({
   body,
   color,
   dismissible,
+  allowOptOut,
   hasCta,
   ctaLabel,
 }: {
@@ -855,6 +872,7 @@ export function ScreenSkeleton({
   body: string;
   color: string;
   dismissible: boolean;
+  allowOptOut?: boolean;
   hasCta: boolean;
   ctaLabel: string;
 }) {
@@ -945,13 +963,13 @@ export function ScreenSkeleton({
 
       {effectiveFormat === 'Overlay' && (
         <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
-          <OverlayPreview title={title} body={body} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          <OverlayPreview title={title} body={body} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
         </div>
       )}
 
       {effectiveFormat === 'Banner' && (
         <div className="absolute left-0 right-0 bottom-0">
-          <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          <BannerPreview body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
         </div>
       )}
     </div>
@@ -1055,6 +1073,7 @@ export function PhoneSkeleton({
   body,
   color,
   dismissible,
+  allowOptOut,
   hasCta,
   ctaLabel,
 }: {
@@ -1063,6 +1082,7 @@ export function PhoneSkeleton({
   body: string;
   color: string;
   dismissible: boolean;
+  allowOptOut?: boolean;
   hasCta: boolean;
   ctaLabel: string;
 }) {
@@ -1139,6 +1159,7 @@ export function PhoneSkeleton({
             title={title}
             body={body}
             dismissible={dismissible}
+            allowOptOut={allowOptOut}
             hasCta={hasCta}
             ctaLabel={ctaLabel}
             rounded={false}
@@ -1149,7 +1170,7 @@ export function PhoneSkeleton({
 
       {effectiveFormat === 'Banner' && (
         <div className="absolute left-0 right-0 bottom-0">
-          <BannerPreview body={body} color={color} dismissible={dismissible} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          <BannerPreview body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
         </div>
       )}
     </div>
@@ -1180,6 +1201,8 @@ type FormData = {
   packages?: string[];
   roles?: string[];
   dismissible?: string;
+  /** Whether recipients are offered a permanent "Don't show again". */
+  allowOptOut?: boolean;
   hasCta?: boolean;
   ctaLabel?: string;
   ctaDestination?: string;
@@ -1334,6 +1357,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const [endDate, setEndDate] = useState(initialData?.endDate ?? '');
   const [noEndDate, setNoEndDate] = useState(initialData?.noEndDate ?? false);
   const [dismissible, setDismissible] = useState<Dismissible>((initialData?.dismissible as Dismissible) ?? 'Dismissible');
+  const [allowOptOut, setAllowOptOut] = useState<boolean>(initialData?.allowOptOut ?? true);
   // Overlay messages are always dismissible — there's no non-dismissible
   // overlay in the design, so the choice only makes sense for Banner. Force
   // it back to Dismissible whenever the format is (or becomes) Overlay,
@@ -1386,6 +1410,11 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   }, [previewSignature, stackedTab]);
 
   const isEmergency = displayFormat === 'Banner' && messageColor === '#DA4040';
+  // Emergency is deliberately unavoidable, and a permanent opt-out on a message
+  // that cannot be closed is meaningless — so the option is unavailable rather
+  // than merely unchecked in those cases.
+  const canOfferOptOut = displayFormat !== '' && !isEmergency && (displayFormat === 'Overlay' || dismissible === 'Dismissible');
+  const effectiveAllowOptOut = canOfferOptOut && allowOptOut;
 
   const audienceCount = getAudienceRecipientCount({ agencies: statesOrAgencies, states, packages, roles, featureFlags });
   // Nothing may be sent to nobody — this gates submission and reddens the count.
@@ -1410,7 +1439,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // lands in the same render as switching to Overlay can't slip through
   // with a stale Non-Dismissible value before the effect has a chance to run.
   const savedDismissible: Dismissible = displayFormat === 'Overlay' ? 'Dismissible' : dismissible;
-  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, statesOrAgencies, states, featureFlags, packages, roles, dismissible: savedDismissible, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
+  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, statesOrAgencies, states, featureFlags, packages, roles, dismissible: savedDismissible, allowOptOut: effectiveAllowOptOut, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
 
   const handleSubmit = () => {
     onMessageCreated?.(allFormData);
@@ -1630,6 +1659,14 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             {displayFormat === 'Banner' && (
               <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} disabled={effectiveReadOnly} />
             )}
+            {canOfferOptOut && (
+              <CheckboxRow
+                label="Let recipients turn this message off permanently"
+                checked={allowOptOut}
+                onChange={setAllowOptOut}
+                disabled={effectiveReadOnly}
+              />
+            )}
             <CtaBox
               checked={hasCta}
               onChange={setHasCta}
@@ -1693,6 +1730,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                           body={body}
                           color={effectiveBannerColor}
                           dismissible={effectiveDismissible}
+                          allowOptOut={effectiveAllowOptOut}
                           hasCta={hasCta}
                           ctaLabel={ctaLabel}
                         />
@@ -1708,6 +1746,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                             body={body}
                             color={effectiveBannerColor}
                             dismissible={effectiveDismissible}
+                            allowOptOut={effectiveAllowOptOut}
                             hasCta={hasCta}
                             ctaLabel={ctaLabel}
                           />
@@ -1724,6 +1763,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                         body={body}
                         color={effectiveBannerColor}
                         dismissible={effectiveDismissible}
+                        allowOptOut={effectiveAllowOptOut}
                         hasCta={hasCta}
                         ctaLabel={ctaLabel}
                       />
