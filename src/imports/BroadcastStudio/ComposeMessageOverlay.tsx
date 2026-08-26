@@ -25,20 +25,26 @@ interface Agency {
   role: string;
   /** Feature flags enabled for this agency — an agency can have several. */
   featureFlags: string[];
+  /**
+   * How many of this agency's people can actually receive a push: app
+   * installed and notifications allowed. Always <= employeeCount, and the gap
+   * varies by agency, so it is stored rather than derived from a flat rate.
+   */
+  pushEnabledCount: number;
   employeeCount: number;
 }
 
 const AGENCIES: Agency[] = [
-  { id: '1', name: 'Sunrise Home Care', state: 'California', package: 'Enterprise', role: 'Owner', featureFlags: ['Smart Billing', 'Advanced Scheduling', 'Family Portal'], employeeCount: 1200 },
-  { id: '2', name: 'Golden Gate Health Partners', state: 'California', package: 'Premium', role: 'Admin', featureFlags: ['Smart Billing', 'eMAR'], employeeCount: 340 },
-  { id: '3', name: 'Lone Star Caregivers', state: 'Texas', package: 'Standard', role: 'Care Coordinator', featureFlags: ['Advanced Scheduling'], employeeCount: 210 },
-  { id: '4', name: 'Austin Family Support', state: 'Texas', package: 'Premium', role: 'Admin', featureFlags: ['Smart Billing', 'Family Portal'], employeeCount: 180 },
-  { id: '5', name: 'Empire Homecare Group', state: 'New York', package: 'Enterprise', role: 'Owner', featureFlags: ['Smart Billing', 'Advanced Scheduling', 'eMAR', 'Family Portal'], employeeCount: 950 },
-  { id: '6', name: 'Brooklyn Senior Services', state: 'New York', package: 'Standard', role: 'Field Staff', featureFlags: ['eMAR'], employeeCount: 275 },
-  { id: '7', name: 'Sunshine State Care', state: 'Florida', package: 'Premium', role: 'Care Coordinator', featureFlags: ['Advanced Scheduling', 'Family Portal'], employeeCount: 410 },
-  { id: '8', name: 'Everglades Health Network', state: 'Florida', package: 'Standard', role: 'Admin', featureFlags: ['Smart Billing'], employeeCount: 165 },
-  { id: '9', name: 'Cascade Caregivers', state: 'Washington', package: 'Enterprise', role: 'Owner', featureFlags: ['Advanced Scheduling', 'eMAR'], employeeCount: 530 },
-  { id: '10', name: 'Windy City Homecare', state: 'Illinois', package: 'Premium', role: 'Field Staff', featureFlags: ['Family Portal'], employeeCount: 295 },
+  { id: '1', name: 'Sunrise Home Care', state: 'California', package: 'Enterprise', role: 'Owner', featureFlags: ['Smart Billing', 'Advanced Scheduling', 'Family Portal'], pushEnabledCount: 910, employeeCount: 1200 },
+  { id: '2', name: 'Golden Gate Health Partners', state: 'California', package: 'Premium', role: 'Admin', featureFlags: ['Smart Billing', 'eMAR'], pushEnabledCount: 244, employeeCount: 340 },
+  { id: '3', name: 'Lone Star Caregivers', state: 'Texas', package: 'Standard', role: 'Care Coordinator', featureFlags: ['Advanced Scheduling'], pushEnabledCount: 121, employeeCount: 210 },
+  { id: '4', name: 'Austin Family Support', state: 'Texas', package: 'Premium', role: 'Admin', featureFlags: ['Smart Billing', 'Family Portal'], pushEnabledCount: 143, employeeCount: 180 },
+  { id: '5', name: 'Empire Homecare Group', state: 'New York', package: 'Enterprise', role: 'Owner', featureFlags: ['Smart Billing', 'Advanced Scheduling', 'eMAR', 'Family Portal'], pushEnabledCount: 602, employeeCount: 950 },
+  { id: '6', name: 'Brooklyn Senior Services', state: 'New York', package: 'Standard', role: 'Field Staff', featureFlags: ['eMAR'], pushEnabledCount: 198, employeeCount: 275 },
+  { id: '7', name: 'Sunshine State Care', state: 'Florida', package: 'Premium', role: 'Care Coordinator', featureFlags: ['Advanced Scheduling', 'Family Portal'], pushEnabledCount: 351, employeeCount: 410 },
+  { id: '8', name: 'Everglades Health Network', state: 'Florida', package: 'Standard', role: 'Admin', featureFlags: ['Smart Billing'], pushEnabledCount: 88, employeeCount: 165 },
+  { id: '9', name: 'Cascade Caregivers', state: 'Washington', package: 'Enterprise', role: 'Owner', featureFlags: ['Advanced Scheduling', 'eMAR'], pushEnabledCount: 404, employeeCount: 530 },
+  { id: '10', name: 'Windy City Homecare', state: 'Illinois', package: 'Premium', role: 'Field Staff', featureFlags: ['Family Portal'], pushEnabledCount: 166, employeeCount: 295 },
 ];
 
 const STATES = Array.from(new Set(AGENCIES.map((a) => a.state)));
@@ -64,15 +70,27 @@ export type AudienceSelection = {
  * is "no constraint" rather than "match nothing", except that agencies and
  * states are the starting set: with neither, nothing is targeted yet.
  */
-export function getAudienceRecipientCount({ agencies = [], states = [], packages = [], roles = [], featureFlags = [] }: AudienceSelection): number {
-  if (agencies.length === 0 && states.length === 0) return 0;
+function getMatchingAgencies({ agencies = [], states = [], packages = [], roles = [], featureFlags = [] }: AudienceSelection): Agency[] {
+  if (agencies.length === 0 && states.length === 0) return [];
   let matching = AGENCIES.filter((a) =>
     (agencies.length === 0 || agencies.includes(a.name)) &&
     (states.length === 0 || states.includes(a.state)));
   if (packages.length > 0) matching = matching.filter((a) => packages.includes(a.package));
   if (roles.length > 0) matching = matching.filter((a) => roles.includes(a.role));
   if (featureFlags.length > 0) matching = matching.filter((a) => featureFlags.some((f) => a.featureFlags.includes(f)));
-  return matching.reduce((sum, a) => sum + a.employeeCount, 0);
+  return matching;
+}
+
+export function getAudienceRecipientCount(selection: AudienceSelection): number {
+  return getMatchingAgencies(selection).reduce((sum, a) => sum + a.employeeCount, 0);
+}
+
+/**
+ * How many of the selected audience can actually be reached by push. Always a
+ * subset of the recipient count — the rest see the message in-app only.
+ */
+export function getAudiencePushCount(selection: AudienceSelection): number {
+  return getMatchingAgencies(selection).reduce((sum, a) => sum + a.pushEnabledCount, 0);
 }
 const STATE_ABBR: Record<string, string> = {
   'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
@@ -676,7 +694,7 @@ function CheckboxCard({ title, description, checked, onChange, disabled }: { tit
   );
 }
 
-function ToggleRow({ label, description, checked, onChange, disabled }: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+function ToggleRow({ label, description, descriptionColor, checked, onChange, disabled }: { label: string; description?: string; descriptionColor?: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <div className="border rounded-[4px] px-[12px] py-[16px] flex items-center justify-between gap-[12px] w-full" style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : '#fcfcfc' }}>
       <span className="flex flex-col gap-[2px] min-w-0">
@@ -684,7 +702,7 @@ function ToggleRow({ label, description, checked, onChange, disabled }: { label:
           {label}
         </span>
         {description && (
-          <span className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: '#8B8B8B' }}>
+          <span className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: descriptionColor ?? '#8B8B8B' }}>
             {description}
           </span>
         )}
@@ -1496,6 +1514,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const audienceCount = getAudienceRecipientCount({ agencies: statesOrAgencies, states, packages, roles, featureFlags });
   // Nothing may be sent to nobody — this gates submission and reddens the count.
   const hasNoRecipients = audienceCount === 0;
+  // Only a subset of the audience has the app installed with notifications
+  // allowed, so turning push on does not mean everyone selected gets one.
+  const pushCount = getAudiencePushCount({ agencies: statesOrAgencies, states, packages, roles, featureFlags });
 
   const isFormValid =
     !hasNoRecipients &&
@@ -1766,7 +1787,10 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             )}
             <ToggleRow
               label="Also send as push notification"
-              description="Recipients get a device notification as well as seeing it in the app"
+              description={pushNotification
+                ? `${pushCount.toLocaleString()} of ${audienceCount.toLocaleString()} ${audienceCount === 1 ? 'recipient' : 'recipients'} get a notification`
+                : 'Recipients get a device notification as well as seeing it in the app'}
+              descriptionColor={pushNotification && pushCount === 0 ? '#DA4040' : undefined}
               checked={pushNotification}
               onChange={setPushNotification}
               disabled={effectiveReadOnly}
