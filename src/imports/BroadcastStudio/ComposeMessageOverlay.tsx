@@ -1795,7 +1795,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               label="Also send as push notification"
               description={pushNotification
                 ? `${pushCount.toLocaleString()} of ${audienceCount.toLocaleString()} ${audienceCount === 1 ? 'recipient' : 'recipients'} get a notification`
-                : 'Recipients get a device notification as well as seeing it in the app'}
+                : undefined}
               checked={pushNotification}
               onChange={setPushNotification}
               disabled={effectiveReadOnly}
