@@ -127,7 +127,7 @@ function SectionHeader({ children }: { children: string }) {
   return <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px] text-black w-full">{children}</p>;
 }
 
-function FieldShell({ label, height, disabled, open, children }: { label: string; height?: number; disabled?: boolean; open?: boolean; children: React.ReactNode }) {
+function FieldShell({ label, height, disabled, open, subtext, children }: { label: string; height?: number; disabled?: boolean; open?: boolean; subtext?: string; children: React.ReactNode }) {
   return (
     <div
       className={`border px-[12px] py-[8px] flex flex-col gap-[8px] justify-center w-full ${open ? 'rounded-t-[4px]' : 'rounded-[4px]'}`}
@@ -137,6 +137,11 @@ function FieldShell({ label, height, disabled, open, children }: { label: string
         {label}
       </p>
       {children}
+      {subtext && (
+        <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] mt-[4px]" style={{ color: '#B8B8B8' }}>
+          {subtext}
+        </p>
+      )}
     </div>
   );
 }
@@ -575,9 +580,9 @@ function RadioDot({ selected }: { selected: boolean }) {
   );
 }
 
-function RadioField({ label, value, onChange, options, disabled }: { label: string; value: string; onChange: (v: string) => void; options: string[]; disabled?: boolean }) {
+function RadioField({ label, value, onChange, options, disabled, subtext }: { label: string; value: string; onChange: (v: string) => void; options: string[]; disabled?: boolean; subtext?: string }) {
   return (
-    <FieldShell label={label} disabled={disabled}>
+    <FieldShell label={label} disabled={disabled} subtext={subtext}>
       <div className="flex gap-[16px] items-center w-full">
         {options.map((opt) => (
           <button key={opt} type="button" onClick={() => onChange(opt)} className="flex items-center gap-[8px] cursor-pointer">
@@ -590,9 +595,9 @@ function RadioField({ label, value, onChange, options, disabled }: { label: stri
   );
 }
 
-function ColorField({ label, value, onChange, options, optionLabels, disabled }: { label: string; value: string; onChange: (v: string) => void; options: string[]; optionLabels?: Record<string, string>; disabled?: boolean }) {
+function ColorField({ label, value, onChange, options, optionLabels, disabled, subtext }: { label: string; value: string; onChange: (v: string) => void; options: string[]; optionLabels?: Record<string, string>; disabled?: boolean; subtext?: string }) {
   return (
-    <FieldShell label={label} disabled={disabled}>
+    <FieldShell label={label} disabled={disabled} subtext={subtext}>
       <div className="flex flex-col gap-[14px] w-full pb-[6px]">
         {options.map((opt) => (
           <button
@@ -1370,6 +1375,19 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayFormat]);
+
+  // Selecting the Emergency colour preselects Non-Dismissible, since that is
+  // the convention the helper text recommends. Keyed on the transition into
+  // red rather than the state of being red, so an author who deliberately
+  // switches back to Dismissible is not overridden on every later render.
+  const prevMessageColor = useRef(messageColor);
+  useEffect(() => {
+    const becameEmergency = messageColor === '#DA4040' && prevMessageColor.current !== '#DA4040';
+    prevMessageColor.current = messageColor;
+    if (becameEmergency && displayFormat === 'Banner') setDismissible('Non-Dismissible');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messageColor, displayFormat]);
+
   const [pushNotification, setPushNotification] = useState(initialData?.pushNotification ?? false);
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
   const [isSubmitHovered, setIsSubmitHovered] = useState(false);
@@ -1606,6 +1624,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 options={MESSAGE_COLOR_OPTIONS}
                 optionLabels={{ '#DA4040': 'Emergency', '#27496D': 'Regular' }}
                 disabled={effectiveReadOnly}
+                subtext={isEmergency ? 'Red is recommended for emergencies.' : undefined}
               />
             )}
             <SelectField label="Placement *" value={placement} onChange={(v) => setPlacement(v as Placement)} placeholder="Select placement..." options={['App-wide', 'Feature Specific']} disabled={effectiveReadOnly} />
@@ -1657,7 +1676,14 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             {/* Overlay is always dismissible (forced above), so the choice is
                 meaningless there — only Banner gets to pick. */}
             {displayFormat === 'Banner' && (
-              <RadioField label="Display" value={dismissible} onChange={(v) => setDismissible(v as Dismissible)} options={['Dismissible', 'Non-Dismissible']} disabled={effectiveReadOnly} />
+              <RadioField
+                label="Display"
+                value={dismissible}
+                onChange={(v) => setDismissible(v as Dismissible)}
+                options={['Dismissible', 'Non-Dismissible']}
+                disabled={effectiveReadOnly}
+                subtext={isEmergency ? 'Non-dismissible is recommended for emergencies (red banners).' : undefined}
+              />
             )}
             {canOfferOptOut && (
               <CheckboxRow
