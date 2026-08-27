@@ -35,16 +35,16 @@ interface Agency {
 }
 
 const AGENCIES: Agency[] = [
-  { id: '1', name: 'Sunrise Home Care', state: 'California', package: 'Enterprise', role: 'Owner', featureFlags: ['Smart Billing', 'Advanced Scheduling', 'Family Portal'], pushEnabledCount: 910, employeeCount: 1200 },
-  { id: '2', name: 'Golden Gate Health Partners', state: 'California', package: 'Premium', role: 'Admin', featureFlags: ['Smart Billing', 'eMAR'], pushEnabledCount: 244, employeeCount: 340 },
-  { id: '3', name: 'Lone Star Caregivers', state: 'Texas', package: 'Standard', role: 'Care Coordinator', featureFlags: ['Advanced Scheduling'], pushEnabledCount: 121, employeeCount: 210 },
-  { id: '4', name: 'Austin Family Support', state: 'Texas', package: 'Premium', role: 'Admin', featureFlags: ['Smart Billing', 'Family Portal'], pushEnabledCount: 143, employeeCount: 180 },
-  { id: '5', name: 'Empire Homecare Group', state: 'New York', package: 'Enterprise', role: 'Owner', featureFlags: ['Smart Billing', 'Advanced Scheduling', 'eMAR', 'Family Portal'], pushEnabledCount: 602, employeeCount: 950 },
-  { id: '6', name: 'Brooklyn Senior Services', state: 'New York', package: 'Standard', role: 'Field Staff', featureFlags: ['eMAR'], pushEnabledCount: 198, employeeCount: 275 },
-  { id: '7', name: 'Sunshine State Care', state: 'Florida', package: 'Premium', role: 'Care Coordinator', featureFlags: ['Advanced Scheduling', 'Family Portal'], pushEnabledCount: 351, employeeCount: 410 },
-  { id: '8', name: 'Everglades Health Network', state: 'Florida', package: 'Standard', role: 'Admin', featureFlags: ['Smart Billing'], pushEnabledCount: 0, employeeCount: 165 },
-  { id: '9', name: 'Cascade Caregivers', state: 'Washington', package: 'Enterprise', role: 'Owner', featureFlags: ['Advanced Scheduling', 'eMAR'], pushEnabledCount: 404, employeeCount: 530 },
-  { id: '10', name: 'Windy City Homecare', state: 'Illinois', package: 'Premium', role: 'Field Staff', featureFlags: ['Family Portal'], pushEnabledCount: 166, employeeCount: 295 },
+  { id: '1', name: 'Sunrise Home Care', state: 'California', package: 'Billing Executive', role: 'Owner', featureFlags: ['Smart Billing', 'Advanced Scheduling', 'Family Portal'], pushEnabledCount: 910, employeeCount: 1200 },
+  { id: '2', name: 'Golden Gate Health Partners', state: 'California', package: 'Billing', role: 'Admin', featureFlags: ['Smart Billing', 'eMAR'], pushEnabledCount: 244, employeeCount: 340 },
+  { id: '3', name: 'Lone Star Caregivers', state: 'Texas', package: 'Advantage', role: 'Care Coordinator', featureFlags: ['Advanced Scheduling'], pushEnabledCount: 121, employeeCount: 210 },
+  { id: '4', name: 'Austin Family Support', state: 'Texas', package: 'Billing', role: 'Admin', featureFlags: ['Smart Billing', 'Family Portal'], pushEnabledCount: 143, employeeCount: 180 },
+  { id: '5', name: 'Empire Homecare Group', state: 'New York', package: 'Billing Executive', role: 'Owner', featureFlags: ['Smart Billing', 'Advanced Scheduling', 'eMAR', 'Family Portal'], pushEnabledCount: 602, employeeCount: 950 },
+  { id: '6', name: 'Brooklyn Senior Services', state: 'New York', package: 'Advantage', role: 'Field Staff', featureFlags: ['eMAR'], pushEnabledCount: 198, employeeCount: 275 },
+  { id: '7', name: 'Sunshine State Care', state: 'Florida', package: 'Billing', role: 'Care Coordinator', featureFlags: ['Advanced Scheduling', 'Family Portal'], pushEnabledCount: 351, employeeCount: 410 },
+  { id: '8', name: 'Everglades Health Network', state: 'Florida', package: 'Advantage', role: 'Admin', featureFlags: ['Smart Billing'], pushEnabledCount: 0, employeeCount: 165 },
+  { id: '9', name: 'Cascade Caregivers', state: 'Washington', package: 'Billing Executive', role: 'Owner', featureFlags: ['Advanced Scheduling', 'eMAR'], pushEnabledCount: 404, employeeCount: 530 },
+  { id: '10', name: 'Windy City Homecare', state: 'Illinois', package: 'Billing', role: 'Field Staff', featureFlags: ['Family Portal'], pushEnabledCount: 166, employeeCount: 295 },
 ];
 
 const STATES = Array.from(new Set(AGENCIES.map((a) => a.state)));
@@ -1747,7 +1747,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               </p>
             </div>
             {/* Agency and State are both first-class now rather than two modes of
-                one field — targeting "Texas agencies on Premium" needed both at
+                one field — targeting "Texas agencies on Billing" needed both at
                 once, which the old Search By radio made impossible. */}
             <MultiSelectField label="Agency" values={statesOrAgencies} onChange={setStatesOrAgencies} placeholder="Select agencies..." options={AGENCIES.map((a) => a.name)} disabled={effectiveReadOnly} variant="agency" />
             <MultiSelectField label="State" values={states} onChange={setStates} placeholder="Select states..." options={STATES} disabled={effectiveReadOnly} variant="state" />
