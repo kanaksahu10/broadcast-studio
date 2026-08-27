@@ -1225,7 +1225,7 @@ export function PhoneSkeleton({
             <SkeletonBar width="54px" height={12} color={SKELETON.greyLight} />
             <SkeletonBar width="54px" height={12} color={SKELETON.greyLight} />
           </div>
-          {/* Select All + record cards, mobile's substitute for the datagrid */}
+          {/* Select All + record cards, mobile's substitute for the desktop mock's table */}
           <div className="rounded-[8px] border flex items-center justify-between px-[10px] py-[8px] shrink-0" style={{ borderColor: BORDER }}>
             <SkeletonBar width="30%" height={8} color="#c7c7c7" />
             <CheckboxSkeleton />
