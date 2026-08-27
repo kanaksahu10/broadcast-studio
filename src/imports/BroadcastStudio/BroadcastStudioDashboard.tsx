@@ -314,10 +314,18 @@ function getRecipientCount(row: BroadcastMessageRow): number {
   const f = row.formData;
   const agencies = f?.statesOrAgencies ?? [];
   const states = f?.states ?? [];
-  if (agencies.length === 0 && states.length === 0) return row.recipients ?? 0;
-  return getAudienceRecipientCount({
-    agencies, states, packages: f?.packages ?? [], roles: f?.roles ?? [], featureFlags: f?.featureFlags ?? [],
-  }) || (row.recipients ?? 0);
+  const packages = f?.packages ?? [];
+  const roles = f?.roles ?? [];
+  const featureFlags = f?.featureFlags ?? [];
+  // Any one facet alone is enough to target an audience — Role by itself, say,
+  // with no Agency/State/Package/Feature Flag. Only fall back to the row's
+  // flat stored count when literally nothing is selected in any facet (older
+  // rows that predate field-based audience targeting). Once there IS a live
+  // selection, 0 matches is itself the real answer — it must not be masked
+  // by a stale stored number.
+  const hasAudienceSelection = agencies.length > 0 || states.length > 0 || packages.length > 0 || roles.length > 0 || featureFlags.length > 0;
+  if (!hasAudienceSelection) return row.recipients ?? 0;
+  return getAudienceRecipientCount({ agencies, states, packages, roles, featureFlags });
 }
 
 function formatDisplayDate(dateStr: string): string {

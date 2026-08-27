@@ -66,15 +66,16 @@ export type AudienceSelection = {
 };
 
 /**
- * Every provided facet narrows the audience — they AND together. An empty facet
- * is "no constraint" rather than "match nothing", except that agencies and
- * states are the starting set: with neither, nothing is targeted yet.
+ * Every facet is independent — none of them require another to be set first.
+ * A facet with no selection is "no constraint" and simply doesn't filter;
+ * facets that do have a selection AND together. The only case that targets
+ * nobody is every facet being empty at once (nothing selected anywhere).
  */
 function getMatchingAgencies({ agencies = [], states = [], packages = [], roles = [], featureFlags = [] }: AudienceSelection): Agency[] {
-  if (agencies.length === 0 && states.length === 0) return [];
-  let matching = AGENCIES.filter((a) =>
-    (agencies.length === 0 || agencies.includes(a.name)) &&
-    (states.length === 0 || states.includes(a.state)));
+  if (agencies.length === 0 && states.length === 0 && packages.length === 0 && roles.length === 0 && featureFlags.length === 0) return [];
+  let matching = AGENCIES;
+  if (agencies.length > 0) matching = matching.filter((a) => agencies.includes(a.name));
+  if (states.length > 0) matching = matching.filter((a) => states.includes(a.state));
   if (packages.length > 0) matching = matching.filter((a) => packages.includes(a.package));
   if (roles.length > 0) matching = matching.filter((a) => roles.includes(a.role));
   if (featureFlags.length > 0) matching = matching.filter((a) => featureFlags.some((f) => a.featureFlags.includes(f)));
@@ -1558,6 +1559,19 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const savedDismissible: Dismissible = displayFormat === 'Overlay' ? 'Dismissible' : dismissible;
   const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, statesOrAgencies, states, featureFlags, packages, roles, dismissible: savedDismissible, allowOptOut: effectiveAllowOptOut, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
 
+  // Baseline to diff against on close, so a draft window that's opened and
+  // closed untouched doesn't save (or toast) anything. Captured once at the
+  // moment draft mode actually starts — on mount for a Draft opened straight
+  // from the board, or the instant "Edit as Draft" flips editingAsDraft true
+  // for a discarded message — rather than at the overlay's original mount,
+  // since that transition itself reassigns the author, which is a real
+  // effect of the click, not a form edit to detect.
+  const draftBaselineRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (inDraftMode) draftBaselineRef.current = JSON.stringify(allFormData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inDraftMode]);
+
   const handleSubmit = () => {
     onMessageCreated?.(allFormData);
     onClose();
@@ -1569,11 +1583,15 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   };
 
   // In draft mode there's no separate Save as Draft button — closing (X) is
-  // itself the save. Everywhere else, X just closes: a brand-new,
+  // itself the save, but only if something actually changed since draft mode
+  // began; otherwise there's nothing to write back and no "All Changes
+  // Saved" toast to show. Everywhere else, X just closes: a brand-new,
   // never-saved message has nothing to save, and the locked discarded/
   // review views have their own explicit actions for anything that mutates.
   const handleClose = () => {
-    if (inDraftMode) onSaveAsDraft?.(allFormData);
+    if (inDraftMode && draftBaselineRef.current !== null && JSON.stringify(allFormData) !== draftBaselineRef.current) {
+      onSaveAsDraft?.(allFormData);
+    }
     onClose();
   };
 
@@ -1744,40 +1762,6 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             <TextAreaField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
           </div>
 
-          {/* Date & Time card */}
-          <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
-            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Date &amp; Time</p>
-            <DateField label="Start Date *" value={startDate} onChange={setStartDate} disabled={effectiveReadOnly} />
-            <DateField label="End Date" value={endDate} onChange={setEndDate} disabled={effectiveReadOnly || noEndDate} />
-            <CheckboxRow
-              label="No end date"
-              checked={noEndDate}
-              onChange={(v) => { setNoEndDate(v); if (v) setEndDate(''); }}
-              disabled={effectiveReadOnly}
-            />
-          </div>
-
-          {/* Audience card */}
-          <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
-            <div className="flex flex-col">
-              <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Audience</p>
-              <p
-                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px]"
-                style={{ color: hasNoRecipients ? '#DA4040' : '#585858' }}
-              >
-                {audienceCount} {audienceCount === 1 ? 'recipient' : 'recipients'} will see this message
-              </p>
-            </div>
-            {/* Agency and State are both first-class now rather than two modes of
-                one field — targeting "Texas agencies on Billing" needed both at
-                once, which the old Search By radio made impossible. */}
-            <MultiSelectField label="Agency" values={statesOrAgencies} onChange={setStatesOrAgencies} placeholder="Select agencies..." options={AGENCIES.map((a) => a.name)} disabled={effectiveReadOnly} variant="agency" />
-            <MultiSelectField label="State" values={states} onChange={setStates} placeholder="Select states..." options={STATES} disabled={effectiveReadOnly} variant="state" />
-            <MultiSelectField label="Feature Flag" values={featureFlags} onChange={setFeatureFlags} placeholder="Select feature flags..." options={FEATURE_FLAGS} disabled={effectiveReadOnly} variant="feature" />
-            <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} disabled={effectiveReadOnly} variant="package" />
-            <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} disabled={effectiveReadOnly} variant="role" />
-          </div>
-
           {/* Display Settings card */}
           <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Display Settings</p>
@@ -1820,6 +1804,40 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 : undefined}
               checked={pushNotification}
               onChange={setPushNotification}
+              disabled={effectiveReadOnly}
+            />
+          </div>
+
+          {/* Audience card */}
+          <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+            <div className="flex flex-col">
+              <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Audience</p>
+              <p
+                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px]"
+                style={{ color: hasNoRecipients ? '#DA4040' : '#585858' }}
+              >
+                {audienceCount} {audienceCount === 1 ? 'recipient' : 'recipients'} will see this message
+              </p>
+            </div>
+            {/* Agency and State are both first-class now rather than two modes of
+                one field — targeting "Texas agencies on Billing" needed both at
+                once, which the old Search By radio made impossible. */}
+            <MultiSelectField label="Agency" values={statesOrAgencies} onChange={setStatesOrAgencies} placeholder="Select agencies..." options={AGENCIES.map((a) => a.name)} disabled={effectiveReadOnly} variant="agency" />
+            <MultiSelectField label="State" values={states} onChange={setStates} placeholder="Select states..." options={STATES} disabled={effectiveReadOnly} variant="state" />
+            <MultiSelectField label="Feature Flag" values={featureFlags} onChange={setFeatureFlags} placeholder="Select feature flags..." options={FEATURE_FLAGS} disabled={effectiveReadOnly} variant="feature" />
+            <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} disabled={effectiveReadOnly} variant="package" />
+            <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} disabled={effectiveReadOnly} variant="role" />
+          </div>
+
+          {/* Date & Time card */}
+          <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Date &amp; Time</p>
+            <DateField label="Start Date *" value={startDate} onChange={setStartDate} disabled={effectiveReadOnly} />
+            <DateField label="End Date" value={endDate} onChange={setEndDate} disabled={effectiveReadOnly || noEndDate} />
+            <CheckboxRow
+              label="No end date"
+              checked={noEndDate}
+              onChange={(v) => { setNoEndDate(v); if (v) setEndDate(''); }}
               disabled={effectiveReadOnly}
             />
           </div>
