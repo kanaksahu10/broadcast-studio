@@ -2294,8 +2294,27 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
     showToast('Message sent for approval');
   };
 
-  const handleApprove = (id: string) => {
-    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Live' } : m));
+  const handleApprove = (id: string, data?: MessageFormData & { title?: string; messageType?: string; startDate?: string; endDate?: string; statesOrAgencies?: string[] }) => {
+    setMessages((prev) => prev.map((m) => {
+      if (m.id !== id) return m;
+      // The quick-approve action straight off the board (no review form open)
+      // has no edited data to apply — just flip status. Approving out of the
+      // Review overlay always does, since any edits the approver made there
+      // need to land in what actually goes live, not be silently discarded.
+      if (!data) return { ...m, status: 'Live' };
+      const agencies = data.statesOrAgencies ?? [];
+      const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;
+      return {
+        ...m,
+        status: 'Live',
+        subject: data.title ?? m.subject,
+        type: (data.messageType as MessageType) ?? m.type,
+        audience,
+        startDate: data.startDate ? formatDisplayDate(data.startDate) : m.startDate,
+        endDate: data.endDate ? formatDisplayDate(data.endDate) : m.endDate,
+        formData: data,
+      };
+    }));
     showToast('Message approved');
   };
 
@@ -2418,12 +2437,14 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
         <ComposeMessageOverlay
           onClose={() => setEditingRow(null)}
           overlayTitle={editingRow.originBucket ? `Edit Message - ${editingRow.originBucket}` : 'Edit Message'}
+          isEditingDraft
           discardedBucketLabel={editingRow.originBucket}
           originalAuthorName={editingRow.originalAuthor}
           currentUserName={getUserIdentity(role).name}
           submitLabel={role === 'executive-approver' ? 'Publish' : 'Send for Approval'}
           rejectionReason={editingRow.rejectionReason}
           rejected={editingRow.originBucket === 'Rejected'}
+          onDeleteRow={() => { handleDelete(editingRow.id); setEditingRow(null); }}
           initialData={{
             title: editingRow.subject,
             messageType: editingRow.type,
@@ -2460,7 +2481,10 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
               originalAuthor: editingRow!.originalAuthor,
             }, ...prev.filter((m) => m.id !== editingRow!.id)]);
             setEditingRow(null);
-            showToast('Draft saved');
+            // Reached only via the X button now — there's no separate Save
+            // as Draft button in draft mode, so this always means "closed
+            // an existing draft," not "explicitly chose to save as a draft."
+            showToast('All Changes Saved');
           }}
         />
       )}
@@ -2471,7 +2495,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           overlayTitle="Review Message"
           readOnly={role !== 'executive-approver'}
           {...(role === 'executive-approver' ? {
-            onApprove: () => { handleApprove(reviewingRow.id); setReviewingRow(null); },
+            onApprove: (data) => { handleApprove(reviewingRow.id, data); setReviewingRow(null); },
             onReject: () => setRejectingRow(reviewingRow),
           } : {})}
           initialData={{
@@ -2548,7 +2572,11 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
               formData: data,
             } : m));
             setViewingDiscardedRow(null);
-            showToast('Draft saved');
+            // Reached only via the X button — there's no separate Save as
+            // Draft button once "Edit as Draft" has switched this into draft
+            // mode, so a save from here always means "closed the editor,"
+            // not an explicit standalone save action.
+            showToast('All Changes Saved');
           }}
           onMessageCreated={(data) => {
             setMessages((prev) => prev.filter((m) => m.id !== viewingDiscardedRow.row.id));

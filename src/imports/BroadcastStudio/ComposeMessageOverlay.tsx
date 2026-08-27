@@ -819,7 +819,7 @@ function BannerPreview({
     {allowOptOut && (
       <div className="w-full flex items-center justify-center">
         <span
-          className="font-['Montserrat',sans-serif] font-medium text-[11px] tracking-wide uppercase whitespace-nowrap cursor-pointer"
+          className="font-['Montserrat',sans-serif] font-medium text-[11px] tracking-wide uppercase whitespace-nowrap underline cursor-pointer"
           style={{ color: 'rgba(255,255,255,0.85)' }}
         >
           Don't show again
@@ -1357,7 +1357,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onEditAsDraft, discardedBucketLabel, originalAuthorName, currentUserName, rejectionReason, rejected }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, isEditingDraft, onApprove, onReject, onDeleteRow, onEditAsDraft, discardedBucketLabel, originalAuthorName, currentUserName, rejectionReason, rejected }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -1365,7 +1365,17 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   submitLabel?: string;
   overlayTitle?: string;
   readOnly?: boolean;
-  onApprove?: () => void;
+  /**
+   * True when this overlay is editing a message that's already a Draft
+   * (opened straight from the Drafts board) — as opposed to composing a
+   * brand-new message that doesn't exist as a row yet. Combined with the
+   * discarded-origin transition (editingAsDraft below) into one "draft
+   * mode": no separate Save as Draft button, closing (X) saves in place,
+   * and Delete is offered — same as the discarded overlay's footer.
+   */
+  isEditingDraft?: boolean;
+  /** Approving hands back whatever the approver has edited in this same review pass, so those changes land in the published version instead of being silently discarded. */
+  onApprove?: (data: FormData) => void;
   onReject?: () => void;
   onDeleteRow?: () => void;
   /**
@@ -1405,6 +1415,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // normal editable-draft look, in place.
   const [editingAsDraft, setEditingAsDraft] = useState(false);
   const effectiveReadOnly = readOnly && !editingAsDraft;
+  // Either an existing Draft opened directly, or a discarded message
+  // mid-transition into one — both get the same "draft window" chrome.
+  const inDraftMode = isEditingDraft || editingAsDraft;
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [body, setBody] = useState(initialData?.body ?? '');
   const [reason, setReason] = useState(initialData?.reason ?? '');
@@ -1536,7 +1549,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     placement !== '' &&
     (placement !== 'Feature Specific' || featurePath !== '');
 
-  const showFooter = editingAsDraft || !!onDeleteRow || !!onEditAsDraft || !!(onApprove && onReject) || !effectiveReadOnly;
+  const showFooter = inDraftMode || !!onDeleteRow || !!onEditAsDraft || !!(onApprove && onReject) || !effectiveReadOnly;
 
   const messageType: MessageType = displayFormat === '' ? '' : (isEmergency ? 'Emergency' : 'Announcement');
   // Computed directly (not just left to the effect above) so a submit that
@@ -1552,6 +1565,15 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
   const handleSaveAsDraft = () => {
     onSaveAsDraft?.(allFormData);
+    onClose();
+  };
+
+  // In draft mode there's no separate Save as Draft button — closing (X) is
+  // itself the save. Everywhere else, X just closes: a brand-new,
+  // never-saved message has nothing to save, and the locked discarded/
+  // review views have their own explicit actions for anything that mutates.
+  const handleClose = () => {
+    if (inDraftMode) onSaveAsDraft?.(allFormData);
     onClose();
   };
 
@@ -1577,7 +1599,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
         <h2 className="font-['Montserrat',sans-serif] font-semibold text-[16px] text-black">
           {editingAsDraft && discardedBucketLabel ? `Edit Message - ${discardedBucketLabel}` : (overlayTitle ?? 'New Message')}
         </h2>
-        <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
+        <button type="button" onClick={handleClose} className="cursor-pointer flex items-center">
           <IoIosClose size={26} color="#27496D" />
         </button>
       </div>
@@ -1906,9 +1928,52 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
       {/* Action buttons — full-width footer bar across the whole overlay */}
       {(() => {
-        // Save as Draft / Submit — the normal editable footer. Shared between
-        // the plain new/edit flow and a discarded message mid-transition into
-        // "Edit as Draft", so the two don't drift out of sync.
+        // The submit half — Send for Approval / Publish, whatever
+        // submitLabel says. Shared by every footer variant that can submit.
+        const submitButton = (
+          <div className="relative group shrink-0">
+            <button
+              type="button"
+              onClick={isFormValid ? handleSubmit : undefined}
+              onMouseEnter={() => setIsSubmitHovered(true)}
+              onMouseLeave={() => setIsSubmitHovered(false)}
+              disabled={!isFormValid}
+              className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] flex items-center justify-center gap-[8px] max-sm:gap-[6px] transition-colors duration-150"
+              style={{
+                backgroundColor: isFormValid ? (isSubmitHovered ? '#2C9FFF' : PRIMARY) : '#e1e3e4',
+                cursor: isFormValid ? 'pointer' : 'not-allowed',
+              }}
+            >
+              <MdSend size={17} color={isFormValid ? 'white' : '#a1a3a4'} />
+              <span
+                className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap"
+                style={{ color: isFormValid ? 'white' : '#a1a3a4' }}
+              >
+                {submitLabel ?? 'Send for Approval'}
+              </span>
+            </button>
+            {/* An empty audience takes precedence over the generic required-fields
+                message: it is the more specific reason, and it is the one a
+                filled-in-looking form will otherwise leave unexplained. */}
+            {!isFormValid && (
+              <div
+                className="absolute bottom-full right-0 mb-[8px] w-max max-w-[240px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 rounded-[4px] px-[8px] py-[10px] z-50"
+                style={{ backgroundColor: '#3b5c79' }}
+              >
+                <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-white leading-[17px]">
+                  {hasNoRecipients
+                    ? 'This message would reach 0 recipients. Widen the audience before sending.'
+                    : hasNoPushReach
+                      ? 'Push is on, but nobody in this audience can receive one. Turn push off or widen the audience.'
+                      : 'Please fill in all required fields to proceed'}
+                </p>
+              </div>
+            )}
+          </div>
+        );
+
+        // Save as Draft + Submit — only for a brand-new message that has no
+        // row yet, so there's no "closing saves it" to fall back on.
         const editableFooterButtons = (
           <div className="flex items-center gap-[8px] w-full justify-between">
             <button
@@ -1921,52 +1986,34 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 Save as Draft
               </span>
             </button>
-            <div className="relative group shrink-0">
+            {submitButton}
+          </div>
+        );
+
+        // Draft mode (an existing Draft, or a discarded message mid-
+        // transition into one): no separate Save as Draft — the X button
+        // already saves on close — just an optional Delete and Submit.
+        const draftModeFooterButtons = (
+          <div className={`flex items-center gap-[16px] ${onDeleteRow ? 'w-full justify-between' : 'w-full justify-end'}`}>
+            {onDeleteRow && (
               <button
                 type="button"
-                onClick={isFormValid ? handleSubmit : undefined}
-                onMouseEnter={() => setIsSubmitHovered(true)}
-                onMouseLeave={() => setIsSubmitHovered(false)}
-                disabled={!isFormValid}
-                className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] flex items-center justify-center gap-[8px] max-sm:gap-[6px] transition-colors duration-150"
-                style={{
-                  backgroundColor: isFormValid ? (isSubmitHovered ? '#2C9FFF' : PRIMARY) : '#e1e3e4',
-                  cursor: isFormValid ? 'pointer' : 'not-allowed',
-                }}
+                className="flex items-center gap-[6px] shrink-0 font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+                style={{ color: '#DA4040' }}
+                onClick={() => setShowDeleteConfirm(true)}
               >
-                <MdSend size={17} color={isFormValid ? 'white' : '#a1a3a4'} />
-                <span
-                  className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap"
-                  style={{ color: isFormValid ? 'white' : '#a1a3a4' }}
-                >
-                  {submitLabel ?? 'Send for Approval'}
-                </span>
+                <RiDeleteBinLine size={17} color="#DA4040" />
+                Delete
               </button>
-              {/* An empty audience takes precedence over the generic required-fields
-                  message: it is the more specific reason, and it is the one a
-                  filled-in-looking form will otherwise leave unexplained. */}
-              {!isFormValid && (
-                <div
-                  className="absolute bottom-full right-0 mb-[8px] w-max max-w-[240px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 rounded-[4px] px-[8px] py-[10px] z-50"
-                  style={{ backgroundColor: '#3b5c79' }}
-                >
-                  <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-white leading-[17px]">
-                    {hasNoRecipients
-                      ? 'This message would reach 0 recipients. Widen the audience before sending.'
-                      : hasNoPushReach
-                        ? 'Push is on, but nobody in this audience can receive one. Turn push off or widen the audience.'
-                        : 'Please fill in all required fields to proceed'}
-                  </p>
-                </div>
-              )}
-            </div>
+            )}
+            {submitButton}
           </div>
         );
 
         return showFooter && (
           <div className="shrink-0 border-t px-[24px] max-sm:px-[16px] py-[16px] flex items-center justify-end" style={{ borderColor: BORDER, backgroundColor: 'white' }}>
-            {editingAsDraft ? (
-              editableFooterButtons
+            {inDraftMode ? (
+              draftModeFooterButtons
             ) : onDeleteRow || onEditAsDraft ? (
               <div className={`flex items-center gap-[16px] ${onDeleteRow && onEditAsDraft ? 'w-full justify-between' : ''}`}>
                 {onDeleteRow && (
@@ -2009,7 +2056,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                   </button>
                   <button
                     type="button"
-                    onClick={onApprove}
+                    onClick={() => onApprove?.(allFormData)}
                     className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[8px] max-sm:gap-[6px] cursor-pointer"
                     style={{ backgroundColor: '#00AA00' }}
                   >
