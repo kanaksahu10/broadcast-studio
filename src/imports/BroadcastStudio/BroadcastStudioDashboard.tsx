@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
-import { MdOutlineLocationOn, MdOutlinedFlag, MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdTableRows, MdViewKanban, MdVisibility } from 'react-icons/md';
+import { MdOutlineLocationOn, MdOutlinedFlag, MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdVisibility } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
 import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
 import { useIsBelowDesktop, useIsPhone } from './useIsPhone';
@@ -84,10 +84,6 @@ function RoleToggle({ role, onChange }: { role: UserRole; onChange: (next: UserR
   );
 }
 
-type ViewMode = 'datagrid' | 'kanban';
-
-// FEATURE FLAG: set to true to restore the datagrid/kanban toggle button
-const SHOW_VIEW_TOGGLE = false;
 
 
 type MessageStatus = 'Live' | 'Pending' | 'Draft' | 'Rejected' | 'Discontinued';
@@ -1042,29 +1038,6 @@ export function useSharedMessages() {
   return [messages, setMessages] as const;
 }
 
-const FILTERS: Array<'All' | MessageStatus> = ['All', 'Live', 'Pending', 'Draft'];
-
-function StatusCard({ label, count, color, bg, hoverBorder, hoverShadow, active, onClick, neutralStyle }: { label: string; count: number; color: string; bg: string; hoverBorder: string; hoverShadow: string; active: boolean; onClick: () => void; neutralStyle?: boolean }) {
-  const [hovered, setHovered] = useState(false);
-  const cardBg = neutralStyle ? '#ffffff' : (active ? bg : '#fcfcfc');
-  const cardBorder = neutralStyle ? '#e5e5e5' : (active ? (hovered ? hoverBorder : color) : '#dfdfdf');
-  const cardText = active ? color : '#a1a3a4';
-  const cardShadow = !neutralStyle && active && hovered ? hoverShadow : 'none';
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="rounded-[5px] border p-[12px] flex flex-col gap-[4px] w-[222px] shrink-0 cursor-pointer text-left transition-all duration-150"
-      style={{ backgroundColor: cardBg, borderColor: cardBorder, boxShadow: cardShadow }}
-    >
-      <p className="font-['Montserrat',sans-serif] font-medium text-[28px] leading-[28px]" style={{ color: cardText }}>{count}</p>
-      <p className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px]" style={{ color: cardText }}>{label}</p>
-    </button>
-  );
-}
-
 function NewMessageButton({ onClick }: { onClick: () => void }) {
   return (
     <button
@@ -1135,140 +1108,6 @@ function SearchInput({ value, onChange }: { value: string; onChange: (v: string)
     </div>
   );
 }
-
-function StatusBadge({ status }: { status: MessageStatus }) {
-  return (
-    <div className="content-stretch flex gap-[6px] items-center relative shrink-0">
-      <div className="rounded-full size-[8px] shrink-0" style={{ backgroundColor: STATUS_COLOR[status] }} />
-      <p className="font-['Montserrat',sans-serif] font-normal leading-[17px] text-[12px] text-[#000000] whitespace-nowrap">{status}</p>
-    </div>
-  );
-}
-
-const COLUMNS: Array<{ key: keyof BroadcastMessageRow | 'recipients'; label: string; width: number }> = [
-  { key: 'subject', label: 'Message Title', width: 240 },
-  { key: 'type', label: 'Type', width: 130 },
-  { key: 'audience', label: 'Audience', width: 120 },
-  { key: 'status', label: 'Status', width: 110 },
-  { key: 'startDate', label: 'Start Date', width: 130 },
-  { key: 'endDate', label: 'End Date', width: 130 },
-];
-
-function MessageTable({ rows }: { rows: BroadcastMessageRow[] }) {
-  return (
-    <div className="bg-white relative rounded-[8px] shrink-0 w-full" data-name="Table">
-      <div className="content-stretch flex flex-col items-start overflow-x-auto relative rounded-[inherit] size-full">
-        <div className="bg-white content-stretch flex h-[48px] items-center relative shrink-0 w-full border-b border-[#e5e5e5]" data-name=".Row">
-          {COLUMNS.map((col) => (
-            <div
-              key={col.key}
-              className="h-full flex items-center px-[12px] py-[10px] shrink-0"
-              style={{ width: col.width }}
-            >
-              <p className="font-['Montserrat',sans-serif] font-medium leading-[17px] text-[#27496d] text-[12px] whitespace-nowrap">{col.label}</p>
-            </div>
-          ))}
-        </div>
-        {rows.length === 0 ? (
-          <div className="flex flex-col gap-[4px] items-center justify-center py-[48px] w-full text-[#b8b8b8] text-center">
-            <p className="font-['Montserrat',sans-serif] font-medium text-[15px] leading-[21px]">No messages match your filters</p>
-            <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]">Try a different status or search term.</p>
-          </div>
-        ) : (
-          rows.map((row, index) => (
-            <div
-              key={row.id}
-              className="content-stretch flex h-[48px] items-center relative shrink-0 w-full"
-              style={{ backgroundColor: index % 2 === 0 ? '#F7FBFF' : '#FFFFFF' }}
-              data-name=".Row"
-            >
-              <div className="h-full flex items-center px-[12px] py-[10px] shrink-0" style={{ width: 240 }}>
-                <p className="font-['Montserrat',sans-serif] font-normal leading-[17px] text-[#000000] text-[12px] whitespace-nowrap overflow-hidden text-ellipsis">{row.subject}</p>
-              </div>
-              <div className="h-full flex items-center px-[12px] py-[10px] shrink-0" style={{ width: 130 }}>
-                <p className="font-['Montserrat',sans-serif] font-normal leading-[17px] text-[#000000] text-[12px] whitespace-nowrap">{row.type}</p>
-              </div>
-              <div className="h-full flex items-center px-[12px] py-[10px] shrink-0" style={{ width: 120 }}>
-                <p className="font-['Montserrat',sans-serif] font-normal leading-[17px] text-[#000000] text-[12px] whitespace-nowrap">
-                  {row.recipients === null ? '—' : row.recipients.toLocaleString()}
-                </p>
-              </div>
-              <div className="h-full flex items-center px-[12px] py-[10px] shrink-0" style={{ width: 110 }}>
-                <StatusBadge status={row.status} />
-              </div>
-              <div className="h-full flex items-center px-[12px] py-[10px] shrink-0" style={{ width: 130 }}>
-                <p className="font-['Montserrat',sans-serif] font-normal leading-[17px] text-[#000000] text-[12px] whitespace-nowrap">{row.startDate}</p>
-              </div>
-              <div className="h-full flex items-center px-[12px] py-[10px] shrink-0" style={{ width: 130 }}>
-                <p className="font-['Montserrat',sans-serif] font-normal leading-[17px] text-[#000000] text-[12px] whitespace-nowrap">{row.endDate}</p>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-      <div aria-hidden="true" className="absolute border border-[#e5e5e5] border-solid inset-0 pointer-events-none rounded-[8px]" />
-    </div>
-  );
-}
-
-function MetricItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-[4px] items-start">
-      <p className="font-['Montserrat',sans-serif] font-bold text-[22px] leading-[28px] text-[#27496d]">{value}</p>
-      <p className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] text-[#717182] whitespace-nowrap">{label}</p>
-    </div>
-  );
-}
-
-function AudienceMetrics({ rows }: { rows: BroadcastMessageRow[] }) {
-  const totalRecipients = rows.reduce((sum, r) => sum + (r.recipients ?? 0), 0);
-  const activeAudiences = useMemo(() => new Set(rows.map((r) => r.audience)).size, [rows]);
-
-  return (
-    <div className="flex flex-col gap-[12px] items-start w-full">
-      <p className="font-['Montserrat',sans-serif] font-medium text-[15px] leading-[15px] text-black">Audience Metrics</p>
-      <div className="bg-white rounded-[8px] border border-[#e5e5e5] px-[24px] py-[20px] flex items-center gap-[48px] w-full flex-wrap">
-        <MetricItem label="Total Recipients" value={totalRecipients.toLocaleString()} />
-        <MetricItem label="Active Audiences" value={String(activeAudiences)} />
-        <MetricItem label="Avg. Open Rate" value="68%" />
-        <MetricItem label="Avg. Click Rate" value="24%" />
-      </div>
-    </div>
-  );
-}
-
-function ViewToggle({ view, onChange }: { view: ViewMode; onChange: (v: ViewMode) => void }) {
-  return (
-    <div className="flex items-center rounded-[6px] border border-[#e5e5e5] bg-white overflow-hidden shrink-0">
-      <button
-        type="button"
-        onClick={() => onChange('datagrid')}
-        className="flex items-center justify-center w-[32px] h-[32px] transition-colors duration-150"
-        style={{ backgroundColor: view === 'datagrid' ? '#27496d' : 'white' }}
-        title="Datagrid view"
-      >
-        <MdTableRows size={16} color={view === 'datagrid' ? 'white' : '#8a8a8a'} />
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange('kanban')}
-        className="flex items-center justify-center w-[32px] h-[32px] transition-colors duration-150"
-        style={{ backgroundColor: view === 'kanban' ? '#27496d' : 'white' }}
-        title="Kanban view"
-      >
-        <MdViewKanban size={16} color={view === 'kanban' ? 'white' : '#8a8a8a'} />
-      </button>
-    </div>
-  );
-}
-
-const ACTION_LABEL: Record<MessageStatus, string> = {
-  Live: 'View',
-  Pending: 'Review',
-  Draft: 'Edit',
-  Rejected: 'View',
-  Discontinued: 'View',
-};
 
 function getActionTooltip(status: MessageStatus, role: UserRole): string {
   const isSuperAdmin = role === 'super-admin';
@@ -2378,9 +2217,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
   }, [role]);
 
   const [messages, setMessages] = useSharedMessages();
-  const [selectedStatus, setSelectedStatus] = useState<MessageStatus>('Live');
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [showDiscarded, setShowDiscarded] = useState(false);
   const [editingRow, setEditingRow] = useState<BroadcastMessageRow | null>(null);
@@ -2504,7 +2341,6 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       // originally sent the message.
       formData: m.formData ? { ...m.formData, author: getUserIdentity(role).name } : m.formData,
     } : m));
-    setSelectedStatus('Draft');
   };
 
   const handleMessageCreated = (data: MessageFormData & { title?: string; messageType?: string; startDate?: string; endDate?: string; statesOrAgencies?: string[]; searchMode?: string }) => {
@@ -2524,13 +2360,9 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       formData: data,
     };
     setMessages((prev) => [newMessage, ...prev]);
-    setSelectedStatus(newStatus);
     showToast(role === 'executive-approver' ? 'Message published' : 'Message sent for approval');
   };
 
-  const liveCount = messages.filter((m) => m.status === 'Live' && getDiscardedBucket(m) === null).length;
-  const pendingCount = messages.filter((m) => m.status === 'Pending').length;
-  const draftCount = messages.filter((m) => m.status === 'Draft' && m.authorRole === role).length;
 
   const query = search.trim().toLowerCase();
   const searchFiltered = messages.filter(
@@ -2540,20 +2372,9 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       row.audience.toLowerCase().includes(query)
   );
 
-  const filteredRows = searchFiltered.filter((row) => row.status === selectedStatus && isDraftVisibleToRole(row, role));
 
   return (
     <div className="flex flex-col gap-[20px] items-start w-full pb-[8px]" data-name="Broadcast Studio Dashboard">
-      {viewMode === 'datagrid' && !showDiscarded && (
-        <div className="flex items-center gap-[16px] w-full">
-          <StatusCard label="Live" count={liveCount} color={STATUS_COLOR.Live} bg={STATUS_BG.Live} hoverBorder={STATUS_HOVER_BORDER.Live} hoverShadow={STATUS_HOVER_SHADOW.Live} active={selectedStatus === 'Live'} onClick={() => setSelectedStatus('Live')} />
-          <StatusCard label="Pending Approval" count={pendingCount} color={STATUS_COLOR.Pending} bg={STATUS_BG.Pending} hoverBorder={STATUS_HOVER_BORDER.Pending} hoverShadow={STATUS_HOVER_SHADOW.Pending} active={selectedStatus === 'Pending'} onClick={() => setSelectedStatus('Pending')} />
-          <StatusCard label="Drafts" count={draftCount} color={STATUS_COLOR.Draft} bg={STATUS_BG.Draft} hoverBorder={STATUS_HOVER_BORDER.Draft} hoverShadow={STATUS_HOVER_SHADOW.Draft} active={selectedStatus === 'Draft'} onClick={() => setSelectedStatus('Draft')} />
-        </div>
-      )}
-
-      {/* {viewMode === 'kanban' && <AudienceMetrics rows={messages} />} */}
-
       {/* Wraps at any width, not just on phones: the toolbar runs out of room
           well before 640px once the sidebar and notification rail take their
           share, and the controls are fixed-width, so without this they overflow
@@ -2562,15 +2383,6 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
         <SearchInput value={search} onChange={setSearch} />
         <ShowDiscardedButton checked={showDiscarded} onChange={setShowDiscarded} />
         <NewMessageButton onClick={() => setIsComposeOpen(true)} />
-        {/* The spacer only exists to push the view toggle right, so it is tied
-            to it — left on its own in a wrapping row it would swallow the free
-            space and shove the controls onto a line of their own. */}
-        {SHOW_VIEW_TOGGLE && (
-          <>
-            <div className="flex-1" />
-            <ViewToggle view={viewMode} onChange={setViewMode} />
-          </>
-        )}
       </div>
 
       {showDiscarded ? (
@@ -2580,8 +2392,6 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           onDelete={handleDelete}
           highlightIds={highlightIds}
         />
-      ) : viewMode === 'datagrid' ? (
-        <MessageTable rows={filteredRows} />
       ) : (
         <KanbanBoard
           rows={searchFiltered}
@@ -2649,7 +2459,6 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
               rejectionReason: editingRow!.rejectionReason,
               originalAuthor: editingRow!.originalAuthor,
             }, ...prev.filter((m) => m.id !== editingRow!.id)]);
-            setSelectedStatus('Draft');
             setEditingRow(null);
             showToast('Draft saved');
           }}
@@ -2738,7 +2547,6 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
               endDate: data.endDate ? formatDisplayDate(data.endDate) : '—',
               formData: data,
             } : m));
-            setSelectedStatus('Draft');
             setViewingDiscardedRow(null);
             showToast('Draft saved');
           }}
@@ -2780,7 +2588,6 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
               },
               ...prev,
             ]);
-            setSelectedStatus('Draft');
             showToast('Draft saved');
           }}
         />
