@@ -462,9 +462,9 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
   },
   {
     id: 'seed-d4',
-    subject: 'Enterprise Package Upsell',
+    subject: 'Billing Executive Package Upsell',
     type: 'Announcement',
-    audience: 'California · Enterprise',
+    audience: 'California · Billing Executive',
     channel: 'Email',
     status: 'Draft',
     startDate: '—',
@@ -476,7 +476,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       author: 'Jennifer James',
       department: 'Marketing',
       messageCategory: 'Upsell',
-      body: 'Enterprise adds unlimited custom reports and priority onboarding. See what your agency would gain.',
+      body: 'Billing Executive adds unlimited custom reports and priority onboarding. See what your agency would gain.',
       reason: 'Expansion campaign',
       displayFormat: 'Overlay',
       placement: 'Global',
@@ -487,7 +487,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       ctaLabel: 'Compare packages',
       ctaDestination: '#',
       statesOrAgencies: [],
-      states: ['California'], featureFlags: [], packages: ['Enterprise'], roles: [],
+      states: ['California'], featureFlags: [], packages: ['Billing Executive'], roles: [],
     },
   },
   {
@@ -698,7 +698,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
     id: 'seed-a2',
     subject: 'New Wellness Program',
     type: 'Announcement',
-    audience: 'Enterprise package',
+    audience: 'Billing Executive package',
     channel: 'Email',
     status: 'Live',
     startDate: daysFromNow(-9),
@@ -719,7 +719,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       ctaLabel: 'Learn more',
       ctaDestination: '#',
       statesOrAgencies: [],
-      states: ALL_STATES, featureFlags: [], packages: ['Enterprise'], roles: [],
+      states: ALL_STATES, featureFlags: [], packages: ['Billing Executive'], roles: [],
     },
   },
   {
@@ -1005,7 +1005,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
   },
 ];
 
-const STORAGE_KEY = 'bs-messages-v17';
+const STORAGE_KEY = 'bs-messages-v18';
 
 export function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
