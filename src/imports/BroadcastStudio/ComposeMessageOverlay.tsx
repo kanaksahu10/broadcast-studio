@@ -169,21 +169,39 @@ function FieldShell({ label, height, disabled, open, subtext, children }: { labe
   );
 }
 
-export function TextField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
+// A single-line-looking field that's actually a growing textarea underneath:
+// a plain <input> can only truncate or scroll a long value out of view,
+// never wrap it, so anything with a real length limit (a title, a label)
+// needs this instead. Enter is suppressed — it still reads as "one field,"
+// just one that can wrap onto a second line rather than hide the overflow.
+export function TextField({ label, value, onChange, placeholder, disabled, maxLength }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean; maxLength?: number }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
   return (
     <FieldShell label={label} disabled={disabled}>
-      <input
+      <textarea
+        ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
         placeholder={placeholder}
-        className="font-['Montserrat',sans-serif] font-normal text-[13px] placeholder:text-[#b8b8b8] outline-none bg-transparent w-full"
+        maxLength={maxLength}
+        rows={1}
+        className="font-['Montserrat',sans-serif] font-normal text-[13px] placeholder:text-[#b8b8b8] outline-none bg-transparent w-full resize-none overflow-hidden"
         style={{ color: '#000000' }}
       />
     </FieldShell>
   );
 }
 
-export function TextAreaField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
+export function TextAreaField({ label, value, onChange, placeholder, disabled, maxLength }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean; maxLength?: number }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -200,6 +218,7 @@ export function TextAreaField({ label, value, onChange, placeholder, disabled }:
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        maxLength={maxLength}
         rows={1}
         className="font-['Montserrat',sans-serif] font-normal text-[13px] placeholder:text-[#b8b8b8] outline-none bg-transparent w-full resize-none overflow-hidden"
         style={{ color: '#000000' }}
@@ -761,7 +780,7 @@ function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestin
       </div>
       {checked && (
         <div className="flex flex-col gap-[16px] w-full">
-          <TextAreaField label="Label *" value={label} onChange={onLabelChange} placeholder="Link text shown in banner & overlay" disabled={disabled} />
+          <TextAreaField label="Label *" value={label} onChange={onLabelChange} placeholder="Link text shown in banner & overlay" disabled={disabled} maxLength={255} />
           <TextField label="Destination URL *" value={destination} onChange={onDestinationChange} placeholder="https://..." disabled={disabled} />
           <CheckboxRow label="Stop showing the message once clicked" checked={stopOnClick} onChange={onStopOnClickChange} disabled={disabled} />
         </div>
@@ -1533,13 +1552,20 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // Only a subset of the audience has the app installed with notifications
   // allowed, so turning push on does not mean everyone selected gets one.
   const pushCount = getAudiencePushCount({ agencies: statesOrAgencies, states, packages, roles, featureFlags });
-  // Push on but reaching nobody is a misconfiguration: the author has asked for
-  // a channel that cannot deliver. Blocked rather than warned, per product call.
-  const hasNoPushReach = pushNotification && pushCount === 0;
+  // Push reaching nobody no longer blocks sending — the message still goes
+  // out on every other channel to the full audience, so this is informational
+  // only (the count next to the toggle already says "0 of N get a
+  // notification"), not a reason to stop the whole message.
+
+  // Whichever date the user picks first, an end date earlier than the start
+  // date is invalid — checked as soon as both are set, regardless of which
+  // one was just changed, rather than only when End Date's own onChange
+  // fires.
+  const hasInvalidDateRange = !noEndDate && startDate !== '' && endDate !== '' && endDate < startDate;
 
   const isFormValid =
     !hasNoRecipients &&
-    !hasNoPushReach &&
+    !hasInvalidDateRange &&
     title.trim() !== '' &&
     body.trim() !== '' &&
     reason.trim() !== '' &&
@@ -1559,18 +1585,28 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const savedDismissible: Dismissible = displayFormat === 'Overlay' ? 'Dismissible' : dismissible;
   const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, statesOrAgencies, states, featureFlags, packages, roles, dismissible: savedDismissible, allowOptOut: effectiveAllowOptOut, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
 
-  // Baseline to diff against on close, so a draft window that's opened and
-  // closed untouched doesn't save (or toast) anything. Captured once at the
-  // moment draft mode actually starts — on mount for a Draft opened straight
-  // from the board, or the instant "Edit as Draft" flips editingAsDraft true
-  // for a discarded message — rather than at the overlay's original mount,
-  // since that transition itself reassigns the author, which is a real
-  // effect of the click, not a form edit to detect.
+  // An executive approver editing a Pending message in the Review overlay
+  // gets the same "X saves in place" treatment as a draft — they may fix a
+  // typo or two before deciding to Approve/Reject, and closing without
+  // hitting either shouldn't just throw that away. Distinct from inDraftMode
+  // itself so the footer still shows Approve/Reject here rather than the
+  // draft-mode footer — this only affects what closing does, not the
+  // buttons shown.
+  const canSaveOnClose = inDraftMode || (!!onApprove && !!onReject && !effectiveReadOnly);
+
+  // Baseline to diff against on close, so a window that's opened and closed
+  // untouched doesn't save (or toast) anything. Captured once at the moment
+  // this save-on-close eligibility actually starts — on mount for a Draft
+  // opened straight from the board or a Pending message under review, or the
+  // instant "Edit as Draft" flips editingAsDraft true for a discarded
+  // message — rather than at the overlay's original mount, since that
+  // transition itself reassigns the author, which is a real effect of the
+  // click, not a form edit to detect.
   const draftBaselineRef = useRef<string | null>(null);
   useEffect(() => {
-    if (inDraftMode) draftBaselineRef.current = JSON.stringify(allFormData);
+    if (canSaveOnClose) draftBaselineRef.current = JSON.stringify(allFormData);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inDraftMode]);
+  }, [canSaveOnClose]);
 
   const handleSubmit = () => {
     onMessageCreated?.(allFormData);
@@ -1582,14 +1618,15 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     onClose();
   };
 
-  // In draft mode there's no separate Save as Draft button — closing (X) is
-  // itself the save, but only if something actually changed since draft mode
-  // began; otherwise there's nothing to write back and no "All Changes
-  // Saved" toast to show. Everywhere else, X just closes: a brand-new,
-  // never-saved message has nothing to save, and the locked discarded/
-  // review views have their own explicit actions for anything that mutates.
+  // In draft mode (and reviewing-as-approver) there's no separate Save
+  // button — closing (X) is itself the save, but only if something actually
+  // changed since it became eligible; otherwise there's nothing to write
+  // back and no "All Changes Saved" toast to show. Everywhere else, X just
+  // closes: a brand-new, never-saved message has nothing to save, and the
+  // locked discarded view has its own explicit action for anything that
+  // mutates.
   const handleClose = () => {
-    if (inDraftMode && draftBaselineRef.current !== null && JSON.stringify(allFormData) !== draftBaselineRef.current) {
+    if (canSaveOnClose && draftBaselineRef.current !== null && JSON.stringify(allFormData) !== draftBaselineRef.current) {
       onSaveAsDraft?.(allFormData);
     }
     onClose();
@@ -1734,7 +1771,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             <SelectField label="Department *" value={department} onChange={setDepartment} placeholder="Select department..." options={DEPARTMENT_OPTIONS} disabled={effectiveReadOnly} />
             <SelectField label="Message Category" value={messageCategory} onChange={setMessageCategory} placeholder="Select category..." options={CATEGORY_OPTIONS} disabled={effectiveReadOnly} />
             {messageCategory === 'Custom' && (
-              <TextField label="Category Name" value={customCategoryName} onChange={setCustomCategoryName} placeholder="Type a category name" disabled={effectiveReadOnly} />
+              <TextField label="Category Name" value={customCategoryName} onChange={setCustomCategoryName} placeholder="Type a category name" disabled={effectiveReadOnly} maxLength={255} />
             )}
           </div>
 
@@ -1757,7 +1794,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             {placement === 'Feature Specific' && (
               <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} disabled={effectiveReadOnly} />
             )}
-            <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={effectiveReadOnly} />
+            <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={effectiveReadOnly} maxLength={255} />
             <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={effectiveReadOnly} />
             <TextAreaField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
           </div>
@@ -1834,6 +1871,11 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Date &amp; Time</p>
             <DateField label="Start Date *" value={startDate} onChange={setStartDate} disabled={effectiveReadOnly} />
             <DateField label="End Date" value={endDate} onChange={setEndDate} disabled={effectiveReadOnly || noEndDate} />
+            {hasInvalidDateRange && (
+              <p className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] -mt-[8px]" style={{ color: '#DA4040' }}>
+                End date can't be before the start date.
+              </p>
+            )}
             <CheckboxRow
               label="No end date"
               checked={noEndDate}
@@ -1981,8 +2023,8 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-white leading-[17px]">
                   {hasNoRecipients
                     ? 'This message would reach 0 recipients. Widen the audience before sending.'
-                    : hasNoPushReach
-                      ? 'Push is on, but nobody in this audience can receive one. Turn push off or widen the audience.'
+                    : hasInvalidDateRange
+                      ? "End date can't be before the start date."
                       : 'Please fill in all required fields to proceed'}
                 </p>
               </div>

@@ -2007,12 +2007,13 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
 }) {
   const built = KANBAN_COLUMNS.map(({ status, label }) => {
     const colRows = rows.filter((r) => r.status === status && getDiscardedBucket(r) === null && isDraftVisibleToRole(r, role));
-    // Pending Approval surfaces whatever's closest to going live at the top,
-    // since that's the one an approver should look at first. Every other
-    // column stays in "latest saved" order (new items are prepended when
-    // created, so the array's own order already does this) — live date isn't
-    // relevant once a message has already been approved, rejected, etc.
-    if (status === 'Pending') {
+    // Pending Approval and Approved both surface whatever's closest to (or
+    // already) going live at the top — that's the one to look at first,
+    // whether deciding on it or just tracking what's about to run. Drafts
+    // stays in "latest saved" order (new items are prepended when created,
+    // so the array's own order already does this) — there's no live date to
+    // rank by until it's at least been sent somewhere.
+    if (status === 'Pending' || status === 'Live') {
       colRows.sort((a, b) => {
         const da = daysUntilDate(a.startDate);
         const db = daysUntilDate(b.startDate);
@@ -2392,12 +2393,19 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
 
 
   const query = search.trim().toLowerCase();
-  const searchFiltered = messages.filter(
-    (row) =>
-      query.length === 0 ||
-      row.subject.toLowerCase().includes(query) ||
-      row.audience.toLowerCase().includes(query)
-  );
+  // Matches subject/audience like before, plus the author's name and the
+  // display date range — this is what makes searching the Discarded board
+  // by who sent something or roughly when it ran actually work, since those
+  // cards carry no other identifying text on their face.
+  const searchFiltered = messages.filter((row) => {
+    if (query.length === 0) return true;
+    const author = row.formData?.author?.toLowerCase() ?? '';
+    const dateText = `${row.startDate} ${row.endDate}`.toLowerCase();
+    return row.subject.toLowerCase().includes(query) ||
+      row.audience.toLowerCase().includes(query) ||
+      author.includes(query) ||
+      dateText.includes(query);
+  });
 
 
   return (
@@ -2408,7 +2416,11 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           rather than reflow. */}
       <div className="flex items-center gap-[12px] w-full flex-wrap">
         <SearchInput value={search} onChange={setSearch} />
-        <ShowDiscardedButton checked={showDiscarded} onChange={setShowDiscarded} />
+        {/* Switching views clears any search — a term typed against Active
+            cards is almost never meant to carry over to the Discarded board
+            (or back), and a stale query silently hiding cards on the view
+            you just switched to reads as "my messages disappeared." */}
+        <ShowDiscardedButton checked={showDiscarded} onChange={(v) => { setShowDiscarded(v); setSearch(''); }} />
         <NewMessageButton onClick={() => setIsComposeOpen(true)} />
       </div>
 
@@ -2505,6 +2517,25 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           {...(role === 'executive-approver' ? {
             onApprove: (data) => { handleApprove(reviewingRow.id, data); setReviewingRow(null); },
             onReject: () => setRejectingRow(reviewingRow),
+            // Closing (X) without Approving/Rejecting now saves any edits in
+            // place — same "save on close, only if changed" treatment as a
+            // Draft — instead of silently discarding them. Status stays
+            // Pending; only the content updates.
+            onSaveAsDraft: (data) => {
+              const agencies = data.statesOrAgencies ?? [];
+              const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;
+              setMessages((prev) => prev.map((m) => m.id === reviewingRow.id ? {
+                ...m,
+                subject: data.title || m.subject,
+                type: (data.messageType as MessageType) || m.type,
+                audience,
+                startDate: data.startDate ? formatDisplayDate(data.startDate) : m.startDate,
+                endDate: data.endDate ? formatDisplayDate(data.endDate) : m.endDate,
+                formData: data,
+              } : m));
+              setReviewingRow(null);
+              showToast('All Changes Saved');
+            },
           } : {})}
           initialData={{
             title: reviewingRow.subject,
