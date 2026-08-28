@@ -135,6 +135,19 @@ interface BroadcastMessageRow {
    * editor's own name back to themselves as the "original" author.
    */
   originalAuthor?: string;
+  /**
+   * Which browser session last edited or decided this Pending message while
+   * it was open for concurrent review. This prototype has no real accounts
+   * (see authorRole above) — one fixed identity per role — so there's no
+   * way to tell "a different approver" from "the same approver, another
+   * tab" except by browser session: a random id generated once per browser
+   * and persisted to localStorage, so every tab in the *same* browser
+   * shares it (same person) while a different browser/profile/machine gets
+   * its own (a genuinely different reviewer). Matching this id against the
+   * current tab's own is what tells the concurrent-review banners apart
+   * from a same-session change that should just sync silently.
+   */
+  lastReviewActionSessionId?: string;
 }
 
 const STATUS_COLOR: Record<MessageStatus, string> = {
@@ -2238,26 +2251,49 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
   const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
   const showToast = (message: string) => setToast({ id: Date.now(), message });
 
+  // Identifies *this browser* (every tab in it shares the same localStorage,
+  // hence the same id) as opposed to a different one — the closest thing
+  // this account-less prototype has to "which approver." Generated once and
+  // persisted, not per-tab: opening a second tab of your own is still "you";
+  // a genuinely different reviewer means a different browser/profile/
+  // machine, which starts with none of this in its own localStorage.
+  const [mySessionId] = useState<string>(() => {
+    const KEY = 'bs-approver-session-id';
+    let id = localStorage.getItem(KEY);
+    if (!id) {
+      id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(KEY, id);
+    }
+    return id;
+  });
+
   // --- Concurrent-approver review state -----------------------------------
   // Two approvers can have the same Pending message open for review at the
   // same time. These track what happens to *this* tab's reviewingRow from
   // *outside* it — another tab editing the same row's content, or deciding
   // it outright — via the native `storage` event, which (per spec) only
   // ever fires in tabs *other* than the one that made the change. That
-  // asymmetry is exactly the signal needed to tell "someone else's edit"
-  // apart from "my own edit", with no extra bookkeeping.
+  // asymmetry says "some other tab changed this," and comparing
+  // lastReviewActionSessionId against mySessionId says whether that other
+  // tab is *you* (same browser session — sync silently, no banner) or a
+  // genuinely different reviewer (show the conflict/lock banner).
   const [reviewConflict, setReviewConflict] = useState<{ theirsRow: BroadcastMessageRow } | null>(null);
   const [reviewDecisionLock, setReviewDecisionLock] = useState<{ status: 'Live' | 'Rejected' } | null>(null);
+  // A same-session change (another tab of yours) to sync into the open form
+  // without any banner — new object identity each time so the overlay can
+  // tell "there's a fresh one to apply" from "same one already applied."
+  const [reviewSilentSync, setReviewSilentSync] = useState<{ data: MessageFormData & { title?: string; messageType?: string; startDate?: string; endDate?: string } } | null>(null);
   // What this tab currently considers "the known content" for the row under
   // review — reset when review starts, and re-synced whenever a conflict
-  // here gets resolved (Load theirs / Save mine), so the same external
-  // state already accounted for doesn't re-trigger the banner.
+  // here gets resolved (Load theirs / Save mine) or silently synced, so the
+  // same external state already accounted for doesn't re-trigger anything.
   const reviewKnownRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!reviewingRow) {
       setReviewConflict(null);
       setReviewDecisionLock(null);
+      setReviewSilentSync(null);
       reviewKnownRef.current = null;
       return;
     }
@@ -2268,13 +2304,33 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       try { updated = JSON.parse(e.newValue); } catch { return; }
       const latest = updated.find((m) => m.id === reviewingRow.id);
       if (!latest) return;
+      const isSameSession = latest.lastReviewActionSessionId === mySessionId;
       if (latest.status !== 'Pending') {
-        setReviewDecisionLock({ status: latest.status === 'Live' ? 'Live' : 'Rejected' });
+        if (isSameSession) {
+          // You decided this in another tab — follow it here too, quietly.
+          setReviewingRow(null);
+          showToast(`Message ${latest.status === 'Live' ? 'approved' : 'rejected'} in another tab`);
+        } else {
+          setReviewDecisionLock({ status: latest.status === 'Live' ? 'Live' : 'Rejected' });
+        }
         return;
       }
       const nextKnown = JSON.stringify(latest.formData ?? null);
       if (nextKnown !== reviewKnownRef.current) {
-        setReviewConflict({ theirsRow: latest });
+        reviewKnownRef.current = nextKnown;
+        if (isSameSession) {
+          setReviewSilentSync({
+            data: {
+              title: latest.subject,
+              messageType: latest.type,
+              startDate: parseDisplayDate(latest.startDate),
+              endDate: parseDisplayDate(latest.endDate),
+              ...latest.formData,
+            },
+          });
+        } else {
+          setReviewConflict({ theirsRow: latest });
+        }
       }
     };
     window.addEventListener('storage', handler);
@@ -2362,7 +2418,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       // has no edited data to apply — just flip status. Approving out of the
       // Review overlay always does, since any edits the approver made there
       // need to land in what actually goes live, not be silently discarded.
-      if (!data) return { ...m, status: 'Live' };
+      if (!data) return { ...m, status: 'Live', lastReviewActionSessionId: mySessionId };
       const agencies = data.statesOrAgencies ?? [];
       const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;
       return {
@@ -2374,6 +2430,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
         startDate: data.startDate ? formatDisplayDate(data.startDate) : m.startDate,
         endDate: data.endDate ? formatDisplayDate(data.endDate) : m.endDate,
         formData: data,
+        lastReviewActionSessionId: mySessionId,
       };
     }));
     showToast('Message approved');
@@ -2384,7 +2441,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
     const current = messages.find((m) => m.id === id);
     if (!current || current.status !== 'Pending') return false;
     setMessages((prev) => prev.map((m) => m.id === id
-      ? { ...m, status: 'Rejected', statusChangedAt: new Date().toISOString(), ...(reason ? { rejectionReason: reason } : {}) }
+      ? { ...m, status: 'Rejected', statusChangedAt: new Date().toISOString(), lastReviewActionSessionId: mySessionId, ...(reason ? { rejectionReason: reason } : {}) }
       : m));
     showToast('Message rejected');
     return true;
@@ -2405,6 +2462,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       startDate: data.startDate ? formatDisplayDate(data.startDate) : m.startDate,
       endDate: data.endDate ? formatDisplayDate(data.endDate) : m.endDate,
       formData: data,
+      lastReviewActionSessionId: mySessionId,
     } : m));
     reviewKnownRef.current = JSON.stringify(data);
     setReviewConflict(null);
@@ -2605,6 +2663,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
             },
             onSaveMine: (data) => handleReviewSaveMine(reviewingRow.id, data),
           } : undefined}
+          silentSync={reviewSilentSync ?? undefined}
           decisionLock={reviewDecisionLock ? {
             status: reviewDecisionLock.status,
             onView: () => {
@@ -2646,6 +2705,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
                 startDate: data.startDate ? formatDisplayDate(data.startDate) : m.startDate,
                 endDate: data.endDate ? formatDisplayDate(data.endDate) : m.endDate,
                 formData: data,
+                lastReviewActionSessionId: mySessionId,
               } : m));
               setReviewingRow(null);
               showToast('All Changes Saved');

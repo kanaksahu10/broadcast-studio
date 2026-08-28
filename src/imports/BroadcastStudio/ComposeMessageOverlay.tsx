@@ -1377,7 +1377,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, isEditingDraft, onApprove, onReject, onDeleteRow, onEditAsDraft, discardedBucketLabel, originalAuthorName, currentUserName, rejectionReason, rejected, concurrentEdit, decisionLock }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, isEditingDraft, onApprove, onReject, onDeleteRow, onEditAsDraft, discardedBucketLabel, originalAuthorName, currentUserName, rejectionReason, rejected, concurrentEdit, decisionLock, silentSync }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -1443,6 +1443,14 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
    * action, there's no dismissing this and going back to editing.
    */
   decisionLock?: { status: 'Live' | 'Rejected'; onView: () => void };
+  /**
+   * Same person, another tab of the same browser session, made an edit or a
+   * decision to this same Pending message. Unlike concurrentEdit/decisionLock
+   * (a genuinely different approver — shows a banner, requires a choice),
+   * this is silently applied: it's still just you, so there's nothing to
+   * reconcile. A new object reference each time this fires.
+   */
+  silentSync?: { data: FormData };
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   // Flips true the instant "Edit as Draft" is clicked on a discarded
@@ -1636,6 +1644,22 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     states: string[]; featureFlags: string[]; statesOrAgencies: string[]; packages: string[]; roles: string[];
     startDate: string; endDate: string; noEndDate: boolean; dismissible: Dismissible; allowOptOut: boolean; pushNotification: boolean;
   } | null>(null);
+
+  // Pulls the same raw-field shape rawBaselineRef stores out of any FormData
+  // object — the baseline-capturing effect below and the silent-sync effect
+  // both need it, one off the live form fields and the other off a saved
+  // snapshot, so this is the one place that shape is spelled out.
+  const toRawSnapshot = (data: FormData) => ({
+    title: data.title ?? '', body: data.body ?? '', reason: data.reason ?? '', department: data.department ?? '',
+    messageCategory: data.messageCategory ?? '', customCategoryName: data.customCategoryName ?? '',
+    messageColor: data.messageColor ?? MESSAGE_COLOR_OPTIONS[1], displayFormat: (data.displayFormat as DisplayFormat) ?? '',
+    placement: (data.placement as Placement) ?? '', featurePath: data.featurePath ?? '',
+    hasCta: data.hasCta ?? false, ctaLabel: data.ctaLabel ?? '', ctaDestination: data.ctaDestination ?? '', stopOnCtaClick: data.stopOnCtaClick ?? false,
+    states: data.states ?? [], featureFlags: data.featureFlags ?? [], statesOrAgencies: data.statesOrAgencies ?? [], packages: data.packages ?? [], roles: data.roles ?? [],
+    startDate: data.startDate ?? '', endDate: data.endDate ?? '', noEndDate: data.noEndDate ?? false,
+    dismissible: (data.dismissible as Dismissible) ?? 'Dismissible', allowOptOut: data.allowOptOut ?? true, pushNotification: data.pushNotification ?? false,
+  });
+
   useEffect(() => {
     if (canSaveOnClose) {
       draftBaselineRef.current = JSON.stringify(allFormData);
@@ -1649,6 +1673,23 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canSaveOnClose]);
+
+  // Same-session sync: another tab of THIS browser (the approver's own,
+  // detected by session id on the Dashboard side) just saved an edit or a
+  // decision to this same message. Unlike concurrentEdit/decisionLock, it's
+  // still just this person, so there's nothing to reconcile — silently
+  // apply their newer data and move the baselines up to match, so this tab's
+  // own next close/discard diffs against the now-current state rather than
+  // stale data or re-saving over what the other tab just wrote.
+  const lastSilentSyncRef = useRef<typeof silentSync>(undefined);
+  useEffect(() => {
+    if (!silentSync || silentSync === lastSilentSyncRef.current) return;
+    lastSilentSyncRef.current = silentSync;
+    applyFormData(silentSync.data);
+    draftBaselineRef.current = JSON.stringify(silentSync.data);
+    rawBaselineRef.current = toRawSnapshot(silentSync.data);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [silentSync]);
 
   // Every field this form owns, set from one plain FormData object — shared
   // by "Discard Changes" (source: this session's own pre-edit baseline) and
