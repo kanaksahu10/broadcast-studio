@@ -1603,10 +1603,66 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // transition itself reassigns the author, which is a real effect of the
   // click, not a form edit to detect.
   const draftBaselineRef = useRef<string | null>(null);
+  // The raw field values behind that same baseline moment — as opposed to
+  // draftBaselineRef's derived allFormData snapshot — so "Discard Changes"
+  // can actually restore every input to what it was, not just detect that
+  // something differs. author is deliberately left out: it isn't a form
+  // field the user edits directly, so there's nothing to roll it back to.
+  const rawBaselineRef = useRef<{
+    title: string; body: string; reason: string; department: string; messageCategory: string; customCategoryName: string;
+    messageColor: string; displayFormat: DisplayFormat; placement: Placement; featurePath: string;
+    hasCta: boolean; ctaLabel: string; ctaDestination: string; stopOnCtaClick: boolean;
+    states: string[]; featureFlags: string[]; statesOrAgencies: string[]; packages: string[]; roles: string[];
+    startDate: string; endDate: string; noEndDate: boolean; dismissible: Dismissible; allowOptOut: boolean; pushNotification: boolean;
+  } | null>(null);
   useEffect(() => {
-    if (canSaveOnClose) draftBaselineRef.current = JSON.stringify(allFormData);
+    if (canSaveOnClose) {
+      draftBaselineRef.current = JSON.stringify(allFormData);
+      rawBaselineRef.current = {
+        title, body, reason, department, messageCategory, customCategoryName,
+        messageColor, displayFormat, placement, featurePath,
+        hasCta, ctaLabel, ctaDestination, stopOnCtaClick,
+        states, featureFlags, statesOrAgencies, packages, roles,
+        startDate, endDate, noEndDate, dismissible, allowOptOut, pushNotification,
+      };
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canSaveOnClose]);
+
+  // Same eligibility as save-on-close, plus an actual difference to discard —
+  // shown as a secondary action next to Submit/Approve the moment there's
+  // something to throw away, gone again once there isn't.
+  const hasUnsavedChanges = canSaveOnClose && draftBaselineRef.current !== null && JSON.stringify(allFormData) !== draftBaselineRef.current;
+
+  const handleDiscardChanges = () => {
+    const snap = rawBaselineRef.current;
+    if (!snap) return;
+    setTitle(snap.title);
+    setBody(snap.body);
+    setReason(snap.reason);
+    setDepartment(snap.department);
+    setMessageCategory(snap.messageCategory);
+    setCustomCategoryName(snap.customCategoryName);
+    setMessageColor(snap.messageColor);
+    setDisplayFormat(snap.displayFormat);
+    setPlacement(snap.placement);
+    setFeaturePath(snap.featurePath);
+    setHasCta(snap.hasCta);
+    setCtaLabel(snap.ctaLabel);
+    setCtaDestination(snap.ctaDestination);
+    setStopOnCtaClick(snap.stopOnCtaClick);
+    setStates(snap.states);
+    setFeatureFlags(snap.featureFlags);
+    setStatesOrAgencies(snap.statesOrAgencies);
+    setPackages(snap.packages);
+    setRoles(snap.roles);
+    setStartDate(snap.startDate);
+    setEndDate(snap.endDate);
+    setNoEndDate(snap.noEndDate);
+    setDismissible(snap.dismissible);
+    setAllowOptOut(snap.allowOptOut);
+    setPushNotification(snap.pushNotification);
+  };
 
   const handleSubmit = () => {
     onMessageCreated?.(allFormData);
@@ -1873,7 +1929,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             <DateField label="End Date" value={endDate} onChange={setEndDate} disabled={effectiveReadOnly || noEndDate} />
             {hasInvalidDateRange && (
               <p className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] -mt-[8px]" style={{ color: '#DA4040' }}>
-                End date can't be before the start date.
+                End date cannot be before the start date.
               </p>
             )}
             <CheckboxRow
@@ -2024,12 +2080,28 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                   {hasNoRecipients
                     ? 'This message would reach 0 recipients. Widen the audience before sending.'
                     : hasInvalidDateRange
-                      ? "End date can't be before the start date."
+                      ? 'End date cannot be before the start date.'
                       : 'Please fill in all required fields to proceed'}
                 </p>
               </div>
             )}
           </div>
+        );
+
+        // Only appears once there's something to throw away — a Draft or a
+        // Pending message under review, edited since it was opened. Reverts
+        // every field to how it looked at that starting point, same style as
+        // the other secondary (outlined) actions in this footer.
+        const discardChangesButton = hasUnsavedChanges && (
+          <button
+            type="button"
+            onClick={handleDiscardChanges}
+            className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center justify-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
+          >
+            <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
+              Discard Changes
+            </span>
+          </button>
         );
 
         // Save as Draft + Submit — only for a brand-new message that has no
@@ -2066,7 +2138,10 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 Delete
               </button>
             )}
-            {submitButton}
+            <div className="flex items-center gap-[8px]">
+              {discardChangesButton}
+              {submitButton}
+            </div>
           </div>
         );
 
@@ -2114,17 +2189,20 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                       Reject
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onApprove?.(allFormData)}
-                    className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[8px] max-sm:gap-[6px] cursor-pointer"
-                    style={{ backgroundColor: '#00AA00' }}
-                  >
-                    <FaRegCheckCircle size={15} color="white" />
-                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap" style={{ color: 'white' }}>
-                      Approve
-                    </span>
-                  </button>
+                  <div className="flex items-center gap-[8px]">
+                    {discardChangesButton}
+                    <button
+                      type="button"
+                      onClick={() => onApprove?.(allFormData)}
+                      className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[8px] max-sm:gap-[6px] cursor-pointer"
+                      style={{ backgroundColor: '#00AA00' }}
+                    >
+                      <FaRegCheckCircle size={15} color="white" />
+                      <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap" style={{ color: 'white' }}>
+                        Approve
+                      </span>
+                    </button>
+                  </div>
                 </div>
             ) : !effectiveReadOnly ? (
               editableFooterButtons
