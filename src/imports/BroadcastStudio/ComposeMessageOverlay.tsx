@@ -2093,9 +2093,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             type="button"
             onClick={handleDiscardChanges}
             className="flex items-center gap-[6px] shrink-0 font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
-            style={{ color: '#27496D' }}
+            style={{ color: '#DA4040' }}
           >
-            <MdUndo size={17} color="#27496D" />
+            <MdUndo size={17} color="#DA4040" />
             Discard Changes
           </button>
         );
