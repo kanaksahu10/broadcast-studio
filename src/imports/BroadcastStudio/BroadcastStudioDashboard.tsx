@@ -2238,6 +2238,49 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
   const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
   const showToast = (message: string) => setToast({ id: Date.now(), message });
 
+  // --- Concurrent-approver review state -----------------------------------
+  // Two approvers can have the same Pending message open for review at the
+  // same time. These track what happens to *this* tab's reviewingRow from
+  // *outside* it — another tab editing the same row's content, or deciding
+  // it outright — via the native `storage` event, which (per spec) only
+  // ever fires in tabs *other* than the one that made the change. That
+  // asymmetry is exactly the signal needed to tell "someone else's edit"
+  // apart from "my own edit", with no extra bookkeeping.
+  const [reviewConflict, setReviewConflict] = useState<{ theirsRow: BroadcastMessageRow } | null>(null);
+  const [reviewDecisionLock, setReviewDecisionLock] = useState<{ status: 'Live' | 'Rejected' } | null>(null);
+  // What this tab currently considers "the known content" for the row under
+  // review — reset when review starts, and re-synced whenever a conflict
+  // here gets resolved (Load theirs / Save mine), so the same external
+  // state already accounted for doesn't re-trigger the banner.
+  const reviewKnownRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!reviewingRow) {
+      setReviewConflict(null);
+      setReviewDecisionLock(null);
+      reviewKnownRef.current = null;
+      return;
+    }
+    reviewKnownRef.current = JSON.stringify(reviewingRow.formData ?? null);
+    const handler = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY || !e.newValue) return;
+      let updated: BroadcastMessageRow[];
+      try { updated = JSON.parse(e.newValue); } catch { return; }
+      const latest = updated.find((m) => m.id === reviewingRow.id);
+      if (!latest) return;
+      if (latest.status !== 'Pending') {
+        setReviewDecisionLock({ status: latest.status === 'Live' ? 'Live' : 'Rejected' });
+        return;
+      }
+      const nextKnown = JSON.stringify(latest.formData ?? null);
+      if (nextKnown !== reviewKnownRef.current) {
+        setReviewConflict({ theirsRow: latest });
+      }
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, [reviewingRow]);
+
   const anyOverlayOpen =
     isComposeOpen || !!editingRow || !!reviewingRow || !!rejectingRow || !!viewingRow || !!viewingDiscardedRow;
 
@@ -2303,7 +2346,16 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
     showToast('Message sent for approval');
   };
 
-  const handleApprove = (id: string, data?: MessageFormData & { title?: string; messageType?: string; startDate?: string; endDate?: string; statesOrAgencies?: string[] }) => {
+  // Returns whether the approval actually applied. Both handleApprove and
+  // handleReject guard against a message a second approver already decided
+  // on — the real-time storage-event listener on reviewingRow is the
+  // primary way this gets caught (see the effect below), but that's a
+  // best-effort cross-tab signal, not a lock: if it's ever missed, this is
+  // the backend-side check that refuses to double-decide a message and lets
+  // the caller fall back to the same lock UI.
+  const handleApprove = (id: string, data?: MessageFormData & { title?: string; messageType?: string; startDate?: string; endDate?: string; statesOrAgencies?: string[] }): boolean => {
+    const current = messages.find((m) => m.id === id);
+    if (!current || current.status !== 'Pending') return false;
     setMessages((prev) => prev.map((m) => {
       if (m.id !== id) return m;
       // The quick-approve action straight off the board (no review form open)
@@ -2325,13 +2377,38 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
       };
     }));
     showToast('Message approved');
+    return true;
   };
 
-  const handleReject = (id: string, reason?: string) => {
+  const handleReject = (id: string, reason?: string): boolean => {
+    const current = messages.find((m) => m.id === id);
+    if (!current || current.status !== 'Pending') return false;
     setMessages((prev) => prev.map((m) => m.id === id
       ? { ...m, status: 'Rejected', statusChangedAt: new Date().toISOString(), ...(reason ? { rejectionReason: reason } : {}) }
       : m));
     showToast('Message rejected');
+    return true;
+  };
+
+  // "Save mine" side of a concurrent-edit conflict: persists this approver's
+  // current form over whatever the other approver just saved, without
+  // closing the Review overlay (unlike the normal X-saves-on-close path) —
+  // reviewing continues right after, just with the conflict now resolved.
+  const handleReviewSaveMine = (id: string, data: MessageFormData & { title?: string; messageType?: string; startDate?: string; endDate?: string; statesOrAgencies?: string[] }) => {
+    const agencies = data.statesOrAgencies ?? [];
+    const audience = agencies.length === 0 ? 'All' : agencies.length <= 2 ? agencies.join(', ') : `${agencies.slice(0, 2).join(', ')} +${agencies.length - 2}`;
+    setMessages((prev) => prev.map((m) => m.id === id ? {
+      ...m,
+      subject: data.title || m.subject,
+      type: (data.messageType as MessageType) || m.type,
+      audience,
+      startDate: data.startDate ? formatDisplayDate(data.startDate) : m.startDate,
+      endDate: data.endDate ? formatDisplayDate(data.endDate) : m.endDate,
+      formData: data,
+    } : m));
+    reviewKnownRef.current = JSON.stringify(data);
+    setReviewConflict(null);
+    showToast('Saved your version');
   };
 
   const handleDiscontinue = (id: string) => {
@@ -2514,8 +2591,45 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           onClose={() => setReviewingRow(null)}
           overlayTitle="Review Message"
           readOnly={role !== 'executive-approver'}
+          concurrentEdit={reviewConflict ? {
+            theirsData: {
+              title: reviewConflict.theirsRow.subject,
+              messageType: reviewConflict.theirsRow.type,
+              startDate: parseDisplayDate(reviewConflict.theirsRow.startDate),
+              endDate: parseDisplayDate(reviewConflict.theirsRow.endDate),
+              ...reviewConflict.theirsRow.formData,
+            },
+            onLoadTheirs: () => {
+              reviewKnownRef.current = JSON.stringify(reviewConflict.theirsRow.formData ?? null);
+              setReviewConflict(null);
+            },
+            onSaveMine: (data) => handleReviewSaveMine(reviewingRow.id, data),
+          } : undefined}
+          decisionLock={reviewDecisionLock ? {
+            status: reviewDecisionLock.status,
+            onView: () => {
+              const latest = messages.find((m) => m.id === reviewingRow.id);
+              setReviewingRow(null);
+              if (!latest) return;
+              if (latest.status === 'Live') setViewingRow(latest);
+              else setViewingDiscardedRow({ row: latest, bucket: 'Rejected' });
+            },
+          } : undefined}
           {...(role === 'executive-approver' ? {
-            onApprove: (data) => { handleApprove(reviewingRow.id, data); setReviewingRow(null); },
+            onApprove: (data) => {
+              // Real-time sync (the storage-event listener above) is the
+              // primary way a concurrent decision gets caught — this is the
+              // fallback: if that was ever missed, handleApprove itself
+              // refuses to approve a message someone already decided on, so
+              // treat that refusal exactly like the real-time case.
+              const ok = handleApprove(reviewingRow.id, data);
+              if (ok) {
+                setReviewingRow(null);
+              } else {
+                const latest = messages.find((m) => m.id === reviewingRow.id);
+                setReviewDecisionLock({ status: latest?.status === 'Rejected' ? 'Rejected' : 'Live' });
+              }
+            },
             onReject: () => setRejectingRow(reviewingRow),
             // Closing (X) without Approving/Rejecting now saves any edits in
             // place — same "save on close, only if changed" treatment as a
@@ -2552,9 +2666,17 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           subject={rejectingRow.subject}
           onClose={() => setRejectingRow(null)}
           onConfirm={(reason) => {
-            handleReject(rejectingRow.id, reason);
+            // Same fallback as Approve: handleReject refuses if the message
+            // was already decided elsewhere, and that becomes the lock
+            // banner instead of actually rejecting.
+            const ok = handleReject(rejectingRow.id, reason);
             setRejectingRow(null);
-            setReviewingRow(null);
+            if (ok) {
+              setReviewingRow(null);
+            } else {
+              const latest = messages.find((m) => m.id === rejectingRow.id);
+              setReviewDecisionLock({ status: latest?.status === 'Rejected' ? 'Rejected' : 'Live' });
+            }
           }}
         />
       )}

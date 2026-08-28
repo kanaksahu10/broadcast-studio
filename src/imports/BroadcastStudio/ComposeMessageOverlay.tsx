@@ -1377,7 +1377,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, isEditingDraft, onApprove, onReject, onDeleteRow, onEditAsDraft, discardedBucketLabel, originalAuthorName, currentUserName, rejectionReason, rejected }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, isEditingDraft, onApprove, onReject, onDeleteRow, onEditAsDraft, discardedBucketLabel, originalAuthorName, currentUserName, rejectionReason, rejected, concurrentEdit, decisionLock }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -1426,6 +1426,23 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
    * an Expired or Discontinued message must not show it at all.
    */
   rejected?: boolean;
+  /**
+   * Another approver saved an edit to this same Pending message while this
+   * one's open for review — detected in real time (a cross-tab `storage`
+   * event), so this can show up mid-session with no action taken here.
+   * theirsData is what they saved; picking "Load theirs" replaces every
+   * field in this form with it, "Save mine" persists what's currently typed
+   * here instead, overwriting theirs.
+   */
+  concurrentEdit?: { theirsData: FormData; onLoadTheirs: () => void; onSaveMine: (data: FormData) => void };
+  /**
+   * Another approver already approved or rejected this same message while
+   * this one's open for review. One-way: once set, the form is fully locked
+   * (on top of whatever readOnly/editingAsDraft already had it at) and
+   * Approve/Reject disappear — the only way out is the banner's own "View"
+   * action, there's no dismissing this and going back to editing.
+   */
+  decisionLock?: { status: 'Live' | 'Rejected'; onView: () => void };
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   // Flips true the instant "Edit as Draft" is clicked on a discarded
@@ -1434,7 +1451,11 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // chrome (title, lock overlay, field disabled-ness, footer) into the
   // normal editable-draft look, in place.
   const [editingAsDraft, setEditingAsDraft] = useState(false);
-  const effectiveReadOnly = readOnly && !editingAsDraft;
+  // A decision lock always wins — even a reviewing approver's normally-
+  // editable form goes fully read-only the instant someone else has already
+  // approved or rejected the message, on top of whatever readOnly/
+  // editingAsDraft already had it at.
+  const effectiveReadOnly = (readOnly && !editingAsDraft) || !!decisionLock;
   // Either an existing Draft opened directly, or a discarded message
   // mid-transition into one — both get the same "draft window" chrome.
   const inDraftMode = isEditingDraft || editingAsDraft;
@@ -1629,34 +1650,48 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canSaveOnClose]);
 
+  // Every field this form owns, set from one plain FormData object — shared
+  // by "Discard Changes" (source: this session's own pre-edit baseline) and
+  // "Load theirs" (source: another approver's saved edit), since both are
+  // the same operation at heart: replace what's here with a known-good
+  // snapshot. Same fallbacks as each field's own useState initializer above.
+  const applyFormData = (data: FormData) => {
+    setTitle(data.title ?? '');
+    setBody(data.body ?? '');
+    setReason(data.reason ?? '');
+    setDepartment(data.department ?? '');
+    setMessageCategory(data.messageCategory ?? '');
+    setCustomCategoryName(data.customCategoryName ?? '');
+    setMessageColor(data.messageColor ?? MESSAGE_COLOR_OPTIONS[1]);
+    setDisplayFormat((data.displayFormat as DisplayFormat) ?? '');
+    setPlacement((data.placement as Placement) ?? '');
+    setFeaturePath(data.featurePath ?? '');
+    setHasCta(data.hasCta ?? false);
+    setCtaLabel(data.ctaLabel ?? '');
+    setCtaDestination(data.ctaDestination ?? '');
+    setStopOnCtaClick(data.stopOnCtaClick ?? false);
+    setStates(data.states ?? []);
+    setFeatureFlags(data.featureFlags ?? []);
+    setStatesOrAgencies(data.statesOrAgencies ?? []);
+    setPackages(data.packages ?? []);
+    setRoles(data.roles ?? []);
+    setStartDate(data.startDate ?? '');
+    setEndDate(data.endDate ?? '');
+    setNoEndDate(data.noEndDate ?? false);
+    setDismissible((data.dismissible as Dismissible) ?? 'Dismissible');
+    setAllowOptOut(data.allowOptOut ?? true);
+    setPushNotification(data.pushNotification ?? false);
+  };
+
   const handleDiscardChanges = () => {
-    const snap = rawBaselineRef.current;
-    if (!snap) return;
-    setTitle(snap.title);
-    setBody(snap.body);
-    setReason(snap.reason);
-    setDepartment(snap.department);
-    setMessageCategory(snap.messageCategory);
-    setCustomCategoryName(snap.customCategoryName);
-    setMessageColor(snap.messageColor);
-    setDisplayFormat(snap.displayFormat);
-    setPlacement(snap.placement);
-    setFeaturePath(snap.featurePath);
-    setHasCta(snap.hasCta);
-    setCtaLabel(snap.ctaLabel);
-    setCtaDestination(snap.ctaDestination);
-    setStopOnCtaClick(snap.stopOnCtaClick);
-    setStates(snap.states);
-    setFeatureFlags(snap.featureFlags);
-    setStatesOrAgencies(snap.statesOrAgencies);
-    setPackages(snap.packages);
-    setRoles(snap.roles);
-    setStartDate(snap.startDate);
-    setEndDate(snap.endDate);
-    setNoEndDate(snap.noEndDate);
-    setDismissible(snap.dismissible);
-    setAllowOptOut(snap.allowOptOut);
-    setPushNotification(snap.pushNotification);
+    if (!rawBaselineRef.current) return;
+    applyFormData(rawBaselineRef.current);
+  };
+
+  const handleLoadTheirs = () => {
+    if (!concurrentEdit) return;
+    applyFormData(concurrentEdit.theirsData);
+    concurrentEdit.onLoadTheirs();
   };
 
   const handleSubmit = () => {
@@ -1763,6 +1798,67 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           className="p-[24px] max-sm:p-[16px] flex flex-col gap-[16px]"
         >
           {effectiveReadOnly && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} />}
+
+          {/* One-way: once another approver has decided this message, there is
+              nothing left to do here but leave. No dismiss control on this
+              banner on purpose — the only exit is its own "View" action,
+              never back into editing. Takes priority over every other banner
+              below, including a concurrent-edit notice that may have shown
+              moments earlier — a decision supersedes an in-progress edit
+              conflict entirely. */}
+          {decisionLock && (
+            <div className="flex flex-col gap-[10px] rounded-[4px] px-[12px] py-[10px]" style={{ backgroundColor: '#FFE9E9' }}>
+              <div className="flex items-start gap-[8px]">
+                <RiErrorWarningLine size={16} color="#DA4040" className="shrink-0 mt-[1px]" />
+                <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: '#DA4040' }}>
+                  This message has been {decisionLock.status === 'Live' ? 'approved' : 'rejected'}. You cannot perform any actions.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={decisionLock.onView}
+                className="self-start rounded-[8px] px-[12px] h-[32px] shrink-0 flex items-center justify-center gap-[6px] cursor-pointer"
+                style={{ backgroundColor: '#DA4040' }}
+              >
+                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase whitespace-nowrap text-white">
+                  View {decisionLock.status === 'Live' ? 'approved' : 'rejected'} message
+                </span>
+              </button>
+            </div>
+          )}
+
+          {/* Real-time: another approver saved their own edit to this same
+              Pending message while this one's still open for review. Neither
+              version is presumed right — "Load theirs" and "Save mine" carry
+              equal weight, it's just a choice of which edit wins. */}
+          {!decisionLock && concurrentEdit && (
+            <div className="flex flex-col gap-[10px] rounded-[4px] px-[12px] py-[10px]" style={{ backgroundColor: '#FFE9E9' }}>
+              <div className="flex items-start gap-[8px]">
+                <RiErrorWarningLine size={16} color="#DA4040" className="shrink-0 mt-[1px]" />
+                <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: '#DA4040' }}>
+                  Another approver just saved changes to this message while you were reviewing it.
+                </p>
+              </div>
+              <div className="flex items-center gap-[8px]">
+                <button
+                  type="button"
+                  onClick={handleLoadTheirs}
+                  className="rounded-[8px] px-[12px] h-[32px] shrink-0 flex items-center justify-center gap-[6px] border cursor-pointer transition-colors duration-150"
+                  style={{ backgroundColor: PRIMARY_BG, borderColor: PRIMARY, color: PRIMARY }}
+                >
+                  <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase whitespace-nowrap">Load theirs</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => concurrentEdit.onSaveMine(allFormData)}
+                  className="rounded-[8px] px-[12px] h-[32px] shrink-0 flex items-center justify-center gap-[6px] cursor-pointer"
+                  style={{ backgroundColor: PRIMARY }}
+                >
+                  <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase whitespace-nowrap text-white">Save mine</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Rejection Reason and Original Author share one card instead of
               stacking as two separate ones — same border, same padding, one
@@ -2141,7 +2237,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           </div>
         );
 
-        return showFooter && (
+        return !decisionLock && showFooter && (
           <div className="shrink-0 border-t px-[24px] max-sm:px-[16px] py-[16px] flex items-center justify-end" style={{ borderColor: BORDER, backgroundColor: 'white' }}>
             {inDraftMode ? (
               draftModeFooterButtons
