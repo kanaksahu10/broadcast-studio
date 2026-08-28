@@ -4,7 +4,7 @@ import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline } from 'react-icons/md';
+import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline, MdUndo } from 'react-icons/md';
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
@@ -1629,11 +1629,6 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canSaveOnClose]);
 
-  // Same eligibility as save-on-close, plus an actual difference to discard —
-  // shown as a secondary action next to Submit/Approve the moment there's
-  // something to throw away, gone again once there isn't.
-  const hasUnsavedChanges = canSaveOnClose && draftBaselineRef.current !== null && JSON.stringify(allFormData) !== draftBaselineRef.current;
-
   const handleDiscardChanges = () => {
     const snap = rawBaselineRef.current;
     if (!snap) return;
@@ -2088,19 +2083,20 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           </div>
         );
 
-        // Only appears once there's something to throw away — a Draft or a
-        // Pending message under review, edited since it was opened. Reverts
-        // every field to how it looked at that starting point, same style as
-        // the other secondary (outlined) actions in this footer.
-        const discardChangesButton = hasUnsavedChanges && (
+        // Always present in a Draft window / Pending review — not just once
+        // something's actually been edited — same text-only treatment as
+        // Delete, sitting right next to it. Reverts every field to how it
+        // looked at the moment draft/review-editing began; a no-op click
+        // when nothing's changed is harmless.
+        const discardChangesButton = (
           <button
             type="button"
             onClick={handleDiscardChanges}
-            className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center justify-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#e8f4ff] border-[#2699fb] text-[#2699fb] hover:bg-[#2699fb] hover:text-white"
+            className="flex items-center gap-[6px] shrink-0 font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+            style={{ color: '#27496D' }}
           >
-            <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
-              Discard Changes
-            </span>
+            <MdUndo size={17} color="#27496D" />
+            Discard Changes
           </button>
         );
 
@@ -2126,22 +2122,22 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
         // transition into one): no separate Save as Draft — the X button
         // already saves on close — just an optional Delete and Submit.
         const draftModeFooterButtons = (
-          <div className={`flex items-center gap-[16px] ${onDeleteRow ? 'w-full justify-between' : 'w-full justify-end'}`}>
-            {onDeleteRow && (
-              <button
-                type="button"
-                className="flex items-center gap-[6px] shrink-0 font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
-                style={{ color: '#DA4040' }}
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                <RiDeleteBinLine size={17} color="#DA4040" />
-                Delete
-              </button>
-            )}
-            <div className="flex items-center gap-[8px]">
+          <div className="flex items-center gap-[16px] w-full justify-between">
+            <div className="flex items-center gap-[16px]">
+              {onDeleteRow && (
+                <button
+                  type="button"
+                  className="flex items-center gap-[6px] shrink-0 font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+                  style={{ color: '#DA4040' }}
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <RiDeleteBinLine size={17} color="#DA4040" />
+                  Delete
+                </button>
+              )}
               {discardChangesButton}
-              {submitButton}
             </div>
+            {submitButton}
           </div>
         );
 
@@ -2178,31 +2174,31 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             ) : onApprove && onReject ? (
                 /* Pushed to opposite ends of the footer: the destructive action sits
                    well away from the one people mean to hit. */
-                <div className="flex items-center gap-[8px] w-full justify-between">
-                  <button
-                    type="button"
-                    onClick={onReject}
-                    className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#fdeaea] border-[#DA4040] text-[#DA4040] hover:bg-[#DA4040] hover:text-white"
-                  >
-                    <FaRegTimesCircle size={15} />
-                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
-                      Reject
-                    </span>
-                  </button>
-                  <div className="flex items-center gap-[8px]">
-                    {discardChangesButton}
+                <div className="flex items-center gap-[16px] w-full justify-between">
+                  <div className="flex items-center gap-[16px]">
                     <button
                       type="button"
-                      onClick={() => onApprove?.(allFormData)}
-                      className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[8px] max-sm:gap-[6px] cursor-pointer"
-                      style={{ backgroundColor: '#00AA00' }}
+                      onClick={onReject}
+                      className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#fdeaea] border-[#DA4040] text-[#DA4040] hover:bg-[#DA4040] hover:text-white"
                     >
-                      <FaRegCheckCircle size={15} color="white" />
-                      <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap" style={{ color: 'white' }}>
-                        Approve
+                      <FaRegTimesCircle size={15} />
+                      <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
+                        Reject
                       </span>
                     </button>
+                    {discardChangesButton}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => onApprove?.(allFormData)}
+                    className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[8px] max-sm:gap-[6px] cursor-pointer"
+                    style={{ backgroundColor: '#00AA00' }}
+                  >
+                    <FaRegCheckCircle size={15} color="white" />
+                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap" style={{ color: 'white' }}>
+                      Approve
+                    </span>
+                  </button>
                 </div>
             ) : !effectiveReadOnly ? (
               editableFooterButtons
