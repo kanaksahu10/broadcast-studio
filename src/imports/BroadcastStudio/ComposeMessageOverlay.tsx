@@ -4,7 +4,7 @@ import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline } from 'react-icons/md';
+import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline, MdUndo } from 'react-icons/md';
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
@@ -66,15 +66,16 @@ export type AudienceSelection = {
 };
 
 /**
- * Every provided facet narrows the audience — they AND together. An empty facet
- * is "no constraint" rather than "match nothing", except that agencies and
- * states are the starting set: with neither, nothing is targeted yet.
+ * Every facet is independent — none of them require another to be set first.
+ * A facet with no selection is "no constraint" and simply doesn't filter;
+ * facets that do have a selection AND together. The only case that targets
+ * nobody is every facet being empty at once (nothing selected anywhere).
  */
 function getMatchingAgencies({ agencies = [], states = [], packages = [], roles = [], featureFlags = [] }: AudienceSelection): Agency[] {
-  if (agencies.length === 0 && states.length === 0) return [];
-  let matching = AGENCIES.filter((a) =>
-    (agencies.length === 0 || agencies.includes(a.name)) &&
-    (states.length === 0 || states.includes(a.state)));
+  if (agencies.length === 0 && states.length === 0 && packages.length === 0 && roles.length === 0 && featureFlags.length === 0) return [];
+  let matching = AGENCIES;
+  if (agencies.length > 0) matching = matching.filter((a) => agencies.includes(a.name));
+  if (states.length > 0) matching = matching.filter((a) => states.includes(a.state));
   if (packages.length > 0) matching = matching.filter((a) => packages.includes(a.package));
   if (roles.length > 0) matching = matching.filter((a) => roles.includes(a.role));
   if (featureFlags.length > 0) matching = matching.filter((a) => featureFlags.some((f) => a.featureFlags.includes(f)));
@@ -168,21 +169,39 @@ function FieldShell({ label, height, disabled, open, subtext, children }: { labe
   );
 }
 
-export function TextField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
+// A single-line-looking field that's actually a growing textarea underneath:
+// a plain <input> can only truncate or scroll a long value out of view,
+// never wrap it, so anything with a real length limit (a title, a label)
+// needs this instead. Enter is suppressed — it still reads as "one field,"
+// just one that can wrap onto a second line rather than hide the overflow.
+export function TextField({ label, value, onChange, placeholder, disabled, maxLength }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean; maxLength?: number }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
   return (
     <FieldShell label={label} disabled={disabled}>
-      <input
+      <textarea
+        ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
         placeholder={placeholder}
-        className="font-['Montserrat',sans-serif] font-normal text-[13px] placeholder:text-[#b8b8b8] outline-none bg-transparent w-full"
+        maxLength={maxLength}
+        rows={1}
+        className="font-['Montserrat',sans-serif] font-normal text-[13px] placeholder:text-[#b8b8b8] outline-none bg-transparent w-full resize-none overflow-hidden"
         style={{ color: '#000000' }}
       />
     </FieldShell>
   );
 }
 
-export function TextAreaField({ label, value, onChange, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
+export function TextAreaField({ label, value, onChange, placeholder, disabled, maxLength }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean; maxLength?: number }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -199,6 +218,7 @@ export function TextAreaField({ label, value, onChange, placeholder, disabled }:
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        maxLength={maxLength}
         rows={1}
         className="font-['Montserrat',sans-serif] font-normal text-[13px] placeholder:text-[#b8b8b8] outline-none bg-transparent w-full resize-none overflow-hidden"
         style={{ color: '#000000' }}
@@ -760,7 +780,7 @@ function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestin
       </div>
       {checked && (
         <div className="flex flex-col gap-[16px] w-full">
-          <TextAreaField label="Label *" value={label} onChange={onLabelChange} placeholder="Link text shown in banner & overlay" disabled={disabled} />
+          <TextAreaField label="Label *" value={label} onChange={onLabelChange} placeholder="Link text shown in banner & overlay" disabled={disabled} maxLength={255} />
           <TextField label="Destination URL *" value={destination} onChange={onDestinationChange} placeholder="https://..." disabled={disabled} />
           <CheckboxRow label="Stop showing the message once clicked" checked={stopOnClick} onChange={onStopOnClickChange} disabled={disabled} />
         </div>
@@ -819,7 +839,7 @@ function BannerPreview({
     {allowOptOut && (
       <div className="w-full flex items-center justify-center">
         <span
-          className="font-['Montserrat',sans-serif] font-medium text-[11px] tracking-wide uppercase whitespace-nowrap cursor-pointer"
+          className="font-['Montserrat',sans-serif] font-medium text-[11px] tracking-wide uppercase whitespace-nowrap underline cursor-pointer"
           style={{ color: 'rgba(255,255,255,0.85)' }}
         >
           Don't show again
@@ -1357,7 +1377,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, onApprove, onReject, onDeleteRow, onEditAsDraft, discardedBucketLabel, originalAuthorName, currentUserName, rejectionReason, rejected }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, isEditingDraft, onApprove, onReject, onDeleteRow, onEditAsDraft, discardedBucketLabel, originalAuthorName, currentUserName, rejectionReason, rejected, concurrentEdit, decisionLock, silentSync }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -1365,7 +1385,17 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   submitLabel?: string;
   overlayTitle?: string;
   readOnly?: boolean;
-  onApprove?: () => void;
+  /**
+   * True when this overlay is editing a message that's already a Draft
+   * (opened straight from the Drafts board) — as opposed to composing a
+   * brand-new message that doesn't exist as a row yet. Combined with the
+   * discarded-origin transition (editingAsDraft below) into one "draft
+   * mode": no separate Save as Draft button, closing (X) saves in place,
+   * and Delete is offered — same as the discarded overlay's footer.
+   */
+  isEditingDraft?: boolean;
+  /** Approving hands back whatever the approver has edited in this same review pass, so those changes land in the published version instead of being silently discarded. */
+  onApprove?: (data: FormData) => void;
   onReject?: () => void;
   onDeleteRow?: () => void;
   /**
@@ -1396,6 +1426,31 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
    * an Expired or Discontinued message must not show it at all.
    */
   rejected?: boolean;
+  /**
+   * Another approver saved an edit to this same Pending message while this
+   * one's open for review — detected in real time (a cross-tab `storage`
+   * event), so this can show up mid-session with no action taken here.
+   * theirsData is what they saved; picking "Load theirs" replaces every
+   * field in this form with it, "Save mine" persists what's currently typed
+   * here instead, overwriting theirs.
+   */
+  concurrentEdit?: { theirsData: FormData; onLoadTheirs: () => void; onSaveMine: (data: FormData) => void };
+  /**
+   * Another approver already approved or rejected this same message while
+   * this one's open for review. One-way: once set, the form is fully locked
+   * (on top of whatever readOnly/editingAsDraft already had it at) and
+   * Approve/Reject disappear — the only way out is the banner's own "View"
+   * action, there's no dismissing this and going back to editing.
+   */
+  decisionLock?: { status: 'Live' | 'Rejected'; onView: () => void };
+  /**
+   * Same person, another tab of the same browser session, made an edit or a
+   * decision to this same Pending message. Unlike concurrentEdit/decisionLock
+   * (a genuinely different approver — shows a banner, requires a choice),
+   * this is silently applied: it's still just you, so there's nothing to
+   * reconcile. A new object reference each time this fires.
+   */
+  silentSync?: { data: FormData };
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   // Flips true the instant "Edit as Draft" is clicked on a discarded
@@ -1404,7 +1459,14 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // chrome (title, lock overlay, field disabled-ness, footer) into the
   // normal editable-draft look, in place.
   const [editingAsDraft, setEditingAsDraft] = useState(false);
-  const effectiveReadOnly = readOnly && !editingAsDraft;
+  // A decision lock always wins — even a reviewing approver's normally-
+  // editable form goes fully read-only the instant someone else has already
+  // approved or rejected the message, on top of whatever readOnly/
+  // editingAsDraft already had it at.
+  const effectiveReadOnly = (readOnly && !editingAsDraft) || !!decisionLock;
+  // Either an existing Draft opened directly, or a discarded message
+  // mid-transition into one — both get the same "draft window" chrome.
+  const inDraftMode = isEditingDraft || editingAsDraft;
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [body, setBody] = useState(initialData?.body ?? '');
   const [reason, setReason] = useState(initialData?.reason ?? '');
@@ -1519,13 +1581,20 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // Only a subset of the audience has the app installed with notifications
   // allowed, so turning push on does not mean everyone selected gets one.
   const pushCount = getAudiencePushCount({ agencies: statesOrAgencies, states, packages, roles, featureFlags });
-  // Push on but reaching nobody is a misconfiguration: the author has asked for
-  // a channel that cannot deliver. Blocked rather than warned, per product call.
-  const hasNoPushReach = pushNotification && pushCount === 0;
+  // Push reaching nobody no longer blocks sending — the message still goes
+  // out on every other channel to the full audience, so this is informational
+  // only (the count next to the toggle already says "0 of N get a
+  // notification"), not a reason to stop the whole message.
+
+  // Whichever date the user picks first, an end date earlier than the start
+  // date is invalid — checked as soon as both are set, regardless of which
+  // one was just changed, rather than only when End Date's own onChange
+  // fires.
+  const hasInvalidDateRange = !noEndDate && startDate !== '' && endDate !== '' && endDate < startDate;
 
   const isFormValid =
     !hasNoRecipients &&
-    !hasNoPushReach &&
+    !hasInvalidDateRange &&
     title.trim() !== '' &&
     body.trim() !== '' &&
     reason.trim() !== '' &&
@@ -1536,7 +1605,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     placement !== '' &&
     (placement !== 'Feature Specific' || featurePath !== '');
 
-  const showFooter = editingAsDraft || !!onDeleteRow || !!onEditAsDraft || !!(onApprove && onReject) || !effectiveReadOnly;
+  const showFooter = inDraftMode || !!onDeleteRow || !!onEditAsDraft || !!(onApprove && onReject) || !effectiveReadOnly;
 
   const messageType: MessageType = displayFormat === '' ? '' : (isEmergency ? 'Emergency' : 'Announcement');
   // Computed directly (not just left to the effect above) so a submit that
@@ -1545,6 +1614,127 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const savedDismissible: Dismissible = displayFormat === 'Overlay' ? 'Dismissible' : dismissible;
   const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, statesOrAgencies, states, featureFlags, packages, roles, dismissible: savedDismissible, allowOptOut: effectiveAllowOptOut, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
 
+  // An executive approver editing a Pending message in the Review overlay
+  // gets the same "X saves in place" treatment as a draft — they may fix a
+  // typo or two before deciding to Approve/Reject, and closing without
+  // hitting either shouldn't just throw that away. Distinct from inDraftMode
+  // itself so the footer still shows Approve/Reject here rather than the
+  // draft-mode footer — this only affects what closing does, not the
+  // buttons shown.
+  const canSaveOnClose = inDraftMode || (!!onApprove && !!onReject && !effectiveReadOnly);
+
+  // Baseline to diff against on close, so a window that's opened and closed
+  // untouched doesn't save (or toast) anything. Captured once at the moment
+  // this save-on-close eligibility actually starts — on mount for a Draft
+  // opened straight from the board or a Pending message under review, or the
+  // instant "Edit as Draft" flips editingAsDraft true for a discarded
+  // message — rather than at the overlay's original mount, since that
+  // transition itself reassigns the author, which is a real effect of the
+  // click, not a form edit to detect.
+  const draftBaselineRef = useRef<string | null>(null);
+  // The raw field values behind that same baseline moment — as opposed to
+  // draftBaselineRef's derived allFormData snapshot — so "Discard Changes"
+  // can actually restore every input to what it was, not just detect that
+  // something differs. author is deliberately left out: it isn't a form
+  // field the user edits directly, so there's nothing to roll it back to.
+  const rawBaselineRef = useRef<{
+    title: string; body: string; reason: string; department: string; messageCategory: string; customCategoryName: string;
+    messageColor: string; displayFormat: DisplayFormat; placement: Placement; featurePath: string;
+    hasCta: boolean; ctaLabel: string; ctaDestination: string; stopOnCtaClick: boolean;
+    states: string[]; featureFlags: string[]; statesOrAgencies: string[]; packages: string[]; roles: string[];
+    startDate: string; endDate: string; noEndDate: boolean; dismissible: Dismissible; allowOptOut: boolean; pushNotification: boolean;
+  } | null>(null);
+
+  // Pulls the same raw-field shape rawBaselineRef stores out of any FormData
+  // object — the baseline-capturing effect below and the silent-sync effect
+  // both need it, one off the live form fields and the other off a saved
+  // snapshot, so this is the one place that shape is spelled out.
+  const toRawSnapshot = (data: FormData) => ({
+    title: data.title ?? '', body: data.body ?? '', reason: data.reason ?? '', department: data.department ?? '',
+    messageCategory: data.messageCategory ?? '', customCategoryName: data.customCategoryName ?? '',
+    messageColor: data.messageColor ?? MESSAGE_COLOR_OPTIONS[1], displayFormat: (data.displayFormat as DisplayFormat) ?? '',
+    placement: (data.placement as Placement) ?? '', featurePath: data.featurePath ?? '',
+    hasCta: data.hasCta ?? false, ctaLabel: data.ctaLabel ?? '', ctaDestination: data.ctaDestination ?? '', stopOnCtaClick: data.stopOnCtaClick ?? false,
+    states: data.states ?? [], featureFlags: data.featureFlags ?? [], statesOrAgencies: data.statesOrAgencies ?? [], packages: data.packages ?? [], roles: data.roles ?? [],
+    startDate: data.startDate ?? '', endDate: data.endDate ?? '', noEndDate: data.noEndDate ?? false,
+    dismissible: (data.dismissible as Dismissible) ?? 'Dismissible', allowOptOut: data.allowOptOut ?? true, pushNotification: data.pushNotification ?? false,
+  });
+
+  useEffect(() => {
+    if (canSaveOnClose) {
+      draftBaselineRef.current = JSON.stringify(allFormData);
+      rawBaselineRef.current = {
+        title, body, reason, department, messageCategory, customCategoryName,
+        messageColor, displayFormat, placement, featurePath,
+        hasCta, ctaLabel, ctaDestination, stopOnCtaClick,
+        states, featureFlags, statesOrAgencies, packages, roles,
+        startDate, endDate, noEndDate, dismissible, allowOptOut, pushNotification,
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSaveOnClose]);
+
+  // Same-session sync: another tab of THIS browser (the approver's own,
+  // detected by session id on the Dashboard side) just saved an edit or a
+  // decision to this same message. Unlike concurrentEdit/decisionLock, it's
+  // still just this person, so there's nothing to reconcile — silently
+  // apply their newer data and move the baselines up to match, so this tab's
+  // own next close/discard diffs against the now-current state rather than
+  // stale data or re-saving over what the other tab just wrote.
+  const lastSilentSyncRef = useRef<typeof silentSync>(undefined);
+  useEffect(() => {
+    if (!silentSync || silentSync === lastSilentSyncRef.current) return;
+    lastSilentSyncRef.current = silentSync;
+    applyFormData(silentSync.data);
+    draftBaselineRef.current = JSON.stringify(silentSync.data);
+    rawBaselineRef.current = toRawSnapshot(silentSync.data);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [silentSync]);
+
+  // Every field this form owns, set from one plain FormData object — shared
+  // by "Discard Changes" (source: this session's own pre-edit baseline) and
+  // "Load theirs" (source: another approver's saved edit), since both are
+  // the same operation at heart: replace what's here with a known-good
+  // snapshot. Same fallbacks as each field's own useState initializer above.
+  const applyFormData = (data: FormData) => {
+    setTitle(data.title ?? '');
+    setBody(data.body ?? '');
+    setReason(data.reason ?? '');
+    setDepartment(data.department ?? '');
+    setMessageCategory(data.messageCategory ?? '');
+    setCustomCategoryName(data.customCategoryName ?? '');
+    setMessageColor(data.messageColor ?? MESSAGE_COLOR_OPTIONS[1]);
+    setDisplayFormat((data.displayFormat as DisplayFormat) ?? '');
+    setPlacement((data.placement as Placement) ?? '');
+    setFeaturePath(data.featurePath ?? '');
+    setHasCta(data.hasCta ?? false);
+    setCtaLabel(data.ctaLabel ?? '');
+    setCtaDestination(data.ctaDestination ?? '');
+    setStopOnCtaClick(data.stopOnCtaClick ?? false);
+    setStates(data.states ?? []);
+    setFeatureFlags(data.featureFlags ?? []);
+    setStatesOrAgencies(data.statesOrAgencies ?? []);
+    setPackages(data.packages ?? []);
+    setRoles(data.roles ?? []);
+    setStartDate(data.startDate ?? '');
+    setEndDate(data.endDate ?? '');
+    setNoEndDate(data.noEndDate ?? false);
+    setDismissible((data.dismissible as Dismissible) ?? 'Dismissible');
+    setAllowOptOut(data.allowOptOut ?? true);
+    setPushNotification(data.pushNotification ?? false);
+  };
+
+  const handleDiscardChanges = () => {
+    if (!rawBaselineRef.current) return;
+    applyFormData(rawBaselineRef.current);
+  };
+
+  const handleLoadTheirs = () => {
+    if (!concurrentEdit) return;
+    applyFormData(concurrentEdit.theirsData);
+    concurrentEdit.onLoadTheirs();
+  };
+
   const handleSubmit = () => {
     onMessageCreated?.(allFormData);
     onClose();
@@ -1552,6 +1742,20 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
   const handleSaveAsDraft = () => {
     onSaveAsDraft?.(allFormData);
+    onClose();
+  };
+
+  // In draft mode (and reviewing-as-approver) there's no separate Save
+  // button — closing (X) is itself the save, but only if something actually
+  // changed since it became eligible; otherwise there's nothing to write
+  // back and no "All Changes Saved" toast to show. Everywhere else, X just
+  // closes: a brand-new, never-saved message has nothing to save, and the
+  // locked discarded view has its own explicit action for anything that
+  // mutates.
+  const handleClose = () => {
+    if (canSaveOnClose && draftBaselineRef.current !== null && JSON.stringify(allFormData) !== draftBaselineRef.current) {
+      onSaveAsDraft?.(allFormData);
+    }
     onClose();
   };
 
@@ -1577,7 +1781,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
         <h2 className="font-['Montserrat',sans-serif] font-semibold text-[16px] text-black">
           {editingAsDraft && discardedBucketLabel ? `Edit Message - ${discardedBucketLabel}` : (overlayTitle ?? 'New Message')}
         </h2>
-        <button type="button" onClick={onClose} className="cursor-pointer flex items-center">
+        <button type="button" onClick={handleClose} className="cursor-pointer flex items-center">
           <IoIosClose size={26} color="#27496D" />
         </button>
       </div>
@@ -1635,6 +1839,67 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           className="p-[24px] max-sm:p-[16px] flex flex-col gap-[16px]"
         >
           {effectiveReadOnly && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} />}
+
+          {/* One-way: once another approver has decided this message, there is
+              nothing left to do here but leave. No dismiss control on this
+              banner on purpose — the only exit is its own "View" action,
+              never back into editing. Takes priority over every other banner
+              below, including a concurrent-edit notice that may have shown
+              moments earlier — a decision supersedes an in-progress edit
+              conflict entirely. */}
+          {decisionLock && (
+            <div className="flex flex-col gap-[10px] rounded-[4px] px-[12px] py-[10px]" style={{ backgroundColor: '#FFE9E9' }}>
+              <div className="flex items-start gap-[8px]">
+                <RiErrorWarningLine size={16} color="#DA4040" className="shrink-0 mt-[1px]" />
+                <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: '#DA4040' }}>
+                  This message has been {decisionLock.status === 'Live' ? 'approved' : 'rejected'}. You cannot perform any actions.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={decisionLock.onView}
+                className="self-start rounded-[8px] px-[12px] h-[32px] shrink-0 flex items-center justify-center gap-[6px] cursor-pointer"
+                style={{ backgroundColor: '#DA4040' }}
+              >
+                <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase whitespace-nowrap text-white">
+                  View {decisionLock.status === 'Live' ? 'approved' : 'rejected'} message
+                </span>
+              </button>
+            </div>
+          )}
+
+          {/* Real-time: another approver saved their own edit to this same
+              Pending message while this one's still open for review. Neither
+              version is presumed right — "Load theirs" and "Save mine" carry
+              equal weight, it's just a choice of which edit wins. */}
+          {!decisionLock && concurrentEdit && (
+            <div className="flex flex-col gap-[10px] rounded-[4px] px-[12px] py-[10px]" style={{ backgroundColor: '#FFE9E9' }}>
+              <div className="flex items-start gap-[8px]">
+                <RiErrorWarningLine size={16} color="#DA4040" className="shrink-0 mt-[1px]" />
+                <p className="font-['Montserrat',sans-serif] font-normal text-[13px] leading-[18px]" style={{ color: '#DA4040' }}>
+                  Another approver just saved changes to this message while you were reviewing it.
+                </p>
+              </div>
+              <div className="flex items-center gap-[8px]">
+                <button
+                  type="button"
+                  onClick={handleLoadTheirs}
+                  className="rounded-[8px] px-[12px] h-[32px] shrink-0 flex items-center justify-center gap-[6px] border cursor-pointer transition-colors duration-150"
+                  style={{ backgroundColor: PRIMARY_BG, borderColor: PRIMARY, color: PRIMARY }}
+                >
+                  <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase whitespace-nowrap">Load theirs</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => concurrentEdit.onSaveMine(allFormData)}
+                  className="rounded-[8px] px-[12px] h-[32px] shrink-0 flex items-center justify-center gap-[6px] cursor-pointer"
+                  style={{ backgroundColor: PRIMARY }}
+                >
+                  <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase whitespace-nowrap text-white">Save mine</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Rejection Reason and Original Author share one card instead of
               stacking as two separate ones — same border, same padding, one
@@ -1694,7 +1959,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             <SelectField label="Department *" value={department} onChange={setDepartment} placeholder="Select department..." options={DEPARTMENT_OPTIONS} disabled={effectiveReadOnly} />
             <SelectField label="Message Category" value={messageCategory} onChange={setMessageCategory} placeholder="Select category..." options={CATEGORY_OPTIONS} disabled={effectiveReadOnly} />
             {messageCategory === 'Custom' && (
-              <TextField label="Category Name" value={customCategoryName} onChange={setCustomCategoryName} placeholder="Type a category name" disabled={effectiveReadOnly} />
+              <TextField label="Category Name" value={customCategoryName} onChange={setCustomCategoryName} placeholder="Type a category name" disabled={effectiveReadOnly} maxLength={255} />
             )}
           </div>
 
@@ -1717,43 +1982,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             {placement === 'Feature Specific' && (
               <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} disabled={effectiveReadOnly} />
             )}
-            <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={effectiveReadOnly} />
+            <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={effectiveReadOnly} maxLength={255} />
             <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={effectiveReadOnly} />
             <TextAreaField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
-          </div>
-
-          {/* Date & Time card */}
-          <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
-            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Date &amp; Time</p>
-            <DateField label="Start Date *" value={startDate} onChange={setStartDate} disabled={effectiveReadOnly} />
-            <DateField label="End Date" value={endDate} onChange={setEndDate} disabled={effectiveReadOnly || noEndDate} />
-            <CheckboxRow
-              label="No end date"
-              checked={noEndDate}
-              onChange={(v) => { setNoEndDate(v); if (v) setEndDate(''); }}
-              disabled={effectiveReadOnly}
-            />
-          </div>
-
-          {/* Audience card */}
-          <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
-            <div className="flex flex-col">
-              <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Audience</p>
-              <p
-                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px]"
-                style={{ color: hasNoRecipients ? '#DA4040' : '#585858' }}
-              >
-                {audienceCount} {audienceCount === 1 ? 'recipient' : 'recipients'} will see this message
-              </p>
-            </div>
-            {/* Agency and State are both first-class now rather than two modes of
-                one field — targeting "Texas agencies on Billing" needed both at
-                once, which the old Search By radio made impossible. */}
-            <MultiSelectField label="Agency" values={statesOrAgencies} onChange={setStatesOrAgencies} placeholder="Select agencies..." options={AGENCIES.map((a) => a.name)} disabled={effectiveReadOnly} variant="agency" />
-            <MultiSelectField label="State" values={states} onChange={setStates} placeholder="Select states..." options={STATES} disabled={effectiveReadOnly} variant="state" />
-            <MultiSelectField label="Feature Flag" values={featureFlags} onChange={setFeatureFlags} placeholder="Select feature flags..." options={FEATURE_FLAGS} disabled={effectiveReadOnly} variant="feature" />
-            <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} disabled={effectiveReadOnly} variant="package" />
-            <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} disabled={effectiveReadOnly} variant="role" />
           </div>
 
           {/* Display Settings card */}
@@ -1798,6 +2029,45 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 : undefined}
               checked={pushNotification}
               onChange={setPushNotification}
+              disabled={effectiveReadOnly}
+            />
+          </div>
+
+          {/* Audience card */}
+          <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+            <div className="flex flex-col">
+              <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Audience</p>
+              <p
+                className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px]"
+                style={{ color: hasNoRecipients ? '#DA4040' : '#585858' }}
+              >
+                {audienceCount} {audienceCount === 1 ? 'recipient' : 'recipients'} will see this message
+              </p>
+            </div>
+            {/* Agency and State are both first-class now rather than two modes of
+                one field — targeting "Texas agencies on Billing" needed both at
+                once, which the old Search By radio made impossible. */}
+            <MultiSelectField label="Agency" values={statesOrAgencies} onChange={setStatesOrAgencies} placeholder="Select agencies..." options={AGENCIES.map((a) => a.name)} disabled={effectiveReadOnly} variant="agency" />
+            <MultiSelectField label="State" values={states} onChange={setStates} placeholder="Select states..." options={STATES} disabled={effectiveReadOnly} variant="state" />
+            <MultiSelectField label="Feature Flag" values={featureFlags} onChange={setFeatureFlags} placeholder="Select feature flags..." options={FEATURE_FLAGS} disabled={effectiveReadOnly} variant="feature" />
+            <MultiSelectField label="Package" values={packages} onChange={setPackages} placeholder="Select packages..." options={PACKAGES} disabled={effectiveReadOnly} variant="package" />
+            <MultiSelectField label="Role" values={roles} onChange={setRoles} placeholder="Select roles..." options={ROLES} disabled={effectiveReadOnly} variant="role" />
+          </div>
+
+          {/* Date & Time card */}
+          <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
+            <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Date &amp; Time</p>
+            <DateField label="Start Date *" value={startDate} onChange={setStartDate} disabled={effectiveReadOnly} />
+            <DateField label="End Date" value={endDate} onChange={setEndDate} disabled={effectiveReadOnly || noEndDate} />
+            {hasInvalidDateRange && (
+              <p className="font-['Montserrat',sans-serif] font-medium text-[13px] leading-[18px] -mt-[8px]" style={{ color: '#DA4040' }}>
+                End date cannot be before the start date.
+              </p>
+            )}
+            <CheckboxRow
+              label="No end date"
+              checked={noEndDate}
+              onChange={(v) => { setNoEndDate(v); if (v) setEndDate(''); }}
               disabled={effectiveReadOnly}
             />
           </div>
@@ -1906,9 +2176,69 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
 
       {/* Action buttons — full-width footer bar across the whole overlay */}
       {(() => {
-        // Save as Draft / Submit — the normal editable footer. Shared between
-        // the plain new/edit flow and a discarded message mid-transition into
-        // "Edit as Draft", so the two don't drift out of sync.
+        // The submit half — Send for Approval / Publish, whatever
+        // submitLabel says. Shared by every footer variant that can submit.
+        const submitButton = (
+          <div className="relative group shrink-0">
+            <button
+              type="button"
+              onClick={isFormValid ? handleSubmit : undefined}
+              onMouseEnter={() => setIsSubmitHovered(true)}
+              onMouseLeave={() => setIsSubmitHovered(false)}
+              disabled={!isFormValid}
+              className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] flex items-center justify-center gap-[8px] max-sm:gap-[6px] transition-colors duration-150"
+              style={{
+                backgroundColor: isFormValid ? (isSubmitHovered ? '#2C9FFF' : PRIMARY) : '#e1e3e4',
+                cursor: isFormValid ? 'pointer' : 'not-allowed',
+              }}
+            >
+              <MdSend size={17} color={isFormValid ? 'white' : '#a1a3a4'} />
+              <span
+                className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap"
+                style={{ color: isFormValid ? 'white' : '#a1a3a4' }}
+              >
+                {submitLabel ?? 'Send for Approval'}
+              </span>
+            </button>
+            {/* An empty audience takes precedence over the generic required-fields
+                message: it is the more specific reason, and it is the one a
+                filled-in-looking form will otherwise leave unexplained. */}
+            {!isFormValid && (
+              <div
+                className="absolute bottom-full right-0 mb-[8px] w-max max-w-[240px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 rounded-[4px] px-[8px] py-[10px] z-50"
+                style={{ backgroundColor: '#3b5c79' }}
+              >
+                <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-white leading-[17px]">
+                  {hasNoRecipients
+                    ? 'This message would reach 0 recipients. Widen the audience before sending.'
+                    : hasInvalidDateRange
+                      ? 'End date cannot be before the start date.'
+                      : 'Please fill in all required fields to proceed'}
+                </p>
+              </div>
+            )}
+          </div>
+        );
+
+        // Always present in a Draft window / Pending review — not just once
+        // something's actually been edited — same text-only treatment as
+        // Delete, sitting right next to it. Reverts every field to how it
+        // looked at the moment draft/review-editing began; a no-op click
+        // when nothing's changed is harmless.
+        const discardChangesButton = (
+          <button
+            type="button"
+            onClick={handleDiscardChanges}
+            className="flex items-center gap-[6px] shrink-0 font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+            style={{ color: '#DA4040' }}
+          >
+            <MdUndo size={17} color="#DA4040" />
+            Discard Changes
+          </button>
+        );
+
+        // Save as Draft + Submit — only for a brand-new message that has no
+        // row yet, so there's no "closing saves it" to fall back on.
         const editableFooterButtons = (
           <div className="flex items-center gap-[8px] w-full justify-between">
             <button
@@ -1921,52 +2251,37 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 Save as Draft
               </span>
             </button>
-            <div className="relative group shrink-0">
-              <button
-                type="button"
-                onClick={isFormValid ? handleSubmit : undefined}
-                onMouseEnter={() => setIsSubmitHovered(true)}
-                onMouseLeave={() => setIsSubmitHovered(false)}
-                disabled={!isFormValid}
-                className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] flex items-center justify-center gap-[8px] max-sm:gap-[6px] transition-colors duration-150"
-                style={{
-                  backgroundColor: isFormValid ? (isSubmitHovered ? '#2C9FFF' : PRIMARY) : '#e1e3e4',
-                  cursor: isFormValid ? 'pointer' : 'not-allowed',
-                }}
-              >
-                <MdSend size={17} color={isFormValid ? 'white' : '#a1a3a4'} />
-                <span
-                  className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap"
-                  style={{ color: isFormValid ? 'white' : '#a1a3a4' }}
-                >
-                  {submitLabel ?? 'Send for Approval'}
-                </span>
-              </button>
-              {/* An empty audience takes precedence over the generic required-fields
-                  message: it is the more specific reason, and it is the one a
-                  filled-in-looking form will otherwise leave unexplained. */}
-              {!isFormValid && (
-                <div
-                  className="absolute bottom-full right-0 mb-[8px] w-max max-w-[240px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 rounded-[4px] px-[8px] py-[10px] z-50"
-                  style={{ backgroundColor: '#3b5c79' }}
-                >
-                  <p className="font-['Montserrat',sans-serif] font-normal text-[12px] text-white leading-[17px]">
-                    {hasNoRecipients
-                      ? 'This message would reach 0 recipients. Widen the audience before sending.'
-                      : hasNoPushReach
-                        ? 'Push is on, but nobody in this audience can receive one. Turn push off or widen the audience.'
-                        : 'Please fill in all required fields to proceed'}
-                  </p>
-                </div>
-              )}
-            </div>
+            {submitButton}
           </div>
         );
 
-        return showFooter && (
+        // Draft mode (an existing Draft, or a discarded message mid-
+        // transition into one): no separate Save as Draft — the X button
+        // already saves on close — just an optional Delete and Submit.
+        const draftModeFooterButtons = (
+          <div className="flex items-center gap-[16px] w-full justify-between">
+            <div className="flex items-center gap-[16px]">
+              {onDeleteRow && (
+                <button
+                  type="button"
+                  className="flex items-center gap-[6px] shrink-0 font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] leading-[18px] uppercase whitespace-nowrap transition-colors cursor-pointer hover:underline"
+                  style={{ color: '#DA4040' }}
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <RiDeleteBinLine size={17} color="#DA4040" />
+                  Delete
+                </button>
+              )}
+              {discardChangesButton}
+            </div>
+            {submitButton}
+          </div>
+        );
+
+        return !decisionLock && showFooter && (
           <div className="shrink-0 border-t px-[24px] max-sm:px-[16px] py-[16px] flex items-center justify-end" style={{ borderColor: BORDER, backgroundColor: 'white' }}>
-            {editingAsDraft ? (
-              editableFooterButtons
+            {inDraftMode ? (
+              draftModeFooterButtons
             ) : onDeleteRow || onEditAsDraft ? (
               <div className={`flex items-center gap-[16px] ${onDeleteRow && onEditAsDraft ? 'w-full justify-between' : ''}`}>
                 {onDeleteRow && (
@@ -1996,20 +2311,23 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             ) : onApprove && onReject ? (
                 /* Pushed to opposite ends of the footer: the destructive action sits
                    well away from the one people mean to hit. */
-                <div className="flex items-center gap-[8px] w-full justify-between">
+                <div className="flex items-center gap-[16px] w-full justify-between">
+                  <div className="flex items-center gap-[16px]">
+                    <button
+                      type="button"
+                      onClick={onReject}
+                      className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#fdeaea] border-[#DA4040] text-[#DA4040] hover:bg-[#DA4040] hover:text-white"
+                    >
+                      <FaRegTimesCircle size={15} />
+                      <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
+                        Reject
+                      </span>
+                    </button>
+                    {discardChangesButton}
+                  </div>
                   <button
                     type="button"
-                    onClick={onReject}
-                    className="rounded-[8px] px-[12px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[6px] border cursor-pointer transition-colors duration-150 bg-[#fdeaea] border-[#DA4040] text-[#DA4040] hover:bg-[#DA4040] hover:text-white"
-                  >
-                    <FaRegTimesCircle size={15} />
-                    <span className="font-['Montserrat',sans-serif] font-medium text-[13px] max-sm:text-[12px] uppercase whitespace-nowrap">
-                      Reject
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onApprove}
+                    onClick={() => onApprove?.(allFormData)}
                     className="rounded-[8px] px-[16px] max-sm:px-[10px] h-[32px] shrink-0 flex items-center gap-[8px] max-sm:gap-[6px] cursor-pointer"
                     style={{ backgroundColor: '#00AA00' }}
                   >
