@@ -247,21 +247,22 @@ export function TextAreaField({ label, value, onChange, placeholder, disabled, m
 
 /**
  * Banners are one strip across the page, so a long body makes the strip grow
- * and cover more of the app. This is advice, not a limit: past the
- * recommended length the count turns amber but nothing blocks the author.
- * Overlays have no equivalent — their body scrolls inside the drawer.
+ * and cover more of the app. The field stops typing at the limit; a body can
+ * only exceed it when it was written for an overlay and the author then
+ * switches to Banner, and that blocks sending rather than cutting their text.
+ * Overlays have no limit — their body scrolls inside the drawer.
  */
-const BANNER_BODY_RECOMMENDED = 150;
+const BANNER_BODY_LIMIT = 150;
 
 function BannerLengthHint({ length }: { length: number }) {
-  const over = length > BANNER_BODY_RECOMMENDED;
+  const over = length > BANNER_BODY_LIMIT;
   return (
     <p
       className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] tabular-nums"
-      style={{ color: over ? '#B7791F' : TEXT_LIGHT }}
+      style={{ color: over ? '#DA4040' : TEXT_LIGHT }}
       aria-live="polite"
     >
-      {length} / {BANNER_BODY_RECOMMENDED} recommended for banners.{over && ' Long banners cover more of the page.'}
+      {length} / {BANNER_BODY_LIMIT}{over && '. Shorten the text to send this as a banner.'}
     </p>
   );
 }
@@ -1765,9 +1766,11 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // fires.
   const hasInvalidDateRange = !noEndDate && startDate !== '' && endDate !== '' && endDate < startDate;
 
+  const bannerBodyTooLong = displayFormat === 'Banner' && body.length > BANNER_BODY_LIMIT;
   const isFormValid =
     !hasNoRecipients &&
     !hasInvalidDateRange &&
+    !bannerBodyTooLong &&
     title.trim() !== '' &&
     body.trim() !== '' &&
     reason.trim() !== '' &&
@@ -2163,7 +2166,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             )}
             <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={effectiveReadOnly} maxLength={255} />
             <div className="flex flex-col gap-[6px]">
-              <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={effectiveReadOnly} />
+              <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={effectiveReadOnly} maxLength={displayFormat === 'Banner' ? BANNER_BODY_LIMIT : undefined} />
               {displayFormat === 'Banner' && <BannerLengthHint length={body.length} />}
             </div>
             {showImagePicker && <ImagePickerField value={imageId} onChange={setImageId} disabled={effectiveReadOnly} />}
@@ -2402,7 +2405,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                     ? 'This message would reach 0 recipients. Widen the audience before sending.'
                     : hasInvalidDateRange
                       ? 'End date cannot be before the start date.'
-                      : 'Please fill in all required fields to proceed'}
+                      : bannerBodyTooLong
+                        ? `Banner text must be ${BANNER_BODY_LIMIT} characters or fewer.`
+                        : 'Please fill in all required fields to proceed'}
                 </p>
               </div>
             )}
