@@ -988,9 +988,23 @@ function OverlayPreview({
             <PresetArt preset={image} iconSize={compact ? 28 : 44} />
           </div>
         )}
-        <p className={`font-['Montserrat',sans-serif] font-normal ${compact ? 'text-[12px]' : 'text-[13px]'} text-[#383838] whitespace-pre-wrap break-words`}>
-          {body || 'Your message body will appear here.'}
-        </p>
+        {tag ? (
+          // Tagged (What's new / Upgrade) overlays follow the Figma: the title
+          // is repeated as a large heading inside a tinted box with the body,
+          // on top of the one in the drawer header.
+          <div className={`rounded-[6px] flex flex-col ${compact ? 'gap-[6px] p-[10px]' : 'gap-[8px] p-[12px]'}`} style={{ backgroundColor: PRIMARY_BG }}>
+            <p className={`font-['Montserrat',sans-serif] font-semibold ${compact ? 'text-[14px] leading-[19px]' : 'text-[16px] leading-[22px]'} text-black break-words`}>
+              {title || 'Message Title'}
+            </p>
+            <p className={`font-['Montserrat',sans-serif] font-normal ${compact ? 'text-[12px]' : 'text-[13px]'} text-[#383838] whitespace-pre-wrap break-words`}>
+              {body || 'Your message body will appear here.'}
+            </p>
+          </div>
+        ) : (
+          <p className={`font-['Montserrat',sans-serif] font-normal ${compact ? 'text-[12px]' : 'text-[13px]'} text-[#383838] whitespace-pre-wrap break-words`}>
+            {body || 'Your message body will appear here.'}
+          </p>
+        )}
         {hasCta && ctaLabel && (
           <div className="flex items-start gap-[6px] min-w-0 cursor-pointer" style={{ color: '#27496D' }}>
             <p className="font-['Montserrat',sans-serif] font-medium text-[13px] underline break-words min-w-0">{ctaLabel}</p>
