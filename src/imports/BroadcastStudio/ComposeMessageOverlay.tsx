@@ -937,6 +937,19 @@ function BannerPreview({
   );
 }
 
+/** The overlay's blue button — Dismiss, and the CTA on tagged overlays. */
+function PreviewPrimaryButton({ compact, className = '', children }: { compact?: boolean; className?: string; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className={`rounded-[6px] ${compact ? 'px-[8px] py-[4px] text-[10px]' : 'px-[12px] py-[6px] text-[12px]'} font-['Montserrat',sans-serif] font-medium text-white flex items-center gap-[4px] cursor-pointer ${className}`}
+      style={{ backgroundColor: PRIMARY }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function OverlayPreview({
   tag,
   imageId,
@@ -1007,13 +1020,9 @@ function OverlayPreview({
         {hasCta && ctaLabel && (tag ? (
           // On a What's new / Upgrade overlay the call to action is the point
           // of the message, so it's a button rather than a link (Figma).
-          <button
-            type="button"
-            className={`self-start max-w-full rounded-[4px] ${compact ? 'px-[8px] py-[5px] text-[10px]' : 'px-[12px] py-[7px] text-[11px]'} font-['Montserrat',sans-serif] font-semibold uppercase tracking-wide text-white text-left break-words cursor-pointer`}
-            style={{ backgroundColor: PRIMARY }}
-          >
+          <PreviewPrimaryButton compact={compact} className="self-start max-w-full text-left break-words">
             {ctaLabel}
-          </button>
+          </PreviewPrimaryButton>
         ) : (
           <div className="flex items-start gap-[6px] min-w-0 cursor-pointer" style={{ color: '#27496D' }}>
             <p className="font-['Montserrat',sans-serif] font-medium text-[13px] underline break-words min-w-0">{ctaLabel}</p>
@@ -1033,13 +1042,11 @@ function OverlayPreview({
               Don't show again
             </span>
           ) : <span />}
-          {!tag && <button
-            type="button"
-            className={`rounded-[6px] shrink-0 ${compact ? 'px-[8px] py-[4px] text-[10px]' : 'px-[12px] py-[6px] text-[12px]'} font-['Montserrat',sans-serif] font-medium text-white flex items-center gap-[4px] cursor-pointer`}
-            style={{ backgroundColor: PRIMARY }}
-          >
-            <MdCheck size={compact ? 10 : 14} /> Dismiss
-          </button>}
+          {!tag && (
+            <PreviewPrimaryButton compact={compact} className="shrink-0">
+              <MdCheck size={compact ? 10 : 14} /> Dismiss
+            </PreviewPrimaryButton>
+          )}
         </div>
       )}
     </div>
