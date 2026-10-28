@@ -4,7 +4,7 @@ import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs
 import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { MdOutlineLocationOn, MdOutlinedFlag, MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdVisibility } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
-import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
+import ComposeMessageOverlay, { getCategoryTag, ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
 import { useIsBelowDesktop, useIsPhone } from './useIsPhone';
 import { getUserIdentity, type UserRole } from './userIdentity';
 
@@ -2097,6 +2097,7 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
   const effectiveFormat: 'Overlay' | 'Banner' = isEmergency ? 'Banner' : ((row.formData?.displayFormat as 'Overlay' | 'Banner') || 'Overlay');
   const color = isEmergency ? '#DA4040' : (row.formData?.messageColor || '#27496D');
   const body = row.formData?.body || row.subject;
+  const tag = getCategoryTag(row.formData?.messageCategory, isEmergency);
   const hasCta = row.formData?.hasCta ?? false;
   const ctaLabel = row.formData?.ctaLabel || 'Learn more';
   const dismissible = row.formData?.dismissible !== 'Non-Dismissible';
@@ -2196,18 +2197,18 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
                 // screen comes out portrait and its 320px message panel then
                 // covers the app behind it. Scale a real-size mock instead.
                 <ScaledMock baseWidth={MOCK_WIDTH} baseHeight={MOCK_WIDTH / 1.6}>
-                  <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
+                  <ScreenSkeleton tag={tag} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
                 </ScaledMock>
               ) : (
                 <div className="w-full h-full flex justify-center">
                   <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
-                    <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
+                    <ScreenSkeleton tag={tag} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
                   </div>
                 </div>
               )
             ) : (
               <ScaledMock baseWidth={PHONE_WIDTH} baseHeight={PHONE_HEIGHT}>
-                <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
+                <PhoneSkeleton tag={tag} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
               </ScaledMock>
             )}
           </div>

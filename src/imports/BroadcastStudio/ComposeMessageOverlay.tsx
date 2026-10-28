@@ -4,7 +4,7 @@ import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline, MdUndo } from 'react-icons/md';
+import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline, MdUndo, MdKeyboardDoubleArrowRight } from 'react-icons/md';
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
@@ -125,6 +125,19 @@ const ROLE_SUBTEXT: Record<string, string> = {
 const FEATURE_PATHS = ['Dashboard', 'Operations', 'Scheduling', 'Payroll', 'Billing', 'Clients', 'Employees', 'Smart Billing', 'Reporting', 'Fax', 'Agency Management', 'My Account'];
 const DEPARTMENT_OPTIONS = ['Admin Services', 'Billing', 'Customer Success', 'Marketing', 'Product', 'Support'];
 const CATEGORY_OPTIONS = ['Billing Notice', 'Emergency', 'New Release', 'Upsell', 'Custom'];
+
+/**
+ * The tag a recipient sees on the banner or overlay, for the two categories
+ * that carry one. Upsell reads as "Upgrade" rather than its internal name so a
+ * sales pitch never looks like a product announcement. An emergency (red
+ * banner) never carries a tag, whatever category it was filed under.
+ */
+export function getCategoryTag(category: string | undefined, isEmergency: boolean): string | null {
+  if (isEmergency) return null;
+  if (category === 'New Release') return "What's new";
+  if (category === 'Upsell') return 'Upgrade';
+  return null;
+}
 // Stand-in for real per-user auth: this prototype has no individual accounts,
 // only the org user shown in the sidebar, so Author auto-populates with that
 // same name rather than a selectable/editable value.
@@ -143,6 +156,9 @@ const NAVY = '#334c6d';
 const PRIMARY = '#2699fb';
 /** Core/Primary/Background — the tinted blue behind primary-flavoured rows. */
 const PRIMARY_BG = '#E8F4FF';
+/** The overlay's category tag, matching the Figma "What's new" chip. */
+const TAG_GREEN = '#1E9E46';
+const TAG_GREEN_BG = '#E7F7EC';
 const ICON_LIGHT = '#8a8a8a';
 const PLACEHOLDER = '#b8b8b8';
 
@@ -790,6 +806,7 @@ function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestin
 }
 
 function BannerPreview({
+  tag,
   body,
   color,
   dismissible,
@@ -805,12 +822,24 @@ function BannerPreview({
   hasCta: boolean;
   ctaLabel: string;
   rounded?: boolean;
+  tag?: string | null;
 }) {
   return (
     <div
       className={`flex flex-col gap-[6px] px-[16px] py-[12px] w-full ${rounded ? 'rounded-[6px]' : ''}`}
       style={{ backgroundColor: color }}
     >
+    {tag && (
+      <div className="w-full flex justify-center">
+        <span
+          className="inline-flex items-center gap-[2px] rounded-[4px] bg-white px-[8px] py-[2px] font-['Montserrat',sans-serif] font-semibold text-[10px] leading-[14px] tracking-wide uppercase whitespace-nowrap"
+          style={{ color: NAVY }}
+        >
+          <MdKeyboardDoubleArrowRight size={12} className="shrink-0" />
+          {tag}
+        </span>
+      </div>
+    )}
     <div className="flex items-center gap-[16px] w-full">
       {dismissible && <div className="shrink-0" style={{ width: 18 }} />}
       {/* min-w-0 lets the flex item shrink below its content, and break-words
@@ -851,6 +880,7 @@ function BannerPreview({
 }
 
 function OverlayPreview({
+  tag,
   title,
   body,
   dismissible,
@@ -870,6 +900,7 @@ function OverlayPreview({
   rounded?: boolean;
   widthClass?: string;
   compact?: boolean;
+  tag?: string | null;
 }) {
   return (
     <div
@@ -881,6 +912,15 @@ function OverlayPreview({
         {dismissible && <MdClose size={compact ? 16 : 18} color="#27496D" className="cursor-pointer shrink-0" />}
       </div>
       <div className={`${compact ? 'px-[12px] py-[10px]' : 'px-[16px] py-[14px]'} flex flex-col gap-[10px] flex-1 min-w-0 overflow-y-auto`}>
+        {tag && (
+          <span
+            className="self-start inline-flex items-center gap-[2px] rounded-[4px] px-[6px] py-[2px] font-['Montserrat',sans-serif] font-semibold text-[10px] leading-[14px] tracking-wide uppercase whitespace-nowrap"
+            style={{ backgroundColor: TAG_GREEN_BG, color: TAG_GREEN }}
+          >
+            <MdKeyboardDoubleArrowRight size={12} className="shrink-0" />
+            {tag}
+          </span>
+        )}
         <p className={`font-['Montserrat',sans-serif] font-normal ${compact ? 'text-[12px]' : 'text-[13px]'} text-[#383838] whitespace-pre-wrap break-words`}>
           {body || 'Your message body will appear here.'}
         </p>
@@ -962,6 +1002,7 @@ function TableRowSkeleton({ index }: { index: number }) {
 }
 
 export function ScreenSkeleton({
+  tag,
   effectiveFormat,
   title,
   body,
@@ -979,6 +1020,7 @@ export function ScreenSkeleton({
   allowOptOut?: boolean;
   hasCta: boolean;
   ctaLabel: string;
+  tag?: string | null;
 }) {
   return (
     <div className="relative w-full h-full bg-white rounded-[8px] border overflow-hidden flex" style={{ borderColor: BORDER }}>
@@ -1067,13 +1109,13 @@ export function ScreenSkeleton({
 
       {effectiveFormat === 'Overlay' && (
         <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
-          <OverlayPreview title={title} body={body} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          <OverlayPreview tag={tag} title={title} body={body} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
         </div>
       )}
 
       {effectiveFormat === 'Banner' && (
         <div className="absolute left-0 right-0 bottom-0">
-          <BannerPreview body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          <BannerPreview tag={tag} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
         </div>
       )}
     </div>
@@ -1172,6 +1214,7 @@ const CHROME_WIDTH = 248;
 const CHROME_SCALE = PHONE_SCREEN_WIDTH / CHROME_WIDTH;
 
 export function PhoneSkeleton({
+  tag,
   effectiveFormat,
   title,
   body,
@@ -1189,6 +1232,7 @@ export function PhoneSkeleton({
   allowOptOut?: boolean;
   hasCta: boolean;
   ctaLabel: string;
+  tag?: string | null;
 }) {
   return (
     <div
@@ -1260,6 +1304,7 @@ export function PhoneSkeleton({
       {effectiveFormat === 'Overlay' && (
         <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
           <OverlayPreview
+            tag={tag}
             title={title}
             body={body}
             dismissible={dismissible}
@@ -1274,7 +1319,7 @@ export function PhoneSkeleton({
 
       {effectiveFormat === 'Banner' && (
         <div className="absolute left-0 right-0 bottom-0">
-          <BannerPreview body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          <BannerPreview tag={tag} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
         </div>
       )}
     </div>
@@ -1762,6 +1807,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const effectiveFormat: DisplayFormat = displayFormat;
   const effectiveDismissible = savedDismissible === 'Dismissible';
   const effectiveBannerColor = messageColor;
+  const categoryTag = getCategoryTag(messageCategory, isEmergency);
   const hasPreview = effectiveFormat !== '';
 
   return (
@@ -2116,6 +2162,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                     isBelowDesktop ? (
                       <ScaledMock baseWidth={MOCK_WIDTH} baseHeight={MOCK_WIDTH / 1.6}>
                         <ScreenSkeleton
+                          tag={categoryTag}
                           effectiveFormat={effectiveFormat}
                           title={title}
                           body={body}
@@ -2132,6 +2179,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                       <div className="w-full h-full flex justify-center">
                         <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
                           <ScreenSkeleton
+                            tag={categoryTag}
                             effectiveFormat={effectiveFormat}
                             title={title}
                             body={body}
@@ -2149,6 +2197,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                     // breakpoint, so the phone mock always scales to fit.
                     <ScaledMock baseWidth={PHONE_WIDTH} baseHeight={PHONE_HEIGHT}>
                       <PhoneSkeleton
+                        tag={categoryTag}
                         effectiveFormat={effectiveFormat}
                         title={title}
                         body={body}
