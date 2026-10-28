@@ -1004,14 +1004,26 @@ function OverlayPreview({
             {body || 'Your message body will appear here.'}
           </p>
         )}
-        {hasCta && ctaLabel && (
+        {hasCta && ctaLabel && (tag ? (
+          // On a What's new / Upgrade overlay the call to action is the point
+          // of the message, so it's a button rather than a link (Figma).
+          <button
+            type="button"
+            className={`self-start max-w-full rounded-[4px] ${compact ? 'px-[8px] py-[5px] text-[10px]' : 'px-[12px] py-[7px] text-[11px]'} font-['Montserrat',sans-serif] font-semibold uppercase tracking-wide text-white text-left break-words cursor-pointer`}
+            style={{ backgroundColor: PRIMARY }}
+          >
+            {ctaLabel}
+          </button>
+        ) : (
           <div className="flex items-start gap-[6px] min-w-0 cursor-pointer" style={{ color: '#27496D' }}>
             <p className="font-['Montserrat',sans-serif] font-medium text-[13px] underline break-words min-w-0">{ctaLabel}</p>
             <FiExternalLink size={14} className="shrink-0 mt-[2px]" />
           </div>
-        )}
+        ))}
       </div>
-      {(dismissible || allowOptOut) && (
+      {/* Tagged overlays drop the Dismiss button so it doesn't compete with
+          the CTA; the header X still closes a dismissible one. */}
+      {(tag ? allowOptOut : (dismissible || allowOptOut)) && (
         <div className={`flex items-center justify-between gap-[8px] ${compact ? 'px-[12px] py-[8px]' : 'px-[16px] py-[10px]'} border-t shrink-0`} style={{ borderColor: BORDER, backgroundColor: '#fafafa' }}>
           {/* "Don't show again" is a separate promise from "Dismiss" — never
               again, versus not now — so the author opts into it explicitly
@@ -1021,13 +1033,13 @@ function OverlayPreview({
               Don't show again
             </span>
           ) : <span />}
-          <button
+          {!tag && <button
             type="button"
             className={`rounded-[6px] shrink-0 ${compact ? 'px-[8px] py-[4px] text-[10px]' : 'px-[12px] py-[6px] text-[12px]'} font-['Montserrat',sans-serif] font-medium text-white flex items-center gap-[4px] cursor-pointer`}
             style={{ backgroundColor: PRIMARY }}
           >
             <MdCheck size={compact ? 10 : 14} /> Dismiss
-          </button>
+          </button>}
         </div>
       )}
     </div>
