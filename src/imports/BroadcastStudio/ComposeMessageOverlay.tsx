@@ -2123,6 +2123,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             {messageCategory === 'Custom' && (
               <TextField label="Category Name" value={customCategoryName} onChange={setCustomCategoryName} placeholder="Type a category name" disabled={effectiveReadOnly} maxLength={255} />
             )}
+            <TextAreaField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
           </div>
 
           {/* Message Details card */}
@@ -2147,7 +2148,6 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={effectiveReadOnly} maxLength={255} />
             <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={effectiveReadOnly} />
             {showImagePicker && <ImagePickerField value={imageId} onChange={setImageId} disabled={effectiveReadOnly} />}
-            <TextAreaField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
           </div>
 
           {/* Display Settings card */}
