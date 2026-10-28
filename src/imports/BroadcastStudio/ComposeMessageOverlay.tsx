@@ -219,7 +219,7 @@ export function TextField({ label, value, onChange, placeholder, disabled, maxLe
   );
 }
 
-export function TextAreaField({ label, value, onChange, placeholder, disabled, maxLength, footer }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean; maxLength?: number; footer?: ReactNode }) {
+export function TextAreaField({ label, value, onChange, placeholder, disabled, maxLength }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean; maxLength?: number }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -241,29 +241,7 @@ export function TextAreaField({ label, value, onChange, placeholder, disabled, m
         className="font-['Montserrat',sans-serif] font-normal text-[13px] placeholder:text-[#b8b8b8] outline-none bg-transparent w-full resize-none overflow-hidden"
         style={{ color: '#000000' }}
       />
-      {footer}
     </FieldShell>
-  );
-}
-
-/**
- * Banners are one strip across the page, so a long body makes the strip grow
- * and cover more of the app. The field stops typing at the limit; a body can
- * only exceed it when it was written for an overlay and the author then
- * switches to Banner, and that blocks sending rather than cutting their text.
- * Overlays have no limit — their body scrolls inside the drawer.
- */
-const BANNER_BODY_LIMIT = 150;
-
-function BannerLengthCounter({ length }: { length: number }) {
-  return (
-    <p
-      className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] tabular-nums text-right"
-      style={{ color: '#b8b8b8' }}
-      aria-live="polite"
-    >
-      {length} / {BANNER_BODY_LIMIT}
-    </p>
   );
 }
 
@@ -1766,11 +1744,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // fires.
   const hasInvalidDateRange = !noEndDate && startDate !== '' && endDate !== '' && endDate < startDate;
 
-  const bannerBodyTooLong = displayFormat === 'Banner' && body.length > BANNER_BODY_LIMIT;
   const isFormValid =
     !hasNoRecipients &&
     !hasInvalidDateRange &&
-    !bannerBodyTooLong &&
     title.trim() !== '' &&
     body.trim() !== '' &&
     reason.trim() !== '' &&
@@ -2165,15 +2141,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} disabled={effectiveReadOnly} />
             )}
             <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={effectiveReadOnly} maxLength={255} />
-            <TextAreaField
-              label="Message Body *"
-              value={body}
-              onChange={setBody}
-              placeholder="Shows in banner & overlay"
-              disabled={effectiveReadOnly}
-              maxLength={displayFormat === 'Banner' ? BANNER_BODY_LIMIT : undefined}
-              footer={displayFormat === 'Banner' ? <BannerLengthCounter length={body.length} /> : undefined}
-            />
+            <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={effectiveReadOnly} />
             {showImagePicker && <ImagePickerField value={imageId} onChange={setImageId} disabled={effectiveReadOnly} />}
             <TextAreaField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
           </div>
@@ -2410,9 +2378,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                     ? 'This message would reach 0 recipients. Widen the audience before sending.'
                     : hasInvalidDateRange
                       ? 'End date cannot be before the start date.'
-                      : bannerBodyTooLong
-                        ? `Banner text must be ${BANNER_BODY_LIMIT} characters or fewer.`
-                        : 'Please fill in all required fields to proceed'}
+                      : 'Please fill in all required fields to proceed'}
                 </p>
               </div>
             )}
