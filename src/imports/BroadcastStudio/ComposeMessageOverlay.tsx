@@ -841,11 +841,10 @@ function ImagePickerField({ value, onChange, disabled }: { value: string; onChan
               aria-label={preset.name}
               disabled={disabled}
               onClick={() => onChange(isSelected ? '' : preset.id)}
-              className="relative rounded-[6px] overflow-hidden border transition-shadow"
+              className="relative rounded-[6px] overflow-hidden border"
               style={{
                 aspectRatio: '2 / 1',
                 borderColor: isSelected ? PRIMARY : BORDER,
-                boxShadow: isSelected ? `0 0 0 2px ${PRIMARY}` : 'none',
                 cursor: disabled ? 'not-allowed' : 'pointer',
                 opacity: disabled && !isSelected ? 0.5 : 1,
               }}
