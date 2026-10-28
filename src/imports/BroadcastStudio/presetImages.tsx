@@ -23,8 +23,8 @@ export const PRESET_IMAGES: PresetImage[] = [
   { id: 'vacation', name: 'Break', alt: 'A nurse taking a coffee break at her desk', icon: MdBeachAccess, tint: '#E5F6FD', ink: '#0B83B8' },
   { id: 'product-update', name: 'Product update', alt: 'A laptop showing a profile and a completed checklist', icon: MdDashboard, tint: '#EAF0F7', ink: '#27496D' },
   { id: 'mobile', name: 'Mobile', alt: 'A hand holding a phone with a notification bell', icon: MdPhoneIphone, tint: '#EEF0FB', ink: '#5B5FC7' },
-  { id: 'growth', name: 'Growth', alt: 'A plant growing from the tallest bar of a rising chart', icon: MdTrendingUp, tint: '#E7F7EC', ink: '#1E9E46' },
   { id: 'premium', name: 'Premium', alt: 'A gold star on a pedestal', icon: MdWorkspacePremium, tint: '#FFF6E0', ink: '#B7791F' },
+  { id: 'growth', name: 'Growth', alt: 'A plant growing from the tallest bar of a rising chart', icon: MdTrendingUp, tint: '#E7F7EC', ink: '#1E9E46' },
   { id: 'teamwork', name: 'Teamwork', alt: 'Three healthcare staff looking at a tablet together', icon: MdGroups, tint: '#E6F6F6', ink: '#178A8A' },
   { id: 'celebration', name: 'Celebration', alt: 'A party popper bursting confetti over a desk calendar', icon: MdCelebration, tint: '#FDECF3', ink: '#C2386F' },
 ];
