@@ -219,7 +219,7 @@ export function TextField({ label, value, onChange, placeholder, disabled, maxLe
   );
 }
 
-export function TextAreaField({ label, value, onChange, placeholder, disabled, maxLength, footer }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean; maxLength?: number; footer?: ReactNode }) {
+export function TextAreaField({ label, value, onChange, placeholder, disabled, maxLength }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean; maxLength?: number }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -241,7 +241,6 @@ export function TextAreaField({ label, value, onChange, placeholder, disabled, m
         className="font-['Montserrat',sans-serif] font-normal text-[13px] placeholder:text-[#b8b8b8] outline-none bg-transparent w-full resize-none overflow-hidden"
         style={{ color: '#000000' }}
       />
-      {footer}
     </FieldShell>
   );
 }
@@ -2163,14 +2162,10 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} disabled={effectiveReadOnly} />
             )}
             <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={effectiveReadOnly} maxLength={255} />
-            <TextAreaField
-              label="Message Body *"
-              value={body}
-              onChange={setBody}
-              placeholder="Shows in banner & overlay"
-              disabled={effectiveReadOnly}
-              footer={displayFormat === 'Banner' ? <BannerLengthHint length={body.length} /> : undefined}
-            />
+            <div className="flex flex-col gap-[6px]">
+              <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={effectiveReadOnly} />
+              {displayFormat === 'Banner' && <BannerLengthHint length={body.length} />}
+            </div>
             {showImagePicker && <ImagePickerField value={imageId} onChange={setImageId} disabled={effectiveReadOnly} />}
             <TextAreaField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
           </div>
