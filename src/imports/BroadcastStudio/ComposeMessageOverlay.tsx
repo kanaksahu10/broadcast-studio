@@ -259,7 +259,7 @@ function BannerLengthCounter({ length }: { length: number }) {
   return (
     <p
       className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] tabular-nums text-right"
-      style={{ color: TEXT_LIGHT }}
+      style={{ color: '#b8b8b8' }}
       aria-live="polite"
     >
       {length} / {BANNER_BODY_LIMIT}
