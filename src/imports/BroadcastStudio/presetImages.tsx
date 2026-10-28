@@ -21,7 +21,7 @@ export interface PresetImage {
 export const PRESET_IMAGES: PresetImage[] = [
   { id: 'launch', name: 'Launch', alt: 'A rocket lifting off from a desk by a sunny window', icon: MdRocketLaunch, tint: '#E8F4FF', ink: '#2699FB' },
   { id: 'vacation', name: 'Break', alt: 'A nurse taking a coffee break at her desk', icon: MdBeachAccess, tint: '#E5F6FD', ink: '#0B83B8' },
-  { id: 'product-update', name: 'Product update', alt: 'A laptop showing a dashboard of colourful charts', icon: MdDashboard, tint: '#EAF0F7', ink: '#27496D' },
+  { id: 'product-update', name: 'Product update', alt: 'A laptop showing a profile and a completed checklist', icon: MdDashboard, tint: '#EAF0F7', ink: '#27496D' },
   { id: 'mobile', name: 'Mobile', alt: 'A hand holding a phone with a notification bell', icon: MdPhoneIphone, tint: '#EEF0FB', ink: '#5B5FC7' },
   { id: 'growth', name: 'Growth', alt: 'A plant growing from the tallest bar of a rising chart', icon: MdTrendingUp, tint: '#E7F7EC', ink: '#1E9E46' },
   { id: 'teamwork', name: 'Teamwork', alt: 'Three healthcare staff looking at a tablet together', icon: MdGroups, tint: '#E6F6F6', ink: '#178A8A' },
