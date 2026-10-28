@@ -4,7 +4,8 @@ import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline, MdUndo, MdKeyboardDoubleArrowRight } from 'react-icons/md';
+import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline, MdUndo } from 'react-icons/md';
+import { HiOutlineSparkles } from 'react-icons/hi';
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
@@ -832,10 +833,10 @@ function BannerPreview({
     {tag && (
       <div className="w-full flex justify-center">
         <span
-          className="inline-flex items-center gap-[2px] rounded-[4px] bg-white px-[8px] py-[2px] font-['Montserrat',sans-serif] font-semibold text-[10px] leading-[14px] tracking-wide uppercase whitespace-nowrap"
+          className="inline-flex items-center gap-[4px] rounded-[4px] bg-white px-[8px] py-[2px] font-['Montserrat',sans-serif] font-semibold text-[10px] leading-[14px] tracking-wide uppercase whitespace-nowrap"
           style={{ color: NAVY }}
         >
-          <MdKeyboardDoubleArrowRight size={12} className="shrink-0" />
+          <HiOutlineSparkles size={12} className="shrink-0" />
           {tag}
         </span>
       </div>
@@ -914,10 +915,10 @@ function OverlayPreview({
       <div className={`${compact ? 'px-[12px] py-[10px]' : 'px-[16px] py-[14px]'} flex flex-col gap-[10px] flex-1 min-w-0 overflow-y-auto`}>
         {tag && (
           <span
-            className="self-start inline-flex items-center gap-[2px] rounded-[4px] px-[6px] py-[2px] font-['Montserrat',sans-serif] font-semibold text-[10px] leading-[14px] tracking-wide uppercase whitespace-nowrap"
+            className="self-start inline-flex items-center gap-[4px] rounded-[4px] px-[6px] py-[2px] font-['Montserrat',sans-serif] font-semibold text-[10px] leading-[14px] tracking-wide uppercase whitespace-nowrap"
             style={{ backgroundColor: TAG_GREEN_BG, color: TAG_GREEN }}
           >
-            <MdKeyboardDoubleArrowRight size={12} className="shrink-0" />
+            <HiOutlineSparkles size={12} className="shrink-0" />
             {tag}
           </span>
         )}
