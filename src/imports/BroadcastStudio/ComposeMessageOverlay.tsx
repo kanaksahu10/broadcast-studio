@@ -1721,6 +1721,13 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   }, [previewSignature, stackedTab]);
 
   const isEmergency = displayFormat === 'Banner' && messageColor === '#DA4040';
+  // What's new and Upgrade banners are always navy: red means emergency, and a
+  // red Upsell would read as an alarm (and lose its tag). Also catches a red
+  // colour arriving through Discard Changes or Load theirs.
+  const colorLockedToNavy = messageCategory === 'New Release' || messageCategory === 'Upsell';
+  useEffect(() => {
+    if (colorLockedToNavy && messageColor !== MESSAGE_COLOR_OPTIONS[1]) setMessageColor(MESSAGE_COLOR_OPTIONS[1]);
+  }, [colorLockedToNavy, messageColor]);
   // Emergency is deliberately unavoidable, and a permanent opt-out on a message
   // that cannot be closed is meaningless — so the option is unavailable rather
   // than merely unchecked in those cases.
@@ -2132,8 +2139,8 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                 onChange={setMessageColor}
                 options={MESSAGE_COLOR_OPTIONS}
                 optionLabels={{ '#DA4040': 'Emergency', '#27496D': 'Regular' }}
-                disabled={effectiveReadOnly}
-                subtext={isEmergency ? 'Red is recommended for emergencies.' : undefined}
+                disabled={effectiveReadOnly || colorLockedToNavy}
+                subtext={colorLockedToNavy ? "What's new and Upgrade banners are always navy." : isEmergency ? 'Red is recommended for emergencies.' : undefined}
               />
             )}
             <SelectField label="Placement *" value={placement} onChange={(v) => setPlacement(v as Placement)} placeholder="Select placement..." options={['App-wide', 'Feature Specific']} disabled={effectiveReadOnly} />
