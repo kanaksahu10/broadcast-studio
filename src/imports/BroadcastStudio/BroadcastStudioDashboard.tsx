@@ -500,7 +500,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       messageCategory: 'Upsell',
       body: 'Billing Executive adds unlimited custom reports and priority onboarding. See what your agency would gain.',
       reason: 'Expansion campaign',
-      displayFormat: 'Overlay',
+      displayFormat: 'Overlay', imageId: 'premium',
       placement: 'Global',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
@@ -672,7 +672,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       messageCategory: 'Upsell',
       body: 'Open enrollment kicks off next month — remind your team to complete their benefits selections before the deadline.',
       reason: 'Enrollment campaign',
-      displayFormat: 'Overlay',
+      displayFormat: 'Overlay', imageId: 'growth',
       placement: 'Global',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
@@ -929,7 +929,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       messageCategory: 'New Release',
       body: 'Our spring onboarding series covered scheduling, billing and eMAR. Recordings remain available in the help centre.',
       reason: 'Training series',
-      displayFormat: 'Overlay',
+      displayFormat: 'Overlay', imageId: 'launch',
       placement: 'Global',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
@@ -1027,7 +1027,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
   },
 ];
 
-const STORAGE_KEY = 'bs-messages-v18';
+// v19: seed overlays tagged What's new / Upgrade gained preset images.
+const STORAGE_KEY = 'bs-messages-v19';
 
 export function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
