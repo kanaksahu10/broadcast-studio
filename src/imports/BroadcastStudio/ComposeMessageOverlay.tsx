@@ -6,6 +6,7 @@ import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
 import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline, MdUndo } from 'react-icons/md';
 import { HiOutlineSparkles } from 'react-icons/hi';
+import { PRESET_IMAGES, PresetArt, getPresetImage } from './presetImages';
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
@@ -806,6 +807,63 @@ function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestin
   );
 }
 
+/**
+ * Optional image for a New Release or Upsell overlay, chosen from the preset
+ * library. Clicking the selected tile again clears it, so "no image" needs no
+ * tile of its own.
+ */
+function ImagePickerField({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
+  const selected = getPresetImage(value);
+  return (
+    <div className="rounded-[4px] border px-[12px] py-[10px] flex flex-col gap-[8px]" style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : 'white' }}>
+      <div className="flex items-baseline justify-between gap-[8px]">
+        <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: disabled ? '#585858' : LABEL_GREY }}>
+          Image
+        </p>
+        {selected && !disabled && (
+          <button type="button" onClick={() => onChange('')} className="font-['Montserrat',sans-serif] font-medium text-[12px] cursor-pointer hover:underline" style={{ color: NAVY }}>
+            Remove
+          </button>
+        )}
+      </div>
+      <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] -mt-[6px]" style={{ color: TEXT_LIGHT }}>
+        Optional. Shown at the top of the overlay.
+      </p>
+      <div className="grid grid-cols-2 gap-[8px]" role="radiogroup" aria-label="Image">
+        {PRESET_IMAGES.map((preset) => {
+          const isSelected = preset.id === value;
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              aria-label={preset.name}
+              disabled={disabled}
+              onClick={() => onChange(isSelected ? '' : preset.id)}
+              className="relative rounded-[6px] overflow-hidden border transition-shadow"
+              style={{
+                aspectRatio: '2 / 1',
+                borderColor: isSelected ? PRIMARY : BORDER,
+                boxShadow: isSelected ? `0 0 0 2px ${PRIMARY}` : 'none',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                opacity: disabled && !isSelected ? 0.5 : 1,
+              }}
+            >
+              <PresetArt preset={preset} iconSize={20} decorative />
+              {isSelected && (
+                <span className="absolute top-[4px] right-[4px] w-[16px] h-[16px] rounded-full flex items-center justify-center" style={{ backgroundColor: PRIMARY }}>
+                  <MdCheck size={12} color="white" />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function BannerPreview({
   tag,
   body,
@@ -882,6 +940,7 @@ function BannerPreview({
 
 function OverlayPreview({
   tag,
+  imageId,
   title,
   body,
   dismissible,
@@ -902,7 +961,9 @@ function OverlayPreview({
   widthClass?: string;
   compact?: boolean;
   tag?: string | null;
+  imageId?: string;
 }) {
+  const image = getPresetImage(imageId);
   return (
     <div
       className={`bg-white border flex flex-col ${widthClass} h-full ${rounded ? 'rounded-[8px] shadow-md' : 'border-t-0 border-r-0 border-b-0'}`}
@@ -921,6 +982,11 @@ function OverlayPreview({
             <HiOutlineSparkles size={12} className="shrink-0" />
             {tag}
           </span>
+        )}
+        {image && (
+          <div className="w-full rounded-[6px] overflow-hidden shrink-0" style={{ aspectRatio: '2 / 1' }}>
+            <PresetArt preset={image} iconSize={compact ? 28 : 44} />
+          </div>
         )}
         <p className={`font-['Montserrat',sans-serif] font-normal ${compact ? 'text-[12px]' : 'text-[13px]'} text-[#383838] whitespace-pre-wrap break-words`}>
           {body || 'Your message body will appear here.'}
@@ -1004,6 +1070,7 @@ function TableRowSkeleton({ index }: { index: number }) {
 
 export function ScreenSkeleton({
   tag,
+  imageId,
   effectiveFormat,
   title,
   body,
@@ -1022,6 +1089,7 @@ export function ScreenSkeleton({
   hasCta: boolean;
   ctaLabel: string;
   tag?: string | null;
+  imageId?: string;
 }) {
   return (
     <div className="relative w-full h-full bg-white rounded-[8px] border overflow-hidden flex" style={{ borderColor: BORDER }}>
@@ -1110,7 +1178,7 @@ export function ScreenSkeleton({
 
       {effectiveFormat === 'Overlay' && (
         <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
-          <OverlayPreview tag={tag} title={title} body={body} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          <OverlayPreview tag={tag} imageId={imageId} title={title} body={body} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
         </div>
       )}
 
@@ -1216,6 +1284,7 @@ const CHROME_SCALE = PHONE_SCREEN_WIDTH / CHROME_WIDTH;
 
 export function PhoneSkeleton({
   tag,
+  imageId,
   effectiveFormat,
   title,
   body,
@@ -1234,6 +1303,7 @@ export function PhoneSkeleton({
   hasCta: boolean;
   ctaLabel: string;
   tag?: string | null;
+  imageId?: string;
 }) {
   return (
     <div
@@ -1306,6 +1376,7 @@ export function PhoneSkeleton({
         <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
           <OverlayPreview
             tag={tag}
+            imageId={imageId}
             title={title}
             body={body}
             dismissible={dismissible}
@@ -1358,6 +1429,8 @@ type FormData = {
   ctaDestination?: string;
   stopOnCtaClick?: boolean;
   pushNotification?: boolean;
+  /** Preset image id (see presetImages.tsx); only shown on New Release and Upsell overlays. */
+  imageId?: string;
 };
 
 export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subject: string; onConfirm: () => void; onClose: () => void }) {
@@ -1576,6 +1649,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   }, [messageColor, displayFormat]);
 
   const [pushNotification, setPushNotification] = useState(initialData?.pushNotification ?? false);
+  const [imageId, setImageId] = useState(initialData?.imageId ?? '');
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
   const [isSubmitHovered, setIsSubmitHovered] = useState(false);
 
@@ -1658,7 +1732,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // lands in the same render as switching to Overlay can't slip through
   // with a stale Non-Dismissible value before the effect has a chance to run.
   const savedDismissible: Dismissible = displayFormat === 'Overlay' ? 'Dismissible' : dismissible;
-  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, statesOrAgencies, states, featureFlags, packages, roles, dismissible: savedDismissible, allowOptOut: effectiveAllowOptOut, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification };
+  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, statesOrAgencies, states, featureFlags, packages, roles, dismissible: savedDismissible, allowOptOut: effectiveAllowOptOut, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification, imageId };
 
   // An executive approver editing a Pending message in the Review overlay
   // gets the same "X saves in place" treatment as a draft — they may fix a
@@ -1688,7 +1762,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     messageColor: string; displayFormat: DisplayFormat; placement: Placement; featurePath: string;
     hasCta: boolean; ctaLabel: string; ctaDestination: string; stopOnCtaClick: boolean;
     states: string[]; featureFlags: string[]; statesOrAgencies: string[]; packages: string[]; roles: string[];
-    startDate: string; endDate: string; noEndDate: boolean; dismissible: Dismissible; allowOptOut: boolean; pushNotification: boolean;
+    startDate: string; endDate: string; noEndDate: boolean; dismissible: Dismissible; allowOptOut: boolean; pushNotification: boolean; imageId: string;
   } | null>(null);
 
   // Pulls the same raw-field shape rawBaselineRef stores out of any FormData
@@ -1704,6 +1778,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     states: data.states ?? [], featureFlags: data.featureFlags ?? [], statesOrAgencies: data.statesOrAgencies ?? [], packages: data.packages ?? [], roles: data.roles ?? [],
     startDate: data.startDate ?? '', endDate: data.endDate ?? '', noEndDate: data.noEndDate ?? false,
     dismissible: (data.dismissible as Dismissible) ?? 'Dismissible', allowOptOut: data.allowOptOut ?? true, pushNotification: data.pushNotification ?? false,
+    imageId: data.imageId ?? '',
   });
 
   useEffect(() => {
@@ -1714,7 +1789,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
         messageColor, displayFormat, placement, featurePath,
         hasCta, ctaLabel, ctaDestination, stopOnCtaClick,
         states, featureFlags, statesOrAgencies, packages, roles,
-        startDate, endDate, noEndDate, dismissible, allowOptOut, pushNotification,
+        startDate, endDate, noEndDate, dismissible, allowOptOut, pushNotification, imageId,
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1768,6 +1843,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     setDismissible((data.dismissible as Dismissible) ?? 'Dismissible');
     setAllowOptOut(data.allowOptOut ?? true);
     setPushNotification(data.pushNotification ?? false);
+    setImageId(data.imageId ?? '');
   };
 
   const handleDiscardChanges = () => {
@@ -1809,6 +1885,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const effectiveDismissible = savedDismissible === 'Dismissible';
   const effectiveBannerColor = messageColor;
   const categoryTag = getCategoryTag(messageCategory, isEmergency);
+  // Kept while hidden, so switching category away and back doesn't lose the pick.
+  const showImagePicker = categoryTag !== null && displayFormat === 'Overlay';
+  const previewImageId = categoryTag !== null ? imageId : '';
   const hasPreview = effectiveFormat !== '';
 
   return (
@@ -2031,6 +2110,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
             )}
             <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={effectiveReadOnly} maxLength={255} />
             <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={effectiveReadOnly} />
+            {showImagePicker && <ImagePickerField value={imageId} onChange={setImageId} disabled={effectiveReadOnly} />}
             <TextAreaField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
           </div>
 
@@ -2164,6 +2244,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                       <ScaledMock baseWidth={MOCK_WIDTH} baseHeight={MOCK_WIDTH / 1.6}>
                         <ScreenSkeleton
                           tag={categoryTag}
+                          imageId={previewImageId}
                           effectiveFormat={effectiveFormat}
                           title={title}
                           body={body}
@@ -2181,6 +2262,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                         <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
                           <ScreenSkeleton
                             tag={categoryTag}
+                            imageId={previewImageId}
                             effectiveFormat={effectiveFormat}
                             title={title}
                             body={body}
@@ -2199,6 +2281,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                     <ScaledMock baseWidth={PHONE_WIDTH} baseHeight={PHONE_HEIGHT}>
                       <PhoneSkeleton
                         tag={categoryTag}
+                        imageId={previewImageId}
                         effectiveFormat={effectiveFormat}
                         title={title}
                         body={body}

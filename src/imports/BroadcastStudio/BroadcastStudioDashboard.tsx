@@ -90,6 +90,7 @@ type MessageStatus = 'Live' | 'Pending' | 'Draft' | 'Rejected' | 'Discontinued';
 type MessageType = '' | 'Announcement' | 'Emergency';
 
 interface MessageFormData {
+  imageId?: string;
   body?: string; reason?: string; department?: string; messageCategory?: string; customCategoryName?: string; author?: string; noEndDate?: boolean; displayFormat?: string; placement?: string; featurePath?: string;
   messageColor?: string; allowOptOut?: boolean; searchMode?: string; statesOrAgencies?: string[]; states?: string[]; featureFlags?: string[];
   packages?: string[]; roles?: string[]; dismissible?: string; hasCta?: boolean;
@@ -2098,6 +2099,7 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
   const color = isEmergency ? '#DA4040' : (row.formData?.messageColor || '#27496D');
   const body = row.formData?.body || row.subject;
   const tag = getCategoryTag(row.formData?.messageCategory, isEmergency);
+  const imageId = tag ? row.formData?.imageId : undefined;
   const hasCta = row.formData?.hasCta ?? false;
   const ctaLabel = row.formData?.ctaLabel || 'Learn more';
   const dismissible = row.formData?.dismissible !== 'Non-Dismissible';
@@ -2197,18 +2199,18 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
                 // screen comes out portrait and its 320px message panel then
                 // covers the app behind it. Scale a real-size mock instead.
                 <ScaledMock baseWidth={MOCK_WIDTH} baseHeight={MOCK_WIDTH / 1.6}>
-                  <ScreenSkeleton tag={tag} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
+                  <ScreenSkeleton tag={tag} imageId={imageId} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
                 </ScaledMock>
               ) : (
                 <div className="w-full h-full flex justify-center">
                   <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
-                    <ScreenSkeleton tag={tag} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
+                    <ScreenSkeleton tag={tag} imageId={imageId} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
                   </div>
                 </div>
               )
             ) : (
               <ScaledMock baseWidth={PHONE_WIDTH} baseHeight={PHONE_HEIGHT}>
-                <PhoneSkeleton tag={tag} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
+                <PhoneSkeleton tag={tag} imageId={imageId} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
               </ScaledMock>
             )}
           </div>
