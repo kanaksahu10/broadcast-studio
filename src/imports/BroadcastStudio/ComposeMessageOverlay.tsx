@@ -826,9 +826,6 @@ function ImagePickerField({ value, onChange, disabled }: { value: string; onChan
           </button>
         )}
       </div>
-      <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] -mt-[6px]" style={{ color: TEXT_LIGHT }}>
-        Optional. Shown at the top of the overlay.
-      </p>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-[8px]" role="radiogroup" aria-label="Image">
         {PRESET_IMAGES.map((preset) => {
           const isSelected = preset.id === value;
