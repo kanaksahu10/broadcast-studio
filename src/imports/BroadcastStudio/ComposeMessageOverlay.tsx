@@ -219,7 +219,7 @@ export function TextField({ label, value, onChange, placeholder, disabled, maxLe
   );
 }
 
-export function TextAreaField({ label, value, onChange, placeholder, disabled, maxLength }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean; maxLength?: number }) {
+export function TextAreaField({ label, value, onChange, placeholder, disabled, maxLength, footer }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean; maxLength?: number; footer?: ReactNode }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -241,7 +241,29 @@ export function TextAreaField({ label, value, onChange, placeholder, disabled, m
         className="font-['Montserrat',sans-serif] font-normal text-[13px] placeholder:text-[#b8b8b8] outline-none bg-transparent w-full resize-none overflow-hidden"
         style={{ color: '#000000' }}
       />
+      {footer}
     </FieldShell>
+  );
+}
+
+/**
+ * Banners are one strip across the page, so a long body makes the strip grow
+ * and cover more of the app. This is advice, not a limit: past the
+ * recommended length the count turns amber but nothing blocks the author.
+ * Overlays have no equivalent — their body scrolls inside the drawer.
+ */
+const BANNER_BODY_RECOMMENDED = 150;
+
+function BannerLengthHint({ length }: { length: number }) {
+  const over = length > BANNER_BODY_RECOMMENDED;
+  return (
+    <p
+      className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px] tabular-nums"
+      style={{ color: over ? '#B7791F' : TEXT_LIGHT }}
+      aria-live="polite"
+    >
+      {length} / {BANNER_BODY_RECOMMENDED} recommended for banners.{over && ' Long banners cover more of the page.'}
+    </p>
   );
 }
 
@@ -2141,7 +2163,14 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
               <SelectField label="Feature Path *" value={featurePath} onChange={setFeaturePath} placeholder="Select a feature..." options={FEATURE_PATHS} disabled={effectiveReadOnly} />
             )}
             <TextField label="Message Title *" value={title} onChange={setTitle} placeholder="Shows in overlay & list" disabled={effectiveReadOnly} maxLength={255} />
-            <TextAreaField label="Message Body *" value={body} onChange={setBody} placeholder="Shows in banner & overlay" disabled={effectiveReadOnly} />
+            <TextAreaField
+              label="Message Body *"
+              value={body}
+              onChange={setBody}
+              placeholder="Shows in banner & overlay"
+              disabled={effectiveReadOnly}
+              footer={displayFormat === 'Banner' ? <BannerLengthHint length={body.length} /> : undefined}
+            />
             {showImagePicker && <ImagePickerField value={imageId} onChange={setImageId} disabled={effectiveReadOnly} />}
             <TextAreaField label="Message Reason *" value={reason} onChange={setReason} placeholder="Internal only, not shown to users" disabled={effectiveReadOnly} />
           </div>
