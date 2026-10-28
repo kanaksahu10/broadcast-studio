@@ -1,11 +1,15 @@
 # Preset overlay images
 
-Drop the Icons8 artwork here, one file per preset, named by its id:
+One image per preset, named by its id:
 
     launch  product-update  mobile  growth  teamwork  premium  vacation  celebration
 
-Any of `.svg`, `.png`, `.jpg`, `.jpeg` or `.webp` works, e.g. `launch.svg`. A file
-replaces that preset's placeholder automatically; no code change needed.
+The current set was generated with Figma AI (gemini-3.1-flash-image) in the
+GEOH Broadcast Studio Figma file, then cropped to 2:1 and saved as 1200 × 600
+JPG. To replace one, drop a new file with the same name here (`.svg`, `.png`,
+`.jpg`, `.jpeg` or `.webp`); no code change is needed. A preset without a file
+falls back to a coloured placeholder.
 
-Use one illustration style for all eight. Artwork is shown at a 2:1 ratio
-(about 1200 × 600 px for raster images) and cropped to fill.
+Keep one illustration style across all eight, no text inside the image, and
+files under about 200 KB. Update the preset's alt text in
+`src/imports/BroadcastStudio/presetImages.tsx` if the picture changes.

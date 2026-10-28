@@ -19,14 +19,14 @@ export interface PresetImage {
 }
 
 export const PRESET_IMAGES: PresetImage[] = [
-  { id: 'launch', name: 'Launch', alt: 'A rocket lifting off', icon: MdRocketLaunch, tint: '#E8F4FF', ink: '#2699FB' },
-  { id: 'product-update', name: 'Product update', alt: 'A dashboard with new features highlighted', icon: MdDashboard, tint: '#EAF0F7', ink: '#27496D' },
-  { id: 'mobile', name: 'Mobile', alt: 'A phone showing the GEOH app', icon: MdPhoneIphone, tint: '#EEF0FB', ink: '#5B5FC7' },
-  { id: 'growth', name: 'Growth', alt: 'A chart trending upward', icon: MdTrendingUp, tint: '#E7F7EC', ink: '#1E9E46' },
-  { id: 'teamwork', name: 'Teamwork', alt: 'A team working together', icon: MdGroups, tint: '#E6F6F6', ink: '#178A8A' },
-  { id: 'premium', name: 'Premium', alt: 'A premium badge with a star', icon: MdWorkspacePremium, tint: '#FFF6E0', ink: '#B7791F' },
-  { id: 'vacation', name: 'Vacation', alt: 'A beach chair under an umbrella by the sea', icon: MdBeachAccess, tint: '#E5F6FD', ink: '#0B83B8' },
-  { id: 'celebration', name: 'Celebration', alt: 'Confetti and a party popper', icon: MdCelebration, tint: '#FDECF3', ink: '#C2386F' },
+  { id: 'launch', name: 'Launch', alt: 'A rocket lifting off from an office desk', icon: MdRocketLaunch, tint: '#E8F4FF', ink: '#2699FB' },
+  { id: 'product-update', name: 'Product update', alt: 'A laptop showing a dashboard of colourful charts', icon: MdDashboard, tint: '#EAF0F7', ink: '#27496D' },
+  { id: 'mobile', name: 'Mobile', alt: 'A hand holding a phone with a new notification', icon: MdPhoneIphone, tint: '#EEF0FB', ink: '#5B5FC7' },
+  { id: 'growth', name: 'Growth', alt: 'A plant growing from a rising bar chart', icon: MdTrendingUp, tint: '#E7F7EC', ink: '#1E9E46' },
+  { id: 'teamwork', name: 'Teamwork', alt: 'Three healthcare staff looking at a tablet together', icon: MdGroups, tint: '#E6F6F6', ink: '#178A8A' },
+  { id: 'premium', name: 'Premium', alt: 'A gold star badge on a pedestal', icon: MdWorkspacePremium, tint: '#FFF6E0', ink: '#B7791F' },
+  { id: 'vacation', name: 'Vacation', alt: 'A beach chair and umbrella on a sunny beach', icon: MdBeachAccess, tint: '#E5F6FD', ink: '#0B83B8' },
+  { id: 'celebration', name: 'Celebration', alt: 'Confetti bursting over a desk calendar', icon: MdCelebration, tint: '#FDECF3', ink: '#C2386F' },
 ];
 
 // Real artwork in src/assets/presets/ takes over from a placeholder by file
