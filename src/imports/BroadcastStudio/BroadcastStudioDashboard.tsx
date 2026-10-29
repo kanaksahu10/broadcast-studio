@@ -4,7 +4,7 @@ import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs
 import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { MdOutlineLocationOn, MdOutlinedFlag, MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdVisibility } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
-import ComposeMessageOverlay, { ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
+import ComposeMessageOverlay, { getCategoryTag, ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
 import { useIsBelowDesktop, useIsPhone } from './useIsPhone';
 import { getUserIdentity, type UserRole } from './userIdentity';
 
@@ -90,6 +90,7 @@ type MessageStatus = 'Live' | 'Pending' | 'Draft' | 'Rejected' | 'Discontinued';
 type MessageType = '' | 'Announcement' | 'Emergency';
 
 interface MessageFormData {
+  imageId?: string;
   body?: string; reason?: string; department?: string; messageCategory?: string; customCategoryName?: string; author?: string; noEndDate?: boolean; displayFormat?: string; placement?: string; featurePath?: string;
   messageColor?: string; allowOptOut?: boolean; searchMode?: string; statesOrAgencies?: string[]; states?: string[]; featureFlags?: string[];
   packages?: string[]; roles?: string[]; dismissible?: string; hasCta?: boolean;
@@ -499,7 +500,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       messageCategory: 'Upsell',
       body: 'Billing Executive adds unlimited custom reports and priority onboarding. See what your agency would gain.',
       reason: 'Expansion campaign',
-      displayFormat: 'Overlay',
+      displayFormat: 'Overlay', imageId: 'premium',
       placement: 'Global',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
@@ -671,7 +672,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       messageCategory: 'Upsell',
       body: 'Open enrollment kicks off next month — remind your team to complete their benefits selections before the deadline.',
       reason: 'Enrollment campaign',
-      displayFormat: 'Overlay',
+      displayFormat: 'Overlay', imageId: 'growth',
       placement: 'Global',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
@@ -928,7 +929,7 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
       messageCategory: 'New Release',
       body: 'Our spring onboarding series covered scheduling, billing and eMAR. Recordings remain available in the help centre.',
       reason: 'Training series',
-      displayFormat: 'Overlay',
+      displayFormat: 'Overlay', imageId: 'launch',
       placement: 'Global',
       messageColor: '#27496D',
       dismissible: 'Dismissible',
@@ -1026,7 +1027,8 @@ const INITIAL_MESSAGES: BroadcastMessageRow[] = [
   },
 ];
 
-const STORAGE_KEY = 'bs-messages-v18';
+// v19: seed overlays tagged What's new / Upgrade gained preset images.
+const STORAGE_KEY = 'bs-messages-v19';
 
 export function useSharedMessages() {
   const [messages, setMessagesRaw] = useState<BroadcastMessageRow[]>(() => {
@@ -2097,6 +2099,8 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
   const effectiveFormat: 'Overlay' | 'Banner' = isEmergency ? 'Banner' : ((row.formData?.displayFormat as 'Overlay' | 'Banner') || 'Overlay');
   const color = isEmergency ? '#DA4040' : (row.formData?.messageColor || '#27496D');
   const body = row.formData?.body || row.subject;
+  const tag = getCategoryTag(row.formData?.messageCategory, isEmergency);
+  const imageId = tag ? row.formData?.imageId : undefined;
   const hasCta = row.formData?.hasCta ?? false;
   const ctaLabel = row.formData?.ctaLabel || 'Learn more';
   const dismissible = row.formData?.dismissible !== 'Non-Dismissible';
@@ -2196,18 +2200,18 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
                 // screen comes out portrait and its 320px message panel then
                 // covers the app behind it. Scale a real-size mock instead.
                 <ScaledMock baseWidth={MOCK_WIDTH} baseHeight={MOCK_WIDTH / 1.6}>
-                  <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
+                  <ScreenSkeleton tag={tag} imageId={imageId} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
                 </ScaledMock>
               ) : (
                 <div className="w-full h-full flex justify-center">
                   <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
-                    <ScreenSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
+                    <ScreenSkeleton tag={tag} imageId={imageId} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
                   </div>
                 </div>
               )
             ) : (
               <ScaledMock baseWidth={PHONE_WIDTH} baseHeight={PHONE_HEIGHT}>
-                <PhoneSkeleton effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
+                <PhoneSkeleton tag={tag} imageId={imageId} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
               </ScaledMock>
             )}
           </div>
