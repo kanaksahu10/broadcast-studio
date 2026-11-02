@@ -75,40 +75,40 @@ export function PresetArt({ preset, iconSize = 40, showName = true, decorative =
 
 /**
  * An uploaded image is stored in the same `imageId` field as a preset id, as
- * a small JPEG data URL, so everything that passes the image along keeps
- * working. The prototype has no server: messages live in localStorage (about
- * 5 MB in total), so uploads are cropped to 2:1 and shrunk before saving.
+ * a JPEG data URL, so everything that passes the image along keeps working.
+ * The whole picture is kept (not cropped) so the author can reposition it
+ * later; `imagePosition` records which part shows in the 2:1 frame. The
+ * prototype has no server: messages live in localStorage (about 5 MB in
+ * total), so the picture is shrunk to just cover a 960 × 480 frame.
  */
 export function isUploadedImage(id: string | undefined): boolean {
   return !!id && id.startsWith('data:image/');
 }
 
-const UPLOAD_WIDTH = 960;
-const UPLOAD_HEIGHT = 480;
+const FRAME_WIDTH = 960;
+const FRAME_HEIGHT = 480;
+const MAX_SIDE = 1600;
 export const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 export const UPLOAD_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+export const DEFAULT_IMAGE_POSITION = '50% 50%';
 
-/** Centre-crops the file to 2:1, scales it to 960 × 480 and returns a JPEG data URL. */
+/** Shrinks the file to just cover a 960 × 480 frame (longest side ≤ 1600) and returns a JPEG data URL. */
 export function prepareUploadedImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      const target = UPLOAD_WIDTH / UPLOAD_HEIGHT;
-      let sw = img.naturalWidth;
-      let sh = img.naturalHeight;
-      let sx = 0;
-      let sy = 0;
-      if (sw / sh > target) { sw = sh * target; sx = (img.naturalWidth - sw) / 2; }
-      else { sh = sw / target; sy = (img.naturalHeight - sh) / 2; }
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      const scale = Math.min(1, Math.max(FRAME_WIDTH / w, FRAME_HEIGHT / h), MAX_SIDE / Math.max(w, h));
       const canvas = document.createElement('canvas');
-      canvas.width = UPLOAD_WIDTH;
-      canvas.height = UPLOAD_HEIGHT;
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
       const ctx = canvas.getContext('2d');
       if (!ctx) { URL.revokeObjectURL(url); reject(new Error('no canvas')); return; }
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, UPLOAD_WIDTH, UPLOAD_HEIGHT);
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, UPLOAD_WIDTH, UPLOAD_HEIGHT);
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
       resolve(canvas.toDataURL('image/jpeg', 0.8));
     };
