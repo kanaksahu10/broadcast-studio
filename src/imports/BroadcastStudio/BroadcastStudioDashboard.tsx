@@ -1043,7 +1043,9 @@ export function useSharedMessages() {
   const setMessages = useCallback((updater: BroadcastMessageRow[] | ((prev: BroadcastMessageRow[]) => BroadcastMessageRow[])) => {
     setMessagesRaw((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      // Uploaded images make rows heavy; if browser storage fills up, keep the
+      // change on screen for this tab rather than crashing the page.
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch (err) { console.warn('Could not save messages to localStorage', err); }
       return next;
     });
   }, []);

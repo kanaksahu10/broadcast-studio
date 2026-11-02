@@ -4,9 +4,9 @@ import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline, MdUndo } from 'react-icons/md';
+import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline, MdUndo, MdFileUpload } from 'react-icons/md';
 import { HiOutlineSparkles } from 'react-icons/hi';
-import { PRESET_IMAGES, PresetArt, getPresetImage } from './presetImages';
+import { PRESET_IMAGES, PresetArt, getPresetImage, isUploadedImage, prepareUploadedImage, UPLOAD_MAX_BYTES, UPLOAD_TYPES } from './presetImages';
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
@@ -814,13 +814,33 @@ function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestin
  */
 function ImagePickerField({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
   const selected = getPresetImage(value);
+  const uploaded = isUploadedImage(value);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadError, setUploadError] = useState('');
+  // A stale error shouldn't outlive the choice it was about (a new pick, Remove, Discard Changes).
+  useEffect(() => { setUploadError(''); }, [value]);
+
+  const handleFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (!UPLOAD_TYPES.includes(file.type) || file.size > UPLOAD_MAX_BYTES) {
+      setUploadError('Choose a PNG, JPG or WebP image under 10 MB.');
+      return;
+    }
+    try {
+      onChange(await prepareUploadedImage(file));
+      setUploadError('');
+    } catch {
+      setUploadError("That image couldn't be read. Try another file.");
+    }
+  };
+
   return (
     <div className="rounded-[4px] border px-[12px] py-[10px] flex flex-col gap-[8px]" style={{ borderColor: BORDER, backgroundColor: disabled ? '#f2f2f2' : 'white' }}>
       <div className="flex items-baseline justify-between gap-[8px]">
         <p className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px]" style={{ color: disabled ? '#585858' : LABEL_GREY }}>
           Image
         </p>
-        {selected && !disabled && (
+        {(selected || uploaded) && !disabled && (
           <button type="button" onClick={() => onChange('')} className="font-['Montserrat',sans-serif] font-medium text-[12px] cursor-pointer hover:underline" style={{ color: NAVY }}>
             Remove
           </button>
@@ -855,7 +875,53 @@ function ImagePickerField({ value, onChange, disabled }: { value: string; onChan
             </button>
           );
         })}
+        {/* Upload tile, last: shows the uploaded image once there is one, and
+            clicking it again picks a replacement. */}
+        <button
+          type="button"
+          role="radio"
+          aria-checked={uploaded}
+          aria-label={uploaded ? 'Uploaded image, choose to replace' : 'Upload image'}
+          disabled={disabled}
+          onClick={() => fileRef.current?.click()}
+          className="relative rounded-[6px] overflow-hidden border flex flex-col items-center justify-center gap-[2px]"
+          style={{
+            aspectRatio: '2 / 1',
+            borderColor: uploaded ? PRIMARY : BORDER,
+            borderStyle: uploaded ? 'solid' : 'dashed',
+            backgroundColor: '#fafafa',
+            color: NAVY,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            opacity: disabled && !uploaded ? 0.5 : 1,
+          }}
+        >
+          {uploaded ? (
+            <>
+              <img src={value} alt="" className="w-full h-full object-cover block" />
+              <span className="absolute top-[4px] right-[4px] w-[16px] h-[16px] rounded-full flex items-center justify-center" style={{ backgroundColor: PRIMARY }}>
+                <MdCheck size={12} color="white" />
+              </span>
+            </>
+          ) : (
+            <>
+              <MdFileUpload size={20} />
+              <span className="font-['Montserrat',sans-serif] font-semibold text-[11px] leading-[14px]">Upload image</span>
+            </>
+          )}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept={UPLOAD_TYPES.join(',')}
+          className="hidden"
+          onChange={(e) => { handleFile(e.target.files?.[0]); e.target.value = ''; }}
+        />
       </div>
+      {uploadError && (
+        <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: '#DA4040' }}>
+          {uploadError}
+        </p>
+      )}
     </div>
   );
 }
@@ -995,6 +1061,11 @@ function OverlayPreview({
         {image && (
           <div className="w-full rounded-[6px] overflow-hidden shrink-0" style={{ aspectRatio: '2 / 1' }}>
             <PresetArt preset={image} iconSize={compact ? 28 : 44} />
+          </div>
+        )}
+        {isUploadedImage(imageId) && (
+          <div className="w-full rounded-[6px] overflow-hidden shrink-0" style={{ aspectRatio: '2 / 1' }}>
+            <img src={imageId} alt="Image uploaded by the author" className="w-full h-full object-cover block" />
           </div>
         )}
         {tag ? (
