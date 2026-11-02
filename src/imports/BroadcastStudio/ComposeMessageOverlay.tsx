@@ -813,28 +813,32 @@ function CtaBox({ checked, onChange, label, destination, onLabelChange, onDestin
  * tile of its own.
  */
 /**
- * The 2:1 frame an uploaded image is shown in, where the author drags the
- * picture to choose which part shows (arrow keys move it too). The picture
- * fills the frame like the overlay does, so what shows here is what shows
- * there; position is stored as a CSS object-position, e.g. "50% 30%".
+ * An uploaded image inside the overlay preview, which the author drags (or
+ * moves with the arrow keys) to choose which part shows in the 2:1 frame.
+ * Position is a CSS object-position, e.g. "50% 30%". The preview is often
+ * drawn scaled down, so all the maths uses on-screen sizes from
+ * getBoundingClientRect, which keeps the picture under the pointer.
  */
-function ImagePositioner({ src, position, onChange, disabled }: { src: string; position: string; onChange: (v: string) => void; disabled?: boolean }) {
+function DraggableImage({ src, position, onChange }: { src: string; position: string; onChange: (v: string) => void }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
   const drag = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   const [px, py] = position.split(' ').map((v) => parseFloat(v)).concat([50, 50]).slice(0, 2).map((v) => (Number.isFinite(v) ? v : 50));
   const clamp = (v: number) => Math.round(Math.min(100, Math.max(0, v)));
 
-  // How far the picture overhangs the frame on each axis; dragging can only
+  // How far the picture overhangs the frame on screen; dragging can only
   // reveal what overhangs, and an axis that fits exactly stays centred.
   const overhang = () => {
     const f = frameRef.current;
     if (!f || !natural) return { ox: 0, oy: 0 };
-    const scale = Math.max(f.clientWidth / natural.w, f.clientHeight / natural.h);
-    return { ox: natural.w * scale - f.clientWidth, oy: natural.h * scale - f.clientHeight };
+    const r = f.getBoundingClientRect();
+    const scale = Math.max(r.width / natural.w, r.height / natural.h);
+    return { ox: natural.w * scale - r.width, oy: natural.h * scale - r.height };
   };
 
   const moveTo = (nx: number, ny: number) => onChange(`${clamp(nx)}% ${clamp(ny)}%`);
+  const endDrag = () => { drag.current = null; setDragging(false); };
 
   return (
     <div
@@ -842,14 +846,14 @@ function ImagePositioner({ src, position, onChange, disabled }: { src: string; p
       role="slider"
       aria-label="Image position. Drag, or use the arrow keys, to choose what shows."
       aria-valuetext={`${px}% across, ${py}% down`}
-      tabIndex={disabled ? -1 : 0}
-      className="relative w-full rounded-[6px] overflow-hidden border select-none touch-none outline-none focus-visible:ring-2"
-      style={{ aspectRatio: '2 / 1', borderColor: BORDER, cursor: disabled ? 'default' : drag.current ? 'grabbing' : 'grab' }}
+      tabIndex={0}
+      className="relative w-full h-full select-none touch-none outline-none focus-visible:ring-2"
+      style={{ cursor: dragging ? 'grabbing' : 'grab' }}
       onPointerDown={(e) => {
-        if (disabled) return;
         // Keeps the drag going when the pointer leaves the frame; optional.
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
         drag.current = { x: e.clientX, y: e.clientY, px, py };
+        setDragging(true);
       }}
       onPointerMove={(e) => {
         const d = drag.current;
@@ -858,10 +862,9 @@ function ImagePositioner({ src, position, onChange, disabled }: { src: string; p
         // Dragging the picture right reveals more of its left side.
         moveTo(ox > 0 ? d.px - ((e.clientX - d.x) / ox) * 100 : 50, oy > 0 ? d.py - ((e.clientY - d.y) / oy) * 100 : 50);
       }}
-      onPointerUp={() => { drag.current = null; }}
-      onPointerCancel={() => { drag.current = null; }}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
       onKeyDown={(e) => {
-        if (disabled) return;
         const step = 5;
         const moves: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
         const m = moves[e.key];
@@ -872,20 +875,18 @@ function ImagePositioner({ src, position, onChange, disabled }: { src: string; p
     >
       <img
         src={src}
-        alt=""
+        alt="Image uploaded by the author"
         draggable={false}
         onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
         className="w-full h-full object-cover block pointer-events-none"
         style={{ objectPosition: position }}
       />
-      {!disabled && (
-        <span
-          className="absolute left-[6px] bottom-[6px] inline-flex items-center gap-[4px] rounded-[4px] px-[6px] py-[2px] font-['Montserrat',sans-serif] font-medium text-[11px] leading-[14px] text-white pointer-events-none"
-          style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
-        >
-          <MdOpenWith size={12} /> Drag to reposition
-        </span>
-      )}
+      <span
+        className="absolute left-[6px] bottom-[6px] inline-flex items-center gap-[4px] rounded-[4px] px-[6px] py-[2px] font-['Montserrat',sans-serif] font-medium text-[11px] leading-[14px] text-white pointer-events-none"
+        style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+      >
+        <MdOpenWith size={12} /> Drag to reposition
+      </span>
     </div>
   );
 }
@@ -996,7 +997,6 @@ function ImagePickerField({ value, onChange, position, onPositionChange, disable
           onChange={(e) => { handleFile(e.target.files?.[0]); e.target.value = ''; }}
         />
       </div>
-      {uploaded && <ImagePositioner src={value} position={position} onChange={onPositionChange} disabled={disabled} />}
       {uploadError && (
         <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: '#DA4040' }}>
           {uploadError}
@@ -1097,6 +1097,7 @@ function OverlayPreview({
   tag,
   imageId,
   imagePosition,
+  onImagePositionChange,
   title,
   body,
   dismissible,
@@ -1119,6 +1120,8 @@ function OverlayPreview({
   tag?: string | null;
   imageId?: string;
   imagePosition?: string;
+  /** Present only where the author can edit: makes an uploaded image draggable. */
+  onImagePositionChange?: (v: string) => void;
 }) {
   const image = getPresetImage(imageId);
   return (
@@ -1147,7 +1150,11 @@ function OverlayPreview({
         )}
         {isUploadedImage(imageId) && (
           <div className="w-full rounded-[6px] overflow-hidden shrink-0" style={{ aspectRatio: '2 / 1' }}>
-            <img src={imageId} alt="Image uploaded by the author" className="w-full h-full object-cover block" style={{ objectPosition: imagePosition || DEFAULT_IMAGE_POSITION }} />
+            {onImagePositionChange ? (
+              <DraggableImage src={imageId!} position={imagePosition || DEFAULT_IMAGE_POSITION} onChange={onImagePositionChange} />
+            ) : (
+              <img src={imageId} alt="Image uploaded by the author" className="w-full h-full object-cover block" style={{ objectPosition: imagePosition || DEFAULT_IMAGE_POSITION }} />
+            )}
           </div>
         )}
         {tag ? (
@@ -1254,6 +1261,7 @@ export function ScreenSkeleton({
   tag,
   imageId,
   imagePosition,
+  onImagePositionChange,
   effectiveFormat,
   title,
   body,
@@ -1274,6 +1282,7 @@ export function ScreenSkeleton({
   tag?: string | null;
   imageId?: string;
   imagePosition?: string;
+  onImagePositionChange?: (v: string) => void;
 }) {
   return (
     <div className="relative w-full h-full bg-white rounded-[8px] border overflow-hidden flex" style={{ borderColor: BORDER }}>
@@ -1362,7 +1371,7 @@ export function ScreenSkeleton({
 
       {effectiveFormat === 'Overlay' && (
         <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
-          <OverlayPreview tag={tag} imageId={imageId} imagePosition={imagePosition} title={title} body={body} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          <OverlayPreview tag={tag} imageId={imageId} imagePosition={imagePosition} onImagePositionChange={onImagePositionChange} title={title} body={body} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
         </div>
       )}
 
@@ -1470,6 +1479,7 @@ export function PhoneSkeleton({
   tag,
   imageId,
   imagePosition,
+  onImagePositionChange,
   effectiveFormat,
   title,
   body,
@@ -1490,6 +1500,7 @@ export function PhoneSkeleton({
   tag?: string | null;
   imageId?: string;
   imagePosition?: string;
+  onImagePositionChange?: (v: string) => void;
 }) {
   return (
     <div
@@ -1564,6 +1575,7 @@ export function PhoneSkeleton({
             tag={tag}
             imageId={imageId}
             imagePosition={imagePosition}
+            onImagePositionChange={onImagePositionChange}
             title={title}
             body={body}
             dismissible={dismissible}
@@ -2086,6 +2098,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // Kept while hidden, so switching category away and back doesn't lose the pick.
   const showImagePicker = categoryTag !== null && displayFormat === 'Overlay';
   const previewImageId = categoryTag !== null ? imageId : '';
+  const canDragImage = !effectiveReadOnly && isUploadedImage(previewImageId);
   const hasPreview = effectiveFormat !== '';
 
   return (
@@ -2444,6 +2457,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                           tag={categoryTag}
                           imageId={previewImageId}
                           imagePosition={imagePosition}
+                          onImagePositionChange={canDragImage ? setImagePosition : undefined}
                           effectiveFormat={effectiveFormat}
                           title={title}
                           body={body}
@@ -2463,6 +2477,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                             tag={categoryTag}
                             imageId={previewImageId}
                             imagePosition={imagePosition}
+                            onImagePositionChange={canDragImage ? setImagePosition : undefined}
                             effectiveFormat={effectiveFormat}
                             title={title}
                             body={body}
@@ -2483,6 +2498,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                         tag={categoryTag}
                         imageId={previewImageId}
                         imagePosition={imagePosition}
+                        onImagePositionChange={canDragImage ? setImagePosition : undefined}
                         effectiveFormat={effectiveFormat}
                         title={title}
                         body={body}
