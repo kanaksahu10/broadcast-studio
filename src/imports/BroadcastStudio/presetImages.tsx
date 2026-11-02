@@ -88,7 +88,7 @@ export function isUploadedImage(id: string | undefined): boolean {
 const FRAME_WIDTH = 960;
 const FRAME_HEIGHT = 480;
 const MAX_SIDE = 1600;
-export const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+export const UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 export const UPLOAD_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 export const DEFAULT_IMAGE_POSITION = '50% 50%';
 

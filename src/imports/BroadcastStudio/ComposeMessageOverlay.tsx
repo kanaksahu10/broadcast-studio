@@ -901,8 +901,13 @@ function ImagePickerField({ value, onChange, position, onPositionChange, disable
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
-    if (!UPLOAD_TYPES.includes(file.type) || file.size > UPLOAD_MAX_BYTES) {
-      setUploadError('Choose a PNG, JPG or WebP image under 10 MB.');
+    if (!UPLOAD_TYPES.includes(file.type)) {
+      setUploadError('Choose a PNG, JPG or WebP image.');
+      return;
+    }
+    if (file.size > UPLOAD_MAX_BYTES) {
+      const mb = (n: number) => (n / (1024 * 1024)).toFixed(1).replace(/\.0$/, '');
+      setUploadError(`This image is ${mb(file.size)} MB. Choose one under ${mb(UPLOAD_MAX_BYTES)} MB.`);
       return;
     }
     try {
