@@ -7,6 +7,8 @@ import { BiCalendarEvent } from 'react-icons/bi';
 import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline, MdUndo, MdFileUpload, MdOpenWith } from 'react-icons/md';
 import { HiOutlineSparkles } from 'react-icons/hi';
 import { PRESET_IMAGES, PresetArt, getPresetImage, isUploadedImage, prepareUploadedImage, UPLOAD_MAX_BYTES, UPLOAD_TYPES, DEFAULT_IMAGE_POSITION } from './presetImages';
+
+const UPLOAD_MAX_MB = UPLOAD_MAX_BYTES / (1024 * 1024);
 import { BsPersonBadgeFill } from 'react-icons/bs';
 import { FiExternalLink } from 'react-icons/fi';
 import { FaRegCheckCircle, FaRegTimesCircle } from 'react-icons/fa';
@@ -139,6 +141,19 @@ export function getCategoryTag(category: string | undefined, isEmergency: boolea
   if (category === 'New Release') return "What's new";
   if (category === 'Upsell') return 'Upgrade';
   return null;
+}
+
+export type OverlayStyle = 'Image' | 'Text';
+
+/**
+ * The overlay style in force. Nothing picked yet falls back to what each
+ * category did before the picker existed: New Release and Upsell used the
+ * image style, everything else the text-only one. That keeps older messages
+ * looking exactly as they did.
+ */
+export function resolveOverlayStyle(style: string | undefined, category: string | undefined, isEmergency: boolean): OverlayStyle {
+  if (style === 'Image' || style === 'Text') return style;
+  return getCategoryTag(category, isEmergency) !== null ? 'Image' : 'Text';
 }
 // Stand-in for real per-user auth: this prototype has no individual accounts,
 // only the org user shown in the sidebar, so Author auto-populates with that
@@ -891,6 +906,71 @@ function DraggableImage({ src, position, onChange }: { src: string; position: st
   );
 }
 
+/**
+ * Which overlay look the message uses: the image style (optional picture, tag,
+ * large heading, button CTA) or the regular text-only one. Offered for every
+ * category, as two cards with a small drawing of each so the difference is
+ * visible before picking.
+ */
+function OverlayStyleCards({ value, onChange, disabled }: { value: OverlayStyle; onChange: (v: OverlayStyle) => void; disabled?: boolean }) {
+  const cards: { id: OverlayStyle; title: string; description: string }[] = [
+    { id: 'Image', title: 'Feature spotlight', description: 'A highlighted heading, an optional picture and a button. Good for announcements and upgrades.' },
+    { id: 'Text', title: 'Standard notice', description: 'A title, a short message and a link. Good for reminders and updates.' },
+  ];
+  const bar = (w: string, c = '#d6d6d6', h = 4) => <span className="block rounded-[2px]" style={{ width: w, height: h, backgroundColor: c }} />;
+  return (
+    <FieldShell label="Overlay Style" disabled={disabled}>
+      <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-[12px] w-full" role="radiogroup" aria-label="Overlay Style">
+        {cards.map((card) => {
+          const selected = value === card.id;
+          return (
+            <button
+              key={card.id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              disabled={disabled}
+              onClick={() => onChange(card.id)}
+              className="flex flex-col gap-[10px] rounded-[6px] border p-[12px] text-left"
+              style={{
+                borderColor: selected ? PRIMARY : BORDER,
+                boxShadow: selected ? `inset 0 0 0 1px ${PRIMARY}` : 'none',
+                backgroundColor: selected ? PRIMARY_BG : 'white',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                opacity: disabled && !selected ? 0.5 : 1,
+              }}
+            >
+              <div className="flex items-start justify-between gap-[8px]">
+                <div className="rounded-[4px] border bg-white flex flex-col gap-[5px] p-[6px] w-[96px] h-[64px] overflow-hidden" style={{ borderColor: BORDER }}>
+                  {card.id === 'Image' ? (
+                    <>
+                      <span className="block rounded-[2px] w-full" style={{ height: 22, background: `linear-gradient(135deg, ${PRIMARY_BG} 0%, #b9dcfb 100%)` }} />
+                      {bar('70%', '#9a9a9a', 5)}
+                      {bar('90%')}
+                    </>
+                  ) : (
+                    <>
+                      {bar('60%', '#9a9a9a', 5)}
+                      {bar('95%')}
+                      {bar('85%')}
+                      {bar('50%')}
+                    </>
+                  )}
+                </div>
+                <RadioDot selected={selected} />
+              </div>
+              <div className="flex flex-col gap-[2px]">
+                <span className="font-['Montserrat',sans-serif] font-semibold text-[13px] leading-[18px] text-black">{card.title}</span>
+                <span className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: LABEL_GREY }}>{card.description}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </FieldShell>
+  );
+}
+
 function ImagePickerField({ value, onChange, position, onPositionChange, disabled }: { value: string; onChange: (v: string) => void; position: string; onPositionChange: (v: string) => void; disabled?: boolean }) {
   const selected = getPresetImage(value);
   const uploaded = isUploadedImage(value);
@@ -902,12 +982,12 @@ function ImagePickerField({ value, onChange, position, onPositionChange, disable
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
     if (!UPLOAD_TYPES.includes(file.type)) {
-      setUploadError('Choose a PNG, JPG or WebP image.');
+      setUploadError(`"${file.name}" isn't a supported file type. Upload a PNG, JPG or WebP image.`);
       return;
     }
     if (file.size > UPLOAD_MAX_BYTES) {
       const mb = (n: number) => (n / (1024 * 1024)).toFixed(1).replace(/\.0$/, '');
-      setUploadError(`This image is ${mb(file.size)} MB. Choose one under ${mb(UPLOAD_MAX_BYTES)} MB.`);
+      setUploadError(`"${file.name}" is ${mb(file.size)} MB, which is too large. Upload an image under ${mb(UPLOAD_MAX_BYTES)} MB.`);
       return;
     }
     try {
@@ -915,7 +995,7 @@ function ImagePickerField({ value, onChange, position, onPositionChange, disable
       onPositionChange(DEFAULT_IMAGE_POSITION);
       setUploadError('');
     } catch {
-      setUploadError("That image couldn't be read. Try another file.");
+      setUploadError(`"${file.name}" couldn't be read. Try another image.`);
     }
   };
 
@@ -972,7 +1052,7 @@ function ImagePickerField({ value, onChange, position, onPositionChange, disable
           className="relative rounded-[6px] overflow-hidden border flex flex-col items-center justify-center gap-[2px]"
           style={{
             aspectRatio: '2 / 1',
-            borderColor: uploaded ? PRIMARY : BORDER,
+            borderColor: uploadError ? '#DA4040' : uploaded ? PRIMARY : BORDER,
             borderStyle: uploaded ? 'solid' : 'dashed',
             backgroundColor: '#fafafa',
             color: NAVY,
@@ -1002,9 +1082,13 @@ function ImagePickerField({ value, onChange, position, onPositionChange, disable
           onChange={(e) => { handleFile(e.target.files?.[0]); e.target.value = ''; }}
         />
       </div>
+      <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: LABEL_GREY }}>
+        Upload a PNG, JPG or WebP image, up to {UPLOAD_MAX_MB} MB. It shows at a 2:1 ratio; 960 × 480 px or larger works best.
+      </p>
       {uploadError && (
-        <p className="font-['Montserrat',sans-serif] font-normal text-[12px] leading-[17px]" style={{ color: '#DA4040' }}>
-          {uploadError}
+        <p role="alert" className="flex items-start gap-[6px] font-['Montserrat',sans-serif] font-medium text-[12px] leading-[17px]" style={{ color: '#DA4040' }}>
+          <RiErrorWarningLine size={16} className="shrink-0" />
+          <span>{uploadError}</span>
         </p>
       )}
     </div>
@@ -1100,6 +1184,7 @@ function PreviewPrimaryButton({ compact, className = '', children }: { compact?:
 
 function OverlayPreview({
   tag,
+  imageStyle = false,
   imageId,
   imagePosition,
   onImagePositionChange,
@@ -1123,12 +1208,14 @@ function OverlayPreview({
   widthClass?: string;
   compact?: boolean;
   tag?: string | null;
+  /** The image-style layout; false is the regular text-only overlay, which shows no tag or image. */
+  imageStyle?: boolean;
   imageId?: string;
   imagePosition?: string;
   /** Present only where the author can edit: makes an uploaded image draggable. */
   onImagePositionChange?: (v: string) => void;
 }) {
-  const image = getPresetImage(imageId);
+  const image = imageStyle ? getPresetImage(imageId) : undefined;
   return (
     <div
       className={`bg-white border flex flex-col ${widthClass} h-full ${rounded ? 'rounded-[8px] shadow-md' : 'border-t-0 border-r-0 border-b-0'}`}
@@ -1139,7 +1226,7 @@ function OverlayPreview({
         {dismissible && <MdClose size={compact ? 16 : 18} color="#27496D" className="cursor-pointer shrink-0" />}
       </div>
       <div className={`${compact ? 'px-[12px] py-[10px]' : 'px-[16px] py-[14px]'} flex flex-col gap-[10px] flex-1 min-w-0 overflow-y-auto`}>
-        {tag && (
+        {imageStyle && tag && (
           <span
             className="self-start inline-flex items-center gap-[4px] rounded-[4px] px-[6px] py-[2px] font-['Montserrat',sans-serif] font-semibold text-[10px] leading-[14px] tracking-wide uppercase whitespace-nowrap"
             style={{ backgroundColor: TAG_GREEN_BG, color: TAG_GREEN }}
@@ -1153,7 +1240,7 @@ function OverlayPreview({
             <PresetArt preset={image} iconSize={compact ? 28 : 44} />
           </div>
         )}
-        {isUploadedImage(imageId) && (
+        {imageStyle && isUploadedImage(imageId) && (
           <div className="w-full rounded-[6px] overflow-hidden shrink-0" style={{ aspectRatio: '2 / 1' }}>
             {onImagePositionChange ? (
               <DraggableImage src={imageId!} position={imagePosition || DEFAULT_IMAGE_POSITION} onChange={onImagePositionChange} />
@@ -1162,8 +1249,8 @@ function OverlayPreview({
             )}
           </div>
         )}
-        {tag ? (
-          // Tagged (What's new / Upgrade) overlays follow the Figma: the title
+        {imageStyle ? (
+          // Image-style (What's new / Upgrade) overlays follow the Figma: the title
           // is repeated as a large heading inside a tinted box with the body,
           // on top of the one in the drawer header.
           <div className={`rounded-[6px] flex flex-col ${compact ? 'gap-[6px] p-[10px]' : 'gap-[8px] p-[12px]'}`} style={{ backgroundColor: PRIMARY_BG }}>
@@ -1179,7 +1266,7 @@ function OverlayPreview({
             {body || 'Your message body will appear here.'}
           </p>
         )}
-        {hasCta && ctaLabel && (tag ? (
+        {hasCta && ctaLabel && (imageStyle ? (
           // On a What's new / Upgrade overlay the call to action is the point
           // of the message, so it's a button rather than a link (Figma).
           <PreviewPrimaryButton compact={compact} className="self-start max-w-full text-left break-words">
@@ -1192,9 +1279,8 @@ function OverlayPreview({
           </div>
         ))}
       </div>
-      {/* Tagged overlays drop the Dismiss button so it doesn't compete with
-          the CTA; the header X still closes a dismissible one. */}
-      {(tag ? allowOptOut : (dismissible || allowOptOut)) && (
+      {/* Same footer in both overlay styles. */}
+      {(dismissible || allowOptOut) && (
         <div className={`flex items-center justify-between gap-[8px] ${compact ? 'px-[12px] py-[8px]' : 'px-[16px] py-[10px]'} border-t shrink-0`} style={{ borderColor: BORDER, backgroundColor: '#fafafa' }}>
           {/* "Don't show again" is a separate promise from "Dismiss" — never
               again, versus not now — so the author opts into it explicitly
@@ -1204,11 +1290,9 @@ function OverlayPreview({
               Don't show again
             </span>
           ) : <span />}
-          {!tag && (
-            <PreviewPrimaryButton compact={compact} className="shrink-0">
-              <MdCheck size={compact ? 10 : 14} /> Dismiss
-            </PreviewPrimaryButton>
-          )}
+          <PreviewPrimaryButton compact={compact} className="shrink-0">
+            <MdCheck size={compact ? 10 : 14} /> Dismiss
+          </PreviewPrimaryButton>
         </div>
       )}
     </div>
@@ -1264,6 +1348,7 @@ function TableRowSkeleton({ index }: { index: number }) {
 
 export function ScreenSkeleton({
   tag,
+  imageStyle,
   imageId,
   imagePosition,
   onImagePositionChange,
@@ -1285,6 +1370,7 @@ export function ScreenSkeleton({
   hasCta: boolean;
   ctaLabel: string;
   tag?: string | null;
+  imageStyle?: boolean;
   imageId?: string;
   imagePosition?: string;
   onImagePositionChange?: (v: string) => void;
@@ -1376,7 +1462,7 @@ export function ScreenSkeleton({
 
       {effectiveFormat === 'Overlay' && (
         <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
-          <OverlayPreview tag={tag} imageId={imageId} imagePosition={imagePosition} onImagePositionChange={onImagePositionChange} title={title} body={body} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
+          <OverlayPreview tag={tag} imageStyle={imageStyle} imageId={imageId} imagePosition={imagePosition} onImagePositionChange={onImagePositionChange} title={title} body={body} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} rounded={false} />
         </div>
       )}
 
@@ -1482,6 +1568,7 @@ const CHROME_SCALE = PHONE_SCREEN_WIDTH / CHROME_WIDTH;
 
 export function PhoneSkeleton({
   tag,
+  imageStyle,
   imageId,
   imagePosition,
   onImagePositionChange,
@@ -1503,6 +1590,7 @@ export function PhoneSkeleton({
   hasCta: boolean;
   ctaLabel: string;
   tag?: string | null;
+  imageStyle?: boolean;
   imageId?: string;
   imagePosition?: string;
   onImagePositionChange?: (v: string) => void;
@@ -1578,6 +1666,7 @@ export function PhoneSkeleton({
         <div className="absolute inset-0 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
           <OverlayPreview
             tag={tag}
+            imageStyle={imageStyle}
             imageId={imageId}
             imagePosition={imagePosition}
             onImagePositionChange={onImagePositionChange}
@@ -1633,7 +1722,9 @@ type FormData = {
   ctaDestination?: string;
   stopOnCtaClick?: boolean;
   pushNotification?: boolean;
-  /** Preset image id (see presetImages.tsx); only shown on New Release and Upsell overlays. */
+  /** 'Image' or 'Text'; unset falls back to the category's old default (see resolveOverlayStyle). */
+  overlayStyle?: string;
+  /** Preset image id (see presetImages.tsx); only shown on image-style overlays. */
   imageId?: string;
   imagePosition?: string;
 };
@@ -1854,6 +1945,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   }, [messageColor, displayFormat]);
 
   const [pushNotification, setPushNotification] = useState(initialData?.pushNotification ?? false);
+  const [overlayStyle, setOverlayStyle] = useState(initialData?.overlayStyle ?? '');
   const [imageId, setImageId] = useState(initialData?.imageId ?? '');
   const [imagePosition, setImagePosition] = useState(initialData?.imagePosition ?? DEFAULT_IMAGE_POSITION);
   const [deviceView, setDeviceView] = useState<'desktop' | 'phone'>('desktop');
@@ -1945,7 +2037,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   // lands in the same render as switching to Overlay can't slip through
   // with a stale Non-Dismissible value before the effect has a chance to run.
   const savedDismissible: Dismissible = displayFormat === 'Overlay' ? 'Dismissible' : dismissible;
-  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, statesOrAgencies, states, featureFlags, packages, roles, dismissible: savedDismissible, allowOptOut: effectiveAllowOptOut, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification, imageId, imagePosition };
+  const allFormData: FormData = { title, messageType, startDate, endDate, noEndDate, body, reason, department, messageCategory, customCategoryName, author, displayFormat, placement, featurePath, messageColor, statesOrAgencies, states, featureFlags, packages, roles, dismissible: savedDismissible, allowOptOut: effectiveAllowOptOut, hasCta, ctaLabel, ctaDestination, stopOnCtaClick, pushNotification, overlayStyle, imageId, imagePosition };
 
   // An executive approver editing a Pending message in the Review overlay
   // gets the same "X saves in place" treatment as a draft — they may fix a
@@ -1975,7 +2067,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     messageColor: string; displayFormat: DisplayFormat; placement: Placement; featurePath: string;
     hasCta: boolean; ctaLabel: string; ctaDestination: string; stopOnCtaClick: boolean;
     states: string[]; featureFlags: string[]; statesOrAgencies: string[]; packages: string[]; roles: string[];
-    startDate: string; endDate: string; noEndDate: boolean; dismissible: Dismissible; allowOptOut: boolean; pushNotification: boolean; imageId: string; imagePosition: string;
+    startDate: string; endDate: string; noEndDate: boolean; dismissible: Dismissible; allowOptOut: boolean; pushNotification: boolean; overlayStyle: string; imageId: string; imagePosition: string;
   } | null>(null);
 
   // Pulls the same raw-field shape rawBaselineRef stores out of any FormData
@@ -1991,6 +2083,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     states: data.states ?? [], featureFlags: data.featureFlags ?? [], statesOrAgencies: data.statesOrAgencies ?? [], packages: data.packages ?? [], roles: data.roles ?? [],
     startDate: data.startDate ?? '', endDate: data.endDate ?? '', noEndDate: data.noEndDate ?? false,
     dismissible: (data.dismissible as Dismissible) ?? 'Dismissible', allowOptOut: data.allowOptOut ?? true, pushNotification: data.pushNotification ?? false,
+    overlayStyle: data.overlayStyle ?? '',
     imageId: data.imageId ?? '',
     imagePosition: data.imagePosition ?? DEFAULT_IMAGE_POSITION,
   });
@@ -2003,7 +2096,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
         messageColor, displayFormat, placement, featurePath,
         hasCta, ctaLabel, ctaDestination, stopOnCtaClick,
         states, featureFlags, statesOrAgencies, packages, roles,
-        startDate, endDate, noEndDate, dismissible, allowOptOut, pushNotification, imageId, imagePosition,
+        startDate, endDate, noEndDate, dismissible, allowOptOut, pushNotification, overlayStyle, imageId, imagePosition,
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2057,6 +2150,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
     setDismissible((data.dismissible as Dismissible) ?? 'Dismissible');
     setAllowOptOut(data.allowOptOut ?? true);
     setPushNotification(data.pushNotification ?? false);
+    setOverlayStyle(data.overlayStyle ?? '');
     setImageId(data.imageId ?? '');
     setImagePosition(data.imagePosition ?? DEFAULT_IMAGE_POSITION);
   };
@@ -2100,9 +2194,11 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   const effectiveDismissible = savedDismissible === 'Dismissible';
   const effectiveBannerColor = messageColor;
   const categoryTag = getCategoryTag(messageCategory, isEmergency);
-  // Kept while hidden, so switching category away and back doesn't lose the pick.
-  const showImagePicker = categoryTag !== null && displayFormat === 'Overlay';
-  const previewImageId = categoryTag !== null ? imageId : '';
+  const imageStyle = resolveOverlayStyle(overlayStyle, messageCategory, isEmergency) === 'Image';
+  // Kept while hidden, so switching style away and back doesn't lose the pick.
+  const showStylePicker = displayFormat === 'Overlay';
+  const showImagePicker = showStylePicker && imageStyle;
+  const previewImageId = imageStyle ? imageId : '';
   const canDragImage = !effectiveReadOnly && isUploadedImage(previewImageId);
   const hasPreview = effectiveFormat !== '';
 
@@ -2310,6 +2406,9 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
           <div className="bg-white rounded-[4px] border flex flex-col gap-[16px] p-[20px]" style={{ borderColor: BORDER }}>
             <p className="font-['Montserrat',sans-serif] font-semibold text-[14px] text-black">Message Details</p>
             <RadioField label="Display Format *" value={displayFormat} onChange={(v) => setDisplayFormat(v as DisplayFormat)} options={['Overlay', 'Banner']} disabled={effectiveReadOnly} />
+            {showStylePicker && (
+              <OverlayStyleCards value={imageStyle ? 'Image' : 'Text'} onChange={setOverlayStyle} disabled={effectiveReadOnly} />
+            )}
             {displayFormat === 'Banner' && (
               <ColorField
                 label="Message Color"
@@ -2460,6 +2559,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                       <ScaledMock baseWidth={MOCK_WIDTH} baseHeight={MOCK_WIDTH / 1.6}>
                         <ScreenSkeleton
                           tag={categoryTag}
+                          imageStyle={imageStyle}
                           imageId={previewImageId}
                           imagePosition={imagePosition}
                           onImagePositionChange={canDragImage ? setImagePosition : undefined}
@@ -2480,6 +2580,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                         <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
                           <ScreenSkeleton
                             tag={categoryTag}
+                            imageStyle={imageStyle}
                             imageId={previewImageId}
                             imagePosition={imagePosition}
                             onImagePositionChange={canDragImage ? setImagePosition : undefined}
@@ -2501,6 +2602,7 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
                     <ScaledMock baseWidth={PHONE_WIDTH} baseHeight={PHONE_HEIGHT}>
                       <PhoneSkeleton
                         tag={categoryTag}
+                        imageStyle={imageStyle}
                         imageId={previewImageId}
                         imagePosition={imagePosition}
                         onImagePositionChange={canDragImage ? setImagePosition : undefined}
