@@ -91,6 +91,7 @@ type MessageType = '' | 'Announcement' | 'Emergency';
 
 interface MessageFormData {
   imageId?: string;
+  imagePosition?: string;
   body?: string; reason?: string; department?: string; messageCategory?: string; customCategoryName?: string; author?: string; noEndDate?: boolean; displayFormat?: string; placement?: string; featurePath?: string;
   messageColor?: string; allowOptOut?: boolean; searchMode?: string; statesOrAgencies?: string[]; states?: string[]; featureFlags?: string[];
   packages?: string[]; roles?: string[]; dismissible?: string; hasCta?: boolean;
@@ -1043,7 +1044,9 @@ export function useSharedMessages() {
   const setMessages = useCallback((updater: BroadcastMessageRow[] | ((prev: BroadcastMessageRow[]) => BroadcastMessageRow[])) => {
     setMessagesRaw((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      // Uploaded images make rows heavy; if browser storage fills up, keep the
+      // change on screen for this tab rather than crashing the page.
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch (err) { console.warn('Could not save messages to localStorage', err); }
       return next;
     });
   }, []);
@@ -2200,18 +2203,18 @@ function MessagePreviewModal({ row, role, onClose, onDiscontinue }: {
                 // screen comes out portrait and its 320px message panel then
                 // covers the app behind it. Scale a real-size mock instead.
                 <ScaledMock baseWidth={MOCK_WIDTH} baseHeight={MOCK_WIDTH / 1.6}>
-                  <ScreenSkeleton tag={tag} imageId={imageId} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
+                  <ScreenSkeleton tag={tag} imageId={imageId} imagePosition={row.formData?.imagePosition} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
                 </ScaledMock>
               ) : (
                 <div className="w-full h-full flex justify-center">
                   <div style={{ aspectRatio: '16 / 10', height: '100%', maxWidth: '100%' }}>
-                    <ScreenSkeleton tag={tag} imageId={imageId} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
+                    <ScreenSkeleton tag={tag} imageId={imageId} imagePosition={row.formData?.imagePosition} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
                   </div>
                 </div>
               )
             ) : (
               <ScaledMock baseWidth={PHONE_WIDTH} baseHeight={PHONE_HEIGHT}>
-                <PhoneSkeleton tag={tag} imageId={imageId} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
+                <PhoneSkeleton tag={tag} imageId={imageId} imagePosition={row.formData?.imagePosition} effectiveFormat={effectiveFormat} title={row.subject} body={body} color={color} dismissible={dismissible} allowOptOut={allowOptOut} hasCta={hasCta} ctaLabel={ctaLabel} />
               </ScaledMock>
             )}
           </div>

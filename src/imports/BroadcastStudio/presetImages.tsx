@@ -72,3 +72,47 @@ export function PresetArt({ preset, iconSize = 40, showName = true, decorative =
     </div>
   );
 }
+
+/**
+ * An uploaded image is stored in the same `imageId` field as a preset id, as
+ * a JPEG data URL, so everything that passes the image along keeps working.
+ * The whole picture is kept (not cropped) so the author can reposition it
+ * later; `imagePosition` records which part shows in the 2:1 frame. The
+ * prototype has no server: messages live in localStorage (about 5 MB in
+ * total), so the picture is shrunk to just cover a 960 × 480 frame.
+ */
+export function isUploadedImage(id: string | undefined): boolean {
+  return !!id && id.startsWith('data:image/');
+}
+
+const FRAME_WIDTH = 960;
+const FRAME_HEIGHT = 480;
+const MAX_SIDE = 1600;
+export const UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
+export const UPLOAD_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+export const DEFAULT_IMAGE_POSITION = '50% 50%';
+
+/** Shrinks the file to just cover a 960 × 480 frame (longest side ≤ 1600) and returns a JPEG data URL. */
+export function prepareUploadedImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      const scale = Math.min(1, Math.max(FRAME_WIDTH / w, FRAME_HEIGHT / h), MAX_SIDE / Math.max(w, h));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { URL.revokeObjectURL(url); reject(new Error('no canvas')); return; }
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable image')); };
+    img.src = url;
+  });
+}
