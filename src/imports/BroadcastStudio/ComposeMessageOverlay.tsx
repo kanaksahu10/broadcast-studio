@@ -4,7 +4,7 @@ import { IoIosClose } from 'react-icons/io';
 import { IoMdArrowDropdown } from 'react-icons/io';
 import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
 import { BiCalendarEvent } from 'react-icons/bi';
-import { MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline, MdUndo, MdFileUpload, MdOpenWith } from 'react-icons/md';
+import { MdContentCopy, MdOutlinedFlag, MdCheck, MdClose, MdPreview, MdSend, MdDesktopWindows, MdPhoneIphone, MdBusiness, MdManageAccounts, MdApps, MdOutlineSaveAlt, MdModeEditOutline, MdPersonOutline, MdUndo, MdFileUpload, MdOpenWith } from 'react-icons/md';
 import { HiOutlineSparkles } from 'react-icons/hi';
 import { PRESET_IMAGES, PresetArt, getPresetImage, isUploadedImage, prepareUploadedImage, UPLOAD_MAX_BYTES, UPLOAD_TYPES, DEFAULT_IMAGE_POSITION } from './presetImages';
 
@@ -1729,7 +1729,15 @@ type FormData = {
   imagePosition?: string;
 };
 
-export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subject: string; onConfirm: () => void; onClose: () => void }) {
+export function PermanentDeleteOverlay({ subject, onConfirm, onClose, isDraft = false, onCopyToDraftsAndDelete }: {
+  subject: string;
+  onConfirm: () => void;
+  onClose: () => void;
+  /** A draft is deleted straight from where it lives, so the prompt is a plain "are you sure". */
+  isDraft?: boolean;
+  /** Discarded messages only: copies the message into Drafts, then deletes the original. */
+  onCopyToDraftsAndDelete?: () => void;
+}) {
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
   useEffect(() => {
@@ -1744,6 +1752,10 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
   const handleConfirm = () => {
     setClosing(true);
     setTimeout(onConfirm, 300);
+  };
+  const handleCopyAndDelete = () => {
+    setClosing(true);
+    setTimeout(() => onCopyToDraftsAndDelete?.(), 300);
   };
 
   return (
@@ -1765,8 +1777,22 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
         </div>
         <div className="flex-1 px-[16px] pt-[16px] pb-[24px]">
           <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px]" style={{ color: '#343434' }}>
-            You are about to permanently delete the <span className="font-semibold">"{subject}"</span> message. This action cannot be undone and the message will not be recoverable. You can always create a new message and send it for approval, or move this message to drafts to continue working on it.
+            {isDraft
+              ? <>Are you sure you want to delete <span className="font-semibold">"{subject}"</span>?</>
+              : <>You are about to permanently delete the <span className="font-semibold">"{subject}"</span> message. This action cannot be undone and the message will not be recoverable. You can always create a new message and send it for approval, or copy it to Drafts first to keep working on it.</>}
           </p>
+          {onCopyToDraftsAndDelete && !isDraft && (
+            <button
+              type="button"
+              onClick={handleCopyAndDelete}
+              className="group mt-[16px] flex items-center gap-[6px] cursor-pointer"
+            >
+              <MdContentCopy className="shrink-0 text-[#27486d] group-hover:text-[#2699fb] transition-colors" size={16} />
+              <span className="font-['Montserrat',sans-serif] font-medium text-[13px] uppercase text-left transition-colors text-[#27486d] group-hover:text-[#2699fb] group-hover:underline">
+                Copy to drafts and delete
+              </span>
+            </button>
+          )}
         </div>
         <div className="flex items-center justify-between px-[16px] shrink-0" style={{ borderTop: '1px solid #CFCFCF', backgroundColor: '#f8f8f8', height: '60px' }}>
           <button
@@ -1792,7 +1818,7 @@ export function PermanentDeleteOverlay({ subject, onConfirm, onClose }: { subjec
   );
 }
 
-export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, isEditingDraft, onApprove, onReject, onDeleteRow, onEditAsDraft, discardedBucketLabel, originalAuthorName, currentUserName, rejectionReason, rejected, concurrentEdit, decisionLock, silentSync }: {
+export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSaveAsDraft, initialData, submitLabel, overlayTitle, readOnly, isEditingDraft, onApprove, onReject, onDeleteRow, onCopyToDraftsAndDelete, onEditAsDraft, discardedBucketLabel, originalAuthorName, currentUserName, rejectionReason, rejected, concurrentEdit, decisionLock, silentSync }: {
   onClose: () => void;
   onMessageCreated?: (data: FormData) => void;
   onSaveAsDraft?: (data: FormData) => void;
@@ -1813,6 +1839,8 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
   onApprove?: (data: FormData) => void;
   onReject?: () => void;
   onDeleteRow?: () => void;
+  /** Discarded view only: the delete confirmation's "copy to Drafts and delete" shortcut. */
+  onCopyToDraftsAndDelete?: () => void;
   /**
    * A discarded (Rejected/Expired/Discontinued) message's "Edit as Draft"
    * action. Fires the backend move to Draft immediately on click — the
@@ -2209,6 +2237,8 @@ export default function ComposeMessageOverlay({ onClose, onMessageCreated, onSav
       {showDeleteConfirm && onDeleteRow && (
         <PermanentDeleteOverlay
           subject={title || 'Untitled'}
+          isDraft={inDraftMode}
+          onCopyToDraftsAndDelete={onCopyToDraftsAndDelete ? () => { setShowDeleteConfirm(false); onCopyToDraftsAndDelete(); } : undefined}
           onClose={() => setShowDeleteConfirm(false)}
           onConfirm={() => { setShowDeleteConfirm(false); onDeleteRow(); }}
         />
