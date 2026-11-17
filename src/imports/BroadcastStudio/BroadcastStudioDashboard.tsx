@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { BiBuildings } from 'react-icons/bi';
 import { BsPersonBadgeFill, BsSearch, BsThreeDotsVertical } from 'react-icons/bs';
 import { IoIosClose, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io';
-import { MdOutlineLocationOn, MdOutlinedFlag, MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdVisibility } from 'react-icons/md';
+import { MdOutlineLocationOn, MdOutlinedFlag, MdAdd, MdApps, MdBlock, MdBusiness, MdCheckCircleOutline, MdContentCopy, MdDateRange, MdDeleteOutline, MdDesktopWindows, MdErrorOutline, MdInfoOutline, MdMoreVert, MdOutlineGroup, MdOutlineNotificationsActive, MdPersonOutline, MdPhoneIphone, MdVisibility } from 'react-icons/md';
 import { FaRegTimesCircle } from 'react-icons/fa';
 import ComposeMessageOverlay, { getCategoryTag, resolveOverlayStyle, ScreenSkeleton, PhoneSkeleton, PermanentDeleteOverlay, getAudienceRecipientCount, TextAreaField, ScaledMock, MOCK_WIDTH, PHONE_WIDTH, PHONE_HEIGHT } from './ComposeMessageOverlay';
 import { useIsBelowDesktop, useIsPhone } from './useIsPhone';
@@ -1424,7 +1424,7 @@ function RejectConfirmOverlay({ subject, onConfirm, onClose }: { subject: string
   );
 }
 
-function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete', isLive = true }: { subject: string; onConfirm: () => void; onClose: () => void; mode?: 'delete' | 'discontinue'; isLive?: boolean }) {
+function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete', isLive = true, isDraft = false }: { subject: string; onConfirm: () => void; onClose: () => void; mode?: 'delete' | 'discontinue'; isLive?: boolean; isDraft?: boolean }) {
   const isDiscontinue = mode === 'discontinue';
   const verb = isDiscontinue ? 'discontinue' : 'delete';
   const actionLabel = isDiscontinue ? 'DISCONTINUE' : 'DELETE';
@@ -1463,7 +1463,9 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete', is
         </div>
         <div className="flex-1 px-[16px] pt-[16px] pb-[24px]">
           <p className="font-['Montserrat',sans-serif] font-medium text-[14px] leading-[20px]" style={{ color: '#343434' }}>
-            {isLive
+            {isDraft
+              ? <>Are you sure you want to delete <span className="font-semibold">"{subject}"</span>?</>
+              : isLive
               ? <>You are about to {verb} the <span className="font-semibold">"{subject}"</span> message which is live right now. This will remove the announcement from all the recipients immediately.</>
               : <>You are about to {verb} the <span className="font-semibold">"{subject}"</span> message before it goes live. This will cancel it so it's never shown to any recipients.</>}
           </p>
@@ -1492,11 +1494,12 @@ function DeleteConfirmOverlay({ subject, onConfirm, onClose, mode = 'delete', is
   );
 }
 
-function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForApproval, onApprove, onReject, highlight }: {
+function KanbanCard({ row, role, onEdit, onDelete, onCopyToDrafts, onDiscontinue, onSendForApproval, onApprove, onReject, highlight }: {
   row: BroadcastMessageRow;
   role: UserRole;
   onEdit?: () => void;
   onDelete?: () => void;
+  onCopyToDrafts?: () => void;
   onDiscontinue?: () => void;
   onSendForApproval?: () => void;
   onApprove?: () => void;
@@ -1551,6 +1554,7 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
         subject={row.subject}
         mode={row.status === 'Live' ? 'discontinue' : 'delete'}
         isLive={isMessageCurrentlyLive(row)}
+        isDraft={isDraft}
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={() => { setShowDeleteConfirm(false); row.status === 'Live' ? onDiscontinue?.() : onDelete?.(); }}
       />
@@ -1595,7 +1599,7 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
               </p>
             )}
           </div>
-          {(isDraft || (row.status === 'Live' && !isSuperAdmin)) && (
+          {(
             <div className="relative shrink-0" ref={kebabRef} onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
@@ -1607,29 +1611,40 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
               {showKebab && (
                 <div
                   className="absolute top-full right-0 mt-[2px] bg-white rounded-[6px] border z-20 overflow-hidden"
-                  style={{ borderColor: '#E5E5E5', boxShadow: '0 4px 12px rgba(0,0,0,0.10)', minWidth: '120px' }}
+                  style={{ borderColor: '#E5E5E5', boxShadow: '0 4px 12px rgba(0,0,0,0.10)', minWidth: '150px' }}
                 >
-                  <button
-                    type="button"
-                    className="flex items-center gap-[8px] w-full px-[12px] h-[36px] cursor-pointer hover:bg-[#EFEFEF]"
-                    onClick={() => {
-                      setShowKebab(false);
-                      if (row.status === 'Live') { setShowDeleteConfirm(true); return; }
-                      onDelete?.();
-                    }}
-                  >
-                    {row.status === 'Live' ? (
-                      <>
-                        <MdBlock size={15} color="#DA4040" />
-                        <span className="font-['Montserrat',sans-serif] font-medium text-[13px]" style={{ color: '#DA4040' }}>Discontinue</span>
-                      </>
-                    ) : (
-                      <>
-                        <MdDeleteOutline size={15} color="#DA4040" />
-                        <span className="font-['Montserrat',sans-serif] font-medium text-[13px]" style={{ color: '#DA4040' }}>Delete</span>
-                      </>
-                    )}
-                  </button>
+                  {/* A draft is already in Drafts, so there's nothing to copy it to. */}
+                  {!isDraft && (
+                    <button
+                      type="button"
+                      className="flex items-center gap-[8px] w-full px-[12px] h-[36px] cursor-pointer hover:bg-[#EFEFEF]"
+                      onClick={() => { setShowKebab(false); onCopyToDrafts?.(); }}
+                    >
+                      <MdContentCopy size={15} color="#27496D" />
+                      <span className="font-['Montserrat',sans-serif] font-medium text-[13px] whitespace-nowrap" style={{ color: '#27496D' }}>Copy to Drafts</span>
+                    </button>
+                  )}
+                  {/* Drafts can be deleted by their author; only an approver can
+                      discontinue a live message; a pending one is neither. */}
+                  {(isDraft || (row.status === 'Live' && !isSuperAdmin)) && (
+                    <button
+                      type="button"
+                      className="flex items-center gap-[8px] w-full px-[12px] h-[36px] cursor-pointer hover:bg-[#EFEFEF]"
+                      onClick={() => { setShowKebab(false); setShowDeleteConfirm(true); }}
+                    >
+                      {row.status === 'Live' ? (
+                        <>
+                          <MdBlock size={15} color="#DA4040" />
+                          <span className="font-['Montserrat',sans-serif] font-medium text-[13px]" style={{ color: '#DA4040' }}>Discontinue</span>
+                        </>
+                      ) : (
+                        <>
+                          <MdDeleteOutline size={15} color="#DA4040" />
+                          <span className="font-['Montserrat',sans-serif] font-medium text-[13px]" style={{ color: '#DA4040' }}>Delete</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1708,11 +1723,13 @@ function KanbanCard({ row, role, onEdit, onDelete, onDiscontinue, onSendForAppro
   );
 }
 
-function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
+function DiscardedCard({ row, bucket, onView, onDelete, onCopyToDrafts, onCopyToDraftsAndDelete, highlight }: {
   row: BroadcastMessageRow;
   bucket: DiscardedBucket;
   onView: () => void;
   onDelete: () => void;
+  onCopyToDrafts: () => void;
+  onCopyToDraftsAndDelete: () => void;
   highlight?: boolean;
 }) {
   const dateRange = row.startDate === '—' ? '—' : row.endDate === '—' ? `${row.startDate} – Until stopped` : `${row.startDate} – ${row.endDate}`;
@@ -1754,6 +1771,7 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
     {showDeleteConfirm && (
       <PermanentDeleteOverlay
         subject={row.subject}
+        onCopyToDraftsAndDelete={() => { setShowDeleteConfirm(false); onCopyToDraftsAndDelete(); }}
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={() => { setShowDeleteConfirm(false); onDelete(); }}
       />
@@ -1799,8 +1817,16 @@ function DiscardedCard({ row, bucket, onView, onDelete, highlight }: {
             {showKebab && (
               <div
                 className="absolute top-full right-0 mt-[2px] bg-white rounded-[6px] border z-20 overflow-hidden"
-                style={{ borderColor: '#E5E5E5', boxShadow: '0 4px 12px rgba(0,0,0,0.10)', minWidth: '120px' }}
+                style={{ borderColor: '#E5E5E5', boxShadow: '0 4px 12px rgba(0,0,0,0.10)', minWidth: '150px' }}
               >
+                <button
+                  type="button"
+                  className="flex items-center gap-[8px] w-full px-[12px] h-[36px] cursor-pointer hover:bg-[#EFEFEF]"
+                  onClick={() => { setShowKebab(false); onCopyToDrafts(); }}
+                >
+                  <MdContentCopy size={15} color="#27496D" />
+                  <span className="font-['Montserrat',sans-serif] font-medium text-[13px] whitespace-nowrap" style={{ color: '#27496D' }}>Copy to Drafts</span>
+                </button>
                 <button
                   type="button"
                   className="flex items-center gap-[8px] w-full px-[12px] h-[36px] cursor-pointer hover:bg-[#EFEFEF]"
@@ -1950,10 +1976,11 @@ function MobileBoardColumns({ columns }: { columns: BoardColumn[] }) {
 
 const DISCARDED_COLUMNS: DiscardedBucket[] = ['Rejected', 'Expired', 'Discontinued'];
 
-function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
+function DiscardedBoard({ rows, onView, onDelete, onCopyToDrafts, highlightIds }: {
   rows: BroadcastMessageRow[];
   onView: (row: BroadcastMessageRow, bucket: DiscardedBucket) => void;
   onDelete: (id: string) => void;
+  onCopyToDrafts: (id: string, removeOriginal?: boolean) => void;
   highlightIds: Set<string>;
 }) {
   const bucketed = rows
@@ -1993,6 +2020,8 @@ function DiscardedBoard({ rows, onView, onDelete, highlightIds }: {
                   bucket={bucket}
                   onView={() => onView(row, bucket)}
                   onDelete={() => onDelete(row.id)}
+                  onCopyToDrafts={() => onCopyToDrafts(row.id)}
+                  onCopyToDraftsAndDelete={() => onCopyToDrafts(row.id, true)}
                   highlight={highlightIds.has(row.id)}
                 />
               ))
@@ -2013,11 +2042,12 @@ const KANBAN_COLUMNS: Array<{ status: MessageStatus; label: string }> = [
   { status: 'Live', label: 'Approved' },
 ];
 
-function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApproval, onApprove, onReject, highlightIds }: {
+function KanbanBoard({ rows, role, onEdit, onDelete, onCopyToDrafts, onDiscontinue, onSendForApproval, onApprove, onReject, highlightIds }: {
   rows: BroadcastMessageRow[];
   role: UserRole;
   onEdit: (row: BroadcastMessageRow) => void;
   onDelete: (id: string) => void;
+  onCopyToDrafts: (id: string) => void;
   onDiscontinue: (id: string) => void;
   onSendForApproval: (id: string) => void;
   onApprove: (id: string) => void;
@@ -2071,6 +2101,7 @@ function KanbanBoard({ rows, role, onEdit, onDelete, onDiscontinue, onSendForApp
                   role={role}
                   onEdit={() => onEdit(row)}
                   onDelete={() => onDelete(row.id)}
+                  onCopyToDrafts={() => onCopyToDrafts(row.id)}
                   onDiscontinue={() => onDiscontinue(row.id)}
                   onSendForApproval={() => onSendForApproval(row.id)}
                   onApprove={() => onApprove(row.id)}
@@ -2406,6 +2437,36 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
     setMessages((prev) => prev.filter((m) => m.id !== id));
   };
 
+  // Puts a copy of any message into the current user's Drafts, leaving the
+  // original where it is, or, with removeOriginal, deleting it from there as
+  // well (the delete confirmation's "copy to Drafts and delete"). A copy that
+  // keeps the original around is titled "Copy of …" so the two aren't
+  // confused; a move keeps the title. Copies from the discarded buckets match
+  // what "Edit as Draft" does: dates cleared (they've lapsed) and the rejection
+  // note and original author kept for the banner.
+  const handleCopyToDrafts = (id: string, removeOriginal = false) => {
+    const source = messages.find((m) => m.id === id);
+    if (!source) return;
+    const bucket = getDiscardedBucket(source);
+    const title = removeOriginal ? source.subject : `Copy of ${source.subject}`;
+    const copy: BroadcastMessageRow = {
+      ...source,
+      id: Date.now().toString(),
+      subject: title,
+      status: 'Draft',
+      authorRole: role,
+      statusChangedAt: undefined,
+      lastReviewActionSessionId: undefined,
+      rejectionReason: bucket ? source.rejectionReason : undefined,
+      originBucket: bucket ?? undefined,
+      originalAuthor: bucket ? source.formData?.author : undefined,
+      ...(bucket ? { startDate: '—', endDate: '—', recipients: null } : {}),
+      formData: source.formData ? { ...source.formData, author: getUserIdentity(role).name } : source.formData,
+    };
+    setMessages((prev) => [copy, ...(removeOriginal ? prev.filter((m) => m.id !== id) : prev)]);
+    showToast(removeOriginal ? 'Copied to Drafts and deleted' : 'Copied to Drafts');
+  };
+
   const handleSendForApproval = (id: string) => {
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, status: 'Pending' } : m));
     showToast('Message sent for approval');
@@ -2573,6 +2634,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           rows={searchFiltered}
           onView={(row, bucket) => setViewingDiscardedRow({ row, bucket })}
           onDelete={handleDelete}
+          onCopyToDrafts={handleCopyToDrafts}
           highlightIds={highlightIds}
         />
       ) : (
@@ -2580,6 +2642,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
           rows={searchFiltered}
           role={role}
           onDelete={handleDelete}
+          onCopyToDrafts={handleCopyToDrafts}
           onDiscontinue={handleDiscontinue}
           onEdit={(row) => {
             if (row.status === 'Live') {
@@ -2782,6 +2845,7 @@ export default function BroadcastStudioDashboard({ role, onRoleChange }: { role:
             ...viewingDiscardedRow.row.formData,
           }}
           onDeleteRow={() => { handleDelete(viewingDiscardedRow.row.id); setViewingDiscardedRow(null); }}
+          onCopyToDraftsAndDelete={() => { handleCopyToDrafts(viewingDiscardedRow.row.id, true); setViewingDiscardedRow(null); }}
           // Moves the row to Draft immediately — the overlay itself then
           // flips into an editor for this same row, in place. Nothing
           // closes here; onSaveAsDraft/onMessageCreated below (reachable
